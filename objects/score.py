@@ -86,8 +86,11 @@ class Score:
         return False
 
     @classmethod
-    def from_dict(cls, d: dict) -> 'Score':
-        return Score(**d)
+    def from_dict(cls, dictionary: dict) -> 'Score':
+        if 'time' not in dictionary:
+            dictionary['time'] = time.time()
+        
+        return Score(**dictionary)
 
     @classmethod
     def from_score_sub(cls) -> Optional['Score']:
