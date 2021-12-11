@@ -1,4 +1,5 @@
 import time
+import utils
 import config
 import orjson
 import packets
@@ -9,17 +10,6 @@ from typing import Optional
 SCORES = list[dict]
 RANKED_PLAYS = dict[str, list[dict]]
 OSU_DAILY_API = 'https://osudaily.net/api'
-
-def filter_top_scores(_scores: list[dict]) -> list[dict]:
-    """Removes duplicated scores"""
-    md5s = []
-    scores = []
-    for s in _scores:
-        if s['md5'] not in md5s:
-            md5s.append(s['md5'])
-            scores.append(s)
-
-    return scores
 
 class Player:
     def __init__(self) -> None:
@@ -86,7 +76,7 @@ class Player:
                 scores.extend(v)
         
             scores.sort(key = lambda s: s['pp'], reverse = True)
-            top_scores = filter_top_scores(scores[:100])
+            top_scores = utils.filter_top_scores(scores[:100])
             top_scores.sort(key = lambda s: s['pp'], reverse = True)
 
             pp = sum([s['pp'] * 0.95 ** i for i, s in enumerate(top_scores)])

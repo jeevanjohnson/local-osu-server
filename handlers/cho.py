@@ -4,6 +4,13 @@ from ext import glob
 from utils import handler
 from objects import Player
 
+CHANNELS: list[tuple[str, str]] = [
+    # name, desc
+    ('#osu', 'x'),
+    ('#recent', 'shows recently submitted scores!'),
+    ('#tops', 'shows top plays, as well as updates them!')
+]
+
 @handler('login')
 async def login() -> tuple[bytes, str]:
     body = bytearray()
@@ -18,9 +25,14 @@ async def login() -> tuple[bytes, str]:
     if config.menu_icon is not None:
         body += packets.menuIcon(config.menu_icon)
 
-    body += packets.channelInfo('#osu', 'zzz', 1)
+    for channel in CHANNELS:
+        cname, cdesc = channel
+        body += packets.channelInfo(cname, cdesc, 1)
+    
     body += packets.channelInfoEnd()
-    body += packets.channelJoin('#osu')
+    
+    for channel in CHANNELS:
+        body += packets.channelJoin(channel[0])
 
     await glob.player.update()
     body += packets.userPresence(p)

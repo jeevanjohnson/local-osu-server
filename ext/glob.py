@@ -21,7 +21,7 @@ profiles: 'JsonFile'
 replay_folder: 'File'
 default_avatar: bytes
 lock = asyncio.Lock()
-imgur: Optional['Imgur']
+imgur: Optional[Imgur]
 songs_folder: Optional[Path]
 current_profile: dict[str, Any]
 screenshot_folder: Optional[Path]

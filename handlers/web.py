@@ -18,12 +18,6 @@ DEFAULT_RESPONSE = Response(200, b'')
 
 OSU_API_BASE = 'https://osu.ppy.sh/api'
 
-@handler('/img_err')
-async def img_err(request: Request) -> Response:
-    return Response(
-        200, b"Can't upload to imgur!"
-    )
-
 @handler('/web/osu-getfriends.php')
 async def friends(request: Request) -> Response:
     return DEFAULT_RESPONSE

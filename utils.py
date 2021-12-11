@@ -34,3 +34,14 @@ async def _add_to_player_queue(packets: bytes) -> None:
 def add_to_player_queue(packets: bytes) -> None:
     """Safe way to add to a player's queue"""
     asyncio.create_task(_add_to_player_queue(packets))
+
+def filter_top_scores(_scores: list[dict]) -> list[dict]:
+    """Removes duplicated scores"""
+    md5s = []
+    scores = []
+    for s in _scores:
+        if s['md5'] not in md5s:
+            md5s.append(s['md5'])
+            scores.append(s)
+
+    return scores

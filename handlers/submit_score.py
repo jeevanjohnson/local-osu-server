@@ -7,6 +7,8 @@ from objects import Score
 from objects import Beatmap
 from typing import Optional
 
+RANKED_PLAYS = dict[str, list[dict]]
+
 def get_grade(score: Score) -> str:
     total = score.n300 + score.n100 + score.n50 + score.nmiss
     n300_percent = score.n300 / total
@@ -41,10 +43,11 @@ status_to_db = {
 }
 @handler('score_sub')
 async def submit_score() -> None:
-    if (
-        not glob.player or
-        not (score := Score.from_score_sub())
-    ):
+    if not glob.player:
+        return
+    
+    score = Score.from_score_sub()
+    if not score:
         return
     
     if score.name != glob.player.name:
@@ -145,6 +148,7 @@ async def submit_score() -> None:
     utils.update_files()
     await glob.player.update()
 
+    """Sends notification to the user"""
     mods_str = oppai.mods_str(score.mods).upper()
     mods_str = 'NM' if mods_str == 'NOMOD' else mods_str
 
@@ -156,3 +160,18 @@ async def submit_score() -> None:
     )
 
     glob.player.queue += packets.notification(score_str)
+
+    """Sends score to recent channel"""
+    msg = (
+        f'{bmap.artist} - {bmap.title} [{bmap.version}]\n'
+        f'+{mods_str} {score.acc:.2f}% {get_grade(score)} {score.pp:.0f}PP '
+        f'{score.max_combo}x/{bmap.max_combo}x {score.nmiss}X\n'
+        f'achieved by {glob.player.name}'
+    )
+    glob.player.queue += packets.sendMsg(
+        client = 'local',
+        msg = msg,
+        target = '#recent',
+        userid = -1,
+    )
+        

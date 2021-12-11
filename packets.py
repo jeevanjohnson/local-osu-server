@@ -297,3 +297,10 @@ def sendMsg(client: str, msg: str, target: str, userid: int):
         (client, 'str'), (msg, 'str'),
         (target, 'str'), (userid, 'int') 
     )
+
+@functools.cache
+def userSilenced(userid: int) -> bytes:
+    return write(
+        PacketIDS.CHO_USER_SILENCED, 
+        (userid, 'int')
+    )
