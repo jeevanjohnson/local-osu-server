@@ -6,3 +6,5 @@ aiohttp
 borgor
 orjson
 pydantic
+colorama
+pyperclip
