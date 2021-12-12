@@ -1,3 +1,9 @@
+"""
+Just a note, you will have to rename this file to
+config.py in order for it to work!
+"""
+
+from typing import Union
 from typing import Optional
 
 # Just a note
@@ -12,8 +18,8 @@ from typing import Optional
 
 paths: dict[str, Optional[str]] = {
     'osu! path': r'', # if provided no need to fill in below
-                     # unless songs, replay, and ss folder are somewhere else 
-    
+                      # unless songs, replay, and ss folder are somewhere else 
+ 
     'songs': None, # osu! songs folder
     'replay': None, # osu! replay folder
     'screenshots': None # osu! screenshot folder
@@ -21,9 +27,10 @@ paths: dict[str, Optional[str]] = {
 
 """Ingame Config"""
 player_name: str = 'Guest' # ingame name
-
-# example: ('link to image', 'click link')
-menu_icon: Optional[tuple[str, str]] = None
+menu_icon: dict[str, Optional[str]] = {
+    'image_link': '',
+    'click_link': '',
+}
 
 """Server Config"""
 # needed for loading leaderboards
@@ -50,4 +57,4 @@ beatconnect_api_key: Optional[str] = ''
 # list of urls, example: ('https://dsada.png', https://dsad11a.png)
 # if `None` then it will just show no background
 # unless you have the skin background inabled
-seasonal_bgs: Optional[tuple[str]] = ('',) 
+seasonal_bgs: Optional[Union[tuple[str], list[str]]] = []

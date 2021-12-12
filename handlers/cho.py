@@ -23,7 +23,9 @@ async def login() -> tuple[bytes, str]:
     body += packets.friendsList(0)
 
     if config.menu_icon is not None:
-        body += packets.menuIcon(config.menu_icon)
+        body += packets.menuIcon(
+            tuple(config.menu_icon.values())
+        )
 
     for channel in CHANNELS:
         cname, cdesc = channel
