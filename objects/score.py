@@ -3,10 +3,10 @@ import time
 import calendar
 from ext import glob
 from typing import Any
-from borgor import Replay
 import glob as builtin_glob
 from typing import Optional
 from datetime import datetime
+from objects.replay import Replay
 from objects.beatmap import Beatmap
 
 class BanchoScore:
