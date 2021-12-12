@@ -1,7 +1,6 @@
 from typing import Union
 
-# TODO: proper typing?
-def init_profile(name: str) -> dict[str, Union[int, list, dict]]:
+def init_profile(name: str) -> dict[str, Union[int, list[str], dict]]:
     return {
         name: {
             'pp': 0,
