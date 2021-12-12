@@ -11,7 +11,7 @@ from typing import Optional
 # domain: str = 'coverbancho.tk'
 
 paths: dict[str, Optional[str]] = {
-    'osu! path': '', # if provided no need to fill in below
+    'osu! path': r'', # if provided no need to fill in below
                      # unless songs, replay, and ss folder are somewhere else 
     
     'songs': None, # osu! songs folder
@@ -27,6 +27,7 @@ menu_icon: Optional[tuple[str, str]] = None
 
 """Server Config"""
 # needed for loading leaderboards
+# you can find your's here https://old.ppy.sh/p/api
 # if `None` then leaderboards won't load nor score submission
 osu_api_key: Optional[str] = '' 
 
@@ -38,6 +39,7 @@ osu_api_key: Optional[str] = ''
 imgur_client_id: Optional[str] = ''
 
 # that is if you want ur bancho rank to show up
+# you can find your's here https://github.com/Adrriii/osudaily-api/wiki
 # if `None` it will show you as rank 1
 osu_daily_api_key: Optional[str] = ''
 
