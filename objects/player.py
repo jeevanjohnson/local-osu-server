@@ -10,6 +10,7 @@ from typing import Optional
 
 SCORES = list[dict]
 RANKED_PLAYS = dict[str, list[dict]]
+APPROVED_PLAYS = RANKED_PLAYS
 OSU_DAILY_API = 'https://osudaily.net/api'
 
 class Player:
@@ -106,23 +107,27 @@ class Player:
 
         ranked_plays: Optional[RANKED_PLAYS] = \
         glob.current_profile['plays']['ranked_plays']
-        
-        if ranked_plays:
-            for v in ranked_plays.values():
-                scores.extend(v)
-        
-            scores.sort(key = lambda s: s['pp'], reverse = True)
-            top_scores = utils.filter_top_scores(scores[:100])
-            top_scores.sort(key = lambda s: s['pp'], reverse = True)
 
-            pp = sum([s['pp'] * 0.95 ** i for i, s in enumerate(top_scores)])
-            pp += 416.6667 * (1 - (0.9994 ** len(scores)))
-            self.pp = round(pp)
+        approved_plays: Optional[APPROVED_PLAYS] = \
+        glob.current_profile['plays']['ranked_plays']
+        
+        for plays in (ranked_plays, approved_plays):
+            if plays:
+                for v in plays.values():
+                    scores.extend(v)
+        
+        scores.sort(key = lambda s: s['pp'], reverse = True)
+        top_scores = utils.filter_top_scores(scores[:100])
+        top_scores.sort(key = lambda s: s['pp'], reverse = True)
 
-            # TODO: figure out how bancho does it
-            # for now just get the average acc for all top plays
-            # combined
-            self.acc = sum([s['acc'] for s in top_scores]) / len(top_scores)
+        pp = sum([s['pp'] * 0.95 ** i for i, s in enumerate(top_scores)])
+        pp += 416.6667 * (1 - (0.9994 ** len(scores)))
+        self.pp = round(pp)
+
+        # TODO: figure out how bancho does it
+        # for now just get the average acc for all top plays
+        # combined
+        self.acc = sum([s['acc'] for s in top_scores]) / len(top_scores)
 
         all_plays: Optional[SCORES] = \
         glob.current_profile['plays']['all_plays']
