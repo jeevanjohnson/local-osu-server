@@ -24,6 +24,8 @@ coming soon
 
 ---
 # Reminders
+Any unknown errors you see when setting up or just playing, please report them to me on discord `cover#0675` :)
+
 When changing your player_name in the config, it'll make a new profile in the json folder
 
 When changing pfps through the `.data/pfp.json` you'll need to restart the server in order to see updates (will make it auto update soon)
