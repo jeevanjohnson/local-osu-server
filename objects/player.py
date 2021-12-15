@@ -109,7 +109,7 @@ class Player:
         glob.current_profile['plays']['ranked_plays']
 
         approved_plays: Optional[APPROVED_PLAYS] = \
-        glob.current_profile['plays']['ranked_plays']
+        glob.current_profile['plays']['approved_plays']
         
         for plays in (ranked_plays, approved_plays):
             if plays:
