@@ -2,6 +2,7 @@ import time
 import utils
 import config
 import orjson
+import queries
 import packets
 from ext import glob
 from typing import Union
@@ -12,8 +13,11 @@ RANKED_PLAYS = dict[str, list[dict]]
 OSU_DAILY_API = 'https://osudaily.net/api'
 
 class Player:
-    def __init__(self) -> None:
-        self.name = config.player_name
+    def __init__(self, name: str) -> None:
+        self.name = name
+        if name not in glob.profiles:
+            self.init_db()
+        
         self.queue = bytearray()
         self.login_time = time.time()
 
@@ -42,6 +46,25 @@ class Player:
         _queue = self.queue.copy()
         self.queue.clear()
         return _queue 
+    
+    def init_db(self) -> None:
+        if (
+            not glob.pfps or
+            self.name not in glob.pfps or
+            glob.pfps[self.name] is None
+        ):
+            glob.pfps.update({self.name: None})
+
+        if (
+            not glob.profiles or 
+            self.name not in glob.profiles
+        ):
+            glob.profiles.update(
+                queries.init_profile(self.name)
+            )
+        
+        utils.update_files()
+        glob.current_profile = glob.profiles[self.name]
 
     async def get_rank(self) -> int:
         if config.osu_daily_api_key is None:
@@ -62,11 +85,24 @@ class Player:
             json = orjson.loads(await resp.content.read())
             if not json:
                 return 1
+        
+        if 'rank' not in json:
+            input((
+                'Hey!\n'
+                'If you have a valid osu!daily api key and end up\n' 
+                'Seeing this error please send this to cover on discord!\n'
+                f'With the following info: {json}\n'
+                '(At this point, set `config.osu_daily_api_key` to `None`)'
+            ))
+            return 1
             
         return json['rank']
     
     async def update(self) -> None:
         scores: SCORES = []
+
+        if not glob.current_profile:
+            glob.current_profile = glob.profiles[self.name]
 
         ranked_plays: Optional[RANKED_PLAYS] = \
         glob.current_profile['plays']['ranked_plays']

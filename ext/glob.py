@@ -23,7 +23,7 @@ default_avatar: bytes
 lock = asyncio.Lock()
 imgur: Optional[Imgur]
 songs_folder: Optional[Path]
-current_profile: dict[str, Any]
 screenshot_folder: Optional[Path]
 player: Optional['Player'] = None
+current_profile: Optional[dict[str, Any]] = None
 handlers: dict[Union[str, re.Pattern], Callable] = {}

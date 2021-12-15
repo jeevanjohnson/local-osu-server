@@ -61,24 +61,6 @@ async def on_start_up() -> None:
     glob.beatmaps = JsonFile(data_folder / 'beatmaps.json')
     glob.profiles = JsonFile(data_folder / 'profiles.json')
 
-    if (
-        not glob.pfps or
-        config.player_name not in glob.pfps or
-        glob.pfps[config.player_name] is None
-    ):
-        glob.pfps.update({config.player_name: None})
-
-    if (
-        not glob.profiles or 
-        config.player_name not in glob.profiles
-    ):
-        glob.profiles.update(
-            queries.init_profile(config.player_name)
-        )
-    
-    utils.update_files()
-    glob.current_profile = glob.profiles[config.player_name]
-    
     async with glob.http.get('https://a.ppy.sh/') as resp:
         if not resp or resp.status != 200:
             glob.default_avatar = b''
@@ -157,8 +139,9 @@ async def bancho(request: Request) -> Response:
     path = re.compile(r'\/a\/(?P<userid>[0-9]*)')
 )
 async def avatar(request: Request) -> Response:
-    image_bytes = await glob.handlers['avatar'](int(request.args['userid']))
-    return Response(200, image_bytes)
+    return await glob.handlers['avatar'](
+        int(request.args['userid'])
+    )
 
 from handlers import cho
 from handlers import web

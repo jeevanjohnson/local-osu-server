@@ -13,6 +13,10 @@ from typing import Optional
 # good. Only change if testing and I probably won't provide
 # little support on setting that up
 
+# 12/14/2021
+# removed player_name, 
+# use the ingame username login to login and create profiles
+
 # domain for the server isn't a necessary thing,
 # domain: str = 'coverbancho.tk'
 
@@ -26,7 +30,6 @@ paths: dict[str, Optional[str]] = {
 }
 
 """Ingame Config"""
-player_name: str = 'Guest' # ingame name
 menu_icon: dict[str, Optional[str]] = {
     'image_link': '',
     'click_link': '',
