@@ -1,4 +1,5 @@
 import utils
+import config
 import packets
 from ext import glob
 import pyttanko as oppai
@@ -44,6 +45,9 @@ status_to_db = {
 @handler('score_sub')
 async def submit_score() -> None:
     if not glob.player:
+        return
+    
+    if not glob.current_profile:
         return
     
     score = Score.from_score_sub()
@@ -165,9 +169,11 @@ async def submit_score() -> None:
     msg = (
         f'{bmap.artist} - {bmap.title} [{bmap.version}]\n'
         f'+{mods_str} {score.acc:.2f}% {get_grade(score)} {score.pp:.0f}PP '
-        f'{score.max_combo}x/{bmap.max_combo}x {score.nmiss}X\n'
-        f'achieved by {glob.player.name}'
+        f'{score.max_combo}x/{bmap.max_combo}x {score.nmiss}X'
     )
+    if config.ping_user_when_recent_score:
+        msg += f'\nachieved by {glob.player.name}'
+    
     glob.player.queue += packets.sendMsg(
         client = 'local',
         msg = msg,

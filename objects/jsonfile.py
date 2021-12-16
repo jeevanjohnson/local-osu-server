@@ -1,5 +1,4 @@
-import json
-import time
+import orjson
 from typing import Any
 from pathlib import Path
 from typing import Union
@@ -16,11 +15,11 @@ class JsonFile(UserDict):
             self.path.write_bytes(b"{}")
             super().__new__(UserDict)
         else:
-            data = json.loads(self.path.read_bytes() or b"{}")
+            data = orjson.loads(self.path.read_bytes() or b"{}")
             super().__init__(**data)
 
     def __getitem__(self, key: Any) -> Any:        
         return self.data[key]
 
     def update_file(self) -> None:
-        self.path.write_text(json.dumps(dict(self), indent=len(self)))
+        self.path.write_bytes(orjson.dumps(dict(self)))

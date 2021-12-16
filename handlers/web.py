@@ -94,6 +94,7 @@ async def score_sub(request: Request) -> Response:
         REMINDER = 0
     
     REMINDER += 1
+    glob.player.queue += packets.userStats(glob.player)
     return Response(200, DEFAULT_CHARTS)
 
 @handler('/web/osu-getseasonal.php')

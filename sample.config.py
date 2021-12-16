@@ -30,6 +30,8 @@ paths: dict[str, Optional[str]] = {
 }
 
 """Ingame Config"""
+# change to `False` if you don't want to be highlighted
+ping_user_when_recent_score: bool = True
 menu_icon: dict[str, Optional[str]] = {
     'image_link': '',
     'click_link': '',
