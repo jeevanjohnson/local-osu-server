@@ -5,6 +5,7 @@ from ext import glob
 from utils import handler
 from objects import Player
 from typing import Optional
+import urllib.parse as urlparse
 from server.server import Request
 from server.server import Response
 
@@ -23,7 +24,7 @@ profile_name: Optional[str] = None
 @handler('/web/bancho_connect.php')
 async def bancho_connect(request: Request) -> Response:
     global profile_name
-    profile_name = request.params['u']
+    profile_name = urlparse.unquote(request.params['u'])
     return Response(200, b'')
 
 CHO_TOKEN = str

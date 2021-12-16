@@ -127,7 +127,8 @@ class Player:
         # TODO: figure out how bancho does it
         # for now just get the average acc for all top plays
         # combined
-        self.acc = sum([s['acc'] for s in top_scores]) / len(top_scores)
+        if top_scores:
+            self.acc = sum([s['acc'] for s in top_scores]) / len(top_scores)
 
         all_plays: Optional[SCORES] = \
         glob.current_profile['plays']['all_plays']
