@@ -5,3 +5,4 @@ from .score import Score
 from .replay import Replay
 from .jsonfile import JsonFile
 from .leaderboard import Leaderboard
+from .modifiedleaberboard import ModifiedLeaderboard

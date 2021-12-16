@@ -26,8 +26,10 @@ async def bancho_connect(request: Request) -> Response:
     profile_name = request.params['u']
     return Response(200, b'')
 
+CHO_TOKEN = str
+BODY = bytearray
 @handler('login')
-async def login() -> tuple[bytearray, str]:
+async def login() -> tuple[BODY, CHO_TOKEN]:
     global profile_name
     body = bytearray()
 
@@ -42,9 +44,7 @@ async def login() -> tuple[bytearray, str]:
     if not profile_name:
         body += packets.userID(-5)
         body += packets.notification((
-            'Seems either you are trying to login\n'
-            'to a new profile or an existing one with a little conflict\n'
-            'Please restart your game!'
+            'Please restart your game and try logining in again!'
         ))
         return body, 'fail'
 
@@ -76,7 +76,6 @@ async def login() -> tuple[bytearray, str]:
 
     await glob.player.update()
     body += packets.userPresence(p)
-    body += packets.userStats(p)
-
     profile_name = None
+
     return body, 'success'

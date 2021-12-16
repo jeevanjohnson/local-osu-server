@@ -20,17 +20,18 @@ OSU_API_BASE = 'https://osu.ppy.sh/api'
 
 @handler('/web/osu-getfriends.php')
 async def friends(request: Request) -> Response:
+    # TODO: maybe allow bancho friends for bancho friend ranking
+    #       leaderboards? Would need to find a resonable cap tho
     return DEFAULT_RESPONSE
 
 @handler(re.compile(r'\/ss\/(?P<link>.*)'))
 async def web_screenshot(request: Request) -> Response:
     if request.args['link'] == 'img_err':
-        return Response(
-            200, b"Can't upload to imgur!"
-        )
+        return Response(200, b"Can't upload to imgur!")
     else:
         return Response(
-            301, b'',
+            code = 301, 
+            body = b'',
             headers = {'Location': request.args['link']}
         )
 
@@ -59,7 +60,8 @@ async def osu_screenshots(request: Request) -> Response:
 @handler(re.compile(r'\/(beatmaps|beatmapsets)\/(?P<path>.*)'))
 async def bmap_web(request: Request) -> Response:
     return Response(
-        301, b'',
+        code = 301, 
+        body = b'',
         headers = {'Location': f'https://osu.ppy.sh/{request.path[5:]}'}
     )
 
@@ -92,8 +94,6 @@ async def score_sub(request: Request) -> Response:
         REMINDER = 0
     
     REMINDER += 1
-
-    glob.player.queue += packets.userStats(glob.player)
     return Response(200, DEFAULT_CHARTS)
 
 @handler('/web/osu-getseasonal.php')
@@ -124,48 +124,6 @@ async def get_replay(request: Request) -> Response:
     replay_frames = base64.b64decode(json["content"])
     return Response(200, replay_frames)
 
-# TODO: support normal edits like ar od hp etc
-MODIFIED = re.compile(r"(?P<rate>[0-9]{1,2}\.[0-9]{1,2}x) \((?P<bpm>[0-9]*bpm)\)")
-
-"""Map ranking types"""
-NOTSUBMITTED = -1
-PENDING = 0
-UPDATEAVALIABLE = 1
-RANKED = 2
-APPROVED = 3
-QUALIFIED = 4
-LOVED = 5
-
-"""Leaderboard types"""
-LOCAL   = 0
-TOP     = 1
-MODS    = 2
-FRIENDS = 3
-COUNTRY = 4
-
-FROM_API_TO_SERVER_STATUS = {
-    4: LOVED,
-    3: QUALIFIED,
-    2: APPROVED,
-    1: RANKED,
-    0: PENDING,
-    -1: PENDING, # wip
-    -2: PENDING  # graveyard
-}
-
-STARTING_LB_FORMAT = (
-    "{rankedstatus}|false|{mapid}|{setid}|{num_of_scores}\n0\n"
-    "[bold:0,size:20]{artist_unicode}|{title_unicode}\n10.0\n"
-)
-SCORE_FORMAT = (
-    "{score_id}|{username}|{score}|"
-    "{maxcombo}|{count50}|{count100}|"
-    "{count300}|{countmiss}|{countkatu}|"
-    "{countgeki}|{perfect}|{enabled_mods}|{user_id}|"
-    "{num_on_lb}|{time}|{replay_available}"
-)
-VALID_LB_STATUESES = (LOVED, QUALIFIED, RANKED, APPROVED)
-PENDING_LEADERBOARD_RESPONSE = Response(200, b'0|false')
 @handler('/web/osu-osz2-getscores.php')
 async def leaderboard(request: Request) -> Response:
     if not glob.player:
@@ -188,12 +146,7 @@ async def leaderboard(request: Request) -> Response:
         lb = await Leaderboard.from_bancho(**parsed_params)
     else:
         lb = await Leaderboard.from_offline(**parsed_params)
-
-    # if MODIFIED.search(parsed_params['filename']):
-    #     lb = await Leaderboard.from_modified(**parsed_params)
-    # else:
-    #     lb = await Leaderboard.from_bancho(**parsed_params)
-    
+        
     return Response(200, lb.as_binary) # type: ignores
 
 @handler('/difficulty-rating')

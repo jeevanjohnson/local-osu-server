@@ -10,7 +10,6 @@ from server.server import Response
 import utils
 import config
 import pyimgur
-import queries
 from objects import File
 from pathlib import Path
 from aiohttp import ClientSession
@@ -82,7 +81,6 @@ async def while_server_running() -> None:
 
 server = Server()
 DEFAULT_RESPONSE = Response(200, b'')
-
 @server.get(
     path = re.compile(r'\/osu\/(?P<handler>.*)')
 )

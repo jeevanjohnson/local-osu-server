@@ -138,4 +138,3 @@ class Player:
         self.rank = await self.get_rank()
 
         self.queue += packets.userStats(self)
-        self.queue += packets.userPresence(self)

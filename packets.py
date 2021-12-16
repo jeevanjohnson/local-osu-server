@@ -1,6 +1,5 @@
 import enum
 import struct
-import config
 import functools
 from objects import Player
 
