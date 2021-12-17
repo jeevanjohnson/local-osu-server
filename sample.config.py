@@ -13,13 +13,10 @@ from typing import Optional
 # good. Only change if testing and I probably won't provide
 # little support on setting that up
 
-# 12/14/2021
-# removed player_name, 
-# use the ingame username login to login and create profiles
-
-# domain for the server isn't a necessary thing,
-# domain: str = 'coverbancho.tk'
-
+# To make/play with different profiles, 
+# when logging in be sure to put the username 
+# of the profile you want to play/make and 
+# it will automaticly make/go onto the profile.
 paths: dict[str, Optional[str]] = {
     'osu! path': r'', # if provided no need to fill in below
                       # unless songs, replay, and ss folder are somewhere else 

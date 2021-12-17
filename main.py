@@ -3,6 +3,7 @@ import time
 import packets
 import asyncio
 from ext import glob
+import urllib.parse as urlparse
 from server.server import Server
 from server.server import Request
 from server.server import Response
@@ -14,6 +15,8 @@ from objects import File
 from pathlib import Path
 from aiohttp import ClientSession
 from objects.jsonfile import JsonFile
+
+# TODO: simplify path init
 async def on_start_up() -> None:
     glob.http = ClientSession()
 
@@ -86,6 +89,10 @@ DEFAULT_RESPONSE = Response(200, b'')
 )
 async def osu(request: Request) -> Response:
     path = f"/{request.args['handler']}"
+
+    # TODO: add more protection?
+    if 'u' in request.params:
+        glob.profile_name = urlparse.unquote(request.params['u'])
 
     for handler in glob.handlers:
         if isinstance(handler, str):

@@ -26,6 +26,19 @@ coming soon
 # Reminders
 Any unknown errors you see when setting up or just playing, please report them to me on discord `cover#0675` :)
 
-When changing your player_name in the config, it'll make a new profile in the json folder
+To make/play with different profiles, when logging in be sure to put the username of the profile you want to play/make and it will automaticly make/go onto the profile.
 
-When changing pfps through the `.data/pfp.json` you'll need to restart the server in order to see updates (will make it auto update soon)
+# TODOs
+
+(Not listed in any specifc order)
+
+- Funorange speed up map status
+- Updated PP system
+- Proper accuracy calc
+- Ingame menus (includes like change pfp button or smth)
+
+# Maybes
+
+- Support other modes?
+- Local API for other external program uses (programs that do this are gosumemory)
+- Local website for viewing profile? (Would take a while because frontend knowledge is not high)

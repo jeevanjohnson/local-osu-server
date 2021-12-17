@@ -30,6 +30,9 @@ class Request:
         req = cls()
         req.__dict__.update(data)
         return req
+    
+    def __repr__(self) -> str:
+        return self.path
 
 class Route(TypedDict):
     path: Union[str, re.Pattern]

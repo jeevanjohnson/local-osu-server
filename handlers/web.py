@@ -14,15 +14,19 @@ import urllib.parse as urlparse
 from server.server import Request
 from server.server import Response
 
-DEFAULT_RESPONSE = Response(200, b'')
-
 OSU_API_BASE = 'https://osu.ppy.sh/api'
 
-@handler('/web/osu-getfriends.php')
-async def friends(request: Request) -> Response:
-    # TODO: maybe allow bancho friends for bancho friend ranking
-    #       leaderboards? Would need to find a resonable cap tho
-    return DEFAULT_RESPONSE
+async def DEFAULT_RESPONSE_FUNC(request: Request) -> Response:
+    return Response(200, b'')
+
+# unusable or unused handlers
+for hand in [
+    '/web/bancho_connect.php',
+    '/web/osu-getfriends.php',
+    '/web/osu-session.php',
+    '/difficulty-rating'
+]:
+    handler(hand)(DEFAULT_RESPONSE_FUNC)
 
 @handler(re.compile(r'\/ss\/(?P<link>.*)'))
 async def web_screenshot(request: Request) -> Response:
@@ -64,10 +68,6 @@ async def bmap_web(request: Request) -> Response:
         body = b'',
         headers = {'Location': f'https://osu.ppy.sh/{request.path[5:]}'}
     )
-
-@handler('/web/osu-session.php')
-async def session(request: Request) -> Response:
-    return DEFAULT_RESPONSE
 
 REMINDER = None
 DEFAULT_CHARTS = '\n'.join([
@@ -149,10 +149,6 @@ async def leaderboard(request: Request) -> Response:
         lb = await Leaderboard.from_offline(**parsed_params)
         
     return Response(200, lb.as_binary) # type: ignores
-
-@handler('/difficulty-rating')
-async def diff_rating(request: Request) -> Response:
-    return DEFAULT_RESPONSE
 
 BASE_URL = 'https://beatconnect.io'
 @handler(re.compile(r'/d/(?P<setid>[0-9]*)'))

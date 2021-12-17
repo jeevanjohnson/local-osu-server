@@ -4,10 +4,6 @@ import asyncio
 from ext import glob
 from utils import handler
 from objects import Player
-from typing import Optional
-import urllib.parse as urlparse
-from server.server import Request
-from server.server import Response
 
 CHANNELS: list[tuple[str, str]] = [
     # name, desc
@@ -16,47 +12,44 @@ CHANNELS: list[tuple[str, str]] = [
     ('#tops', 'shows top plays, as well as updates them!')
 ]
 
-# Since these 2 request work together,
-# even tho they are seprate like cho, web
-# they should be together
-
-profile_name: Optional[str] = None
-@handler('/web/bancho_connect.php')
-async def bancho_connect(request: Request) -> Response:
-    global profile_name
-    profile_name = urlparse.unquote(request.params['u'])
-    return Response(200, b'')
-
 CHO_TOKEN = str
 BODY = bytearray
 @handler('login')
 async def login() -> tuple[BODY, CHO_TOKEN]:
-    global profile_name
     body = bytearray()
 
     wait_loops = 0
-    while (
-        profile_name == None and
-        wait_loops < 5
+
+    if not glob.player:
+        while (
+            glob.profile_name == None and
+            wait_loops < 5
+        ):
+            await asyncio.sleep(0.2)
+            wait_loops += 1
+    else:
+        while (
+            glob.player.name in (glob.profile_name, None) and
+            wait_loops < 5
+        ):
+            await asyncio.sleep(0.2)
+            wait_loops += 1
+
+    if (
+        not glob.profile_name or
+        (glob.player and glob.player.name == glob.profile_name)
     ):
-        await asyncio.sleep(0.2)
-        wait_loops += 1
-    
-    if not profile_name:
         body += packets.userID(-5)
-        body += packets.notification((
-            'Please restart your game and try logining in again!'
-        ))
+        body += packets.notification(
+            'Please restart your game to login!'
+        )
+
         return body, 'fail'
 
-    glob.player = p = Player(profile_name)
+    glob.player = p = Player(glob.profile_name)
 
     body += packets.userID(p.userid)
-    body += packets.notification((
-        'Sadly, to switch profiles '
-        'you will need to restart your game.\n'
-        'Other then that have fun!'
-    ))
+    body += packets.notification('have fun!')
     body += packets.protocolVersion()
     body += packets.banchoPrivs(p)
     body += packets.friendsList(0)
@@ -77,6 +70,6 @@ async def login() -> tuple[BODY, CHO_TOKEN]:
 
     await glob.player.update()
     body += packets.userPresence(p)
-    profile_name = None
+    glob.profile_name = None
 
     return body, 'success'
