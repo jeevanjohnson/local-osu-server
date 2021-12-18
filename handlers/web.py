@@ -131,7 +131,7 @@ async def leaderboard(request: Request) -> Response:
         return Response(404, b'how')
 
     parsed_params = {
-        'filename': urlparse.unquote(request.params['f']).replace('+', ' ').replace('  ', '+ '),
+        'filename': urlparse.unquote_plus(request.params['f']),
         'mods': request.params['mods'],
         'mode': request.params['m'],
         'rank_type': request.params['v'],
@@ -212,7 +212,7 @@ async def direct(request: Request) -> Response:
     client_params = request.params
 
     if client_params['q'] not in ("Newest", "Top+Rated", "Most+Played"):
-        beatconnect_params['q'] = urlparse.unquote(client_params['q']).replace('+', ' ')
+        beatconnect_params['q'] = urlparse.unquote_plus(client_params['q'])
     
     if client_params['m'] != -1:
         beatconnect_params['m'] = DIRECT_TO_MIRROR_MODE[client_params['m']]
