@@ -21,6 +21,7 @@ class Request:
         self.boundary: str
         self.multipart: Optional[dict[str, Any]]
         self.args: dict[str, Any]
+        self.host: str
     
     def __contains__(self, item: Any) -> bool:
         return self.__dict__.__contains__(item)
@@ -33,7 +34,26 @@ class Request:
     
     def __repr__(self) -> str:
         return self.path
+    
+    @property
+    def as_url(self) -> str:
+        if (
+            ':' in self.host or
+            self.host == 'localhost'
+        ):
+            url = f'http://{self.host}{self.path}'
+        else:
+            url = f'https://{self.host}{self.path}'
+        
+        params_str = '&'.join([
+            f'{k}={v}' for k, v in self.params.items()
+        ])
 
+        if params_str:
+            return f'{url}?{params_str}'
+        else:
+            return url
+        
 class Route(TypedDict):
     path: Union[str, re.Pattern]
     methods: list[str]
@@ -60,7 +80,7 @@ class Response:
         resp += b'\r\n'
         
         return bytes(resp + self.body)
-
+    
 class Server:
     def __init__(self) -> None:
         self.routes: list[Route] = []

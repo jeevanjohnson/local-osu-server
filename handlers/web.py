@@ -14,15 +14,17 @@ import glob as builtin_glob
 from objects import Leaderboard
 import urllib.parse as urlparse
 
-
 async def DEFAULT_RESPONSE_FUNC(request: Request) -> Response:
     return Response(200, b'')
 
 # unusable or unused handlers
 for hand in [
-    '/web/osu-getfriends.php',
+    '/web/lastfm.php',
+    '/web/osu-error.php',
+    '/difficulty-rating',
     '/web/osu-session.php',
-    '/difficulty-rating'
+    '/web/osu-getfriends.php',
+    '/web/osu-markasread.php',
 ]:
     handler(hand)(DEFAULT_RESPONSE_FUNC)
 
