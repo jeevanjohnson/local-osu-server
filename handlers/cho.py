@@ -63,6 +63,7 @@ async def login() -> tuple[BODY, CHO_TOKEN]:
         return body, 'fail'
 
     glob.player = p = Player(profile_name)
+    glob.current_profile = glob.profiles[p.name]
 
     body += packets.userID(p.userid)
     body += packets.notification('have fun!')
