@@ -137,7 +137,10 @@ class Leaderboard:
         scores: list[Union[Score, BanchoScore]] = []
 
         lb.scores = scores
-        if not glob.player:
+        if (
+            not glob.player or 
+            not glob.current_profile
+        ):
             return lb
 
         key = 'qualified_plays'
@@ -210,7 +213,10 @@ class Leaderboard:
             scores: list[Union[Score, BanchoScore]] = []
 
         lb.scores = scores
-        if not glob.player:
+        if (
+            not glob.player or 
+            not glob.current_profile
+        ):
             return lb
 
         key = f'{status_to_db[bmap.approved]}_plays'
@@ -229,7 +235,7 @@ class Leaderboard:
         player_scores.sort(key = lambda s: s['score'], reverse = True)
 
         if rank_type == MODS:
-            player_scores = [x for x in player_scores if x['mods'] & mods]
+            player_scores = [x for x in player_scores if x['mods'] == mods]
             if not player_scores:
                 return lb
             
