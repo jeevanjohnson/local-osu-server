@@ -22,7 +22,6 @@ default_avatar: bytes
 lock = asyncio.Lock()
 imgur: Optional[Imgur] = None
 player: Optional['Player'] = None
-profile_name: Optional[str] = None
 osu_exe_path: Optional[Path] = None
 songs_folder: Optional[Path] = None
 replay_folder: Optional['File'] = None

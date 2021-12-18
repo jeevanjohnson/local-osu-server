@@ -3,10 +3,9 @@ import time
 import packets
 import asyncio
 from ext import glob
-import urllib.parse as urlparse
-from server.server import Server
-from server.server import Request
-from server.server import Response
+from server import Server
+from server import Request
+from server import Response
 
 import utils
 import config
@@ -90,10 +89,6 @@ DEFAULT_RESPONSE = Response(200, b'')
 async def osu(request: Request) -> Response:
     path = f"/{request.args['handler']}"
 
-    # TODO: add more protection?
-    if 'u' in request.params:
-        glob.profile_name = urlparse.unquote(request.params['u'])
-
     for handler in glob.handlers:
         if isinstance(handler, str):
             if handler == path:
@@ -148,10 +143,19 @@ async def avatar(request: Request) -> Response:
         int(request.args['userid'])
     )
 
+@server.get(
+    path = re.compile(r'\/(?P<path>.*)')
+)
+async def website(request: Request) -> Response:
+    return await glob.handlers[
+        f"/{request.args['path']}"
+    ](request)
+
 from handlers import cho
 from handlers import web
 from handlers import ava
 from handlers import submit_score
+from handlers import website as _
 
 if __name__ == '__main__':
     server.run(

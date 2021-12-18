@@ -8,25 +8,25 @@ import packets
 import pyperclip
 from ext import glob
 from utils import handler
+from server import Request
+from server import Response
 import glob as builtin_glob
 from objects import Leaderboard
 import urllib.parse as urlparse
-from server.server import Request
-from server.server import Response
 
-OSU_API_BASE = 'https://osu.ppy.sh/api'
 
 async def DEFAULT_RESPONSE_FUNC(request: Request) -> Response:
     return Response(200, b'')
 
 # unusable or unused handlers
 for hand in [
-    '/web/bancho_connect.php',
     '/web/osu-getfriends.php',
     '/web/osu-session.php',
     '/difficulty-rating'
 ]:
     handler(hand)(DEFAULT_RESPONSE_FUNC)
+
+OSU_API_BASE = 'https://osu.ppy.sh/api'
 
 @handler(re.compile(r'\/ss\/(?P<link>.*)'))
 async def web_screenshot(request: Request) -> Response:

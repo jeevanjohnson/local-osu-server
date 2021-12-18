@@ -1,7 +1,7 @@
 import utils
 from ext import glob
 from utils import handler
-from server.server import Response
+from server import Response
 
 @handler('avatar')
 async def avatar(userid: int) -> Response:
