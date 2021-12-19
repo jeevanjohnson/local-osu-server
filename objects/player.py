@@ -93,7 +93,8 @@ class Player:
                 'If you have a valid osu!daily api key and end up\n' 
                 'Seeing this error please send this to cover on discord!\n'
                 f'With the following info: {json}\n'
-                '(At this point, set `config.osu_daily_api_key` to `None`)'
+                '(At this point, set `config.osu_daily_api_key` to `None`)\n'
+                'click enter to continue however :)'
             ))
             return 1
             
@@ -124,11 +125,10 @@ class Player:
         pp += 416.6667 * (1 - (0.9994 ** len(scores)))
         self.pp = round(pp)
 
-        # TODO: figure out how bancho does it
-        # for now just get the average acc for all top plays
-        # combined
         if top_scores:
-            self.acc = sum([s['acc'] for s in top_scores]) / len(top_scores)
+            acc = sum([s['acc'] * 0.95 ** i for i, s in enumerate(top_scores)])
+            acc += 416.6667 * (1 - (0.9994 ** len(scores)))
+            self.acc = round(acc)
 
         all_plays: Optional[SCORES] = \
         glob.current_profile['plays']['all_plays']
