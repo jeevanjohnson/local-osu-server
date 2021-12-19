@@ -21,9 +21,10 @@ def is_path(p: str) -> Union[Path, Literal[False]]:
         return False
 
 def update_files() -> None:
+    glob.pfps.update_file()
     glob.beatmaps.update_file()
     glob.profiles.update_file()
-    glob.pfps.update_file()
+    glob.modified_beatmaps.update_file()
 
 async def _add_to_player_queue(packets: bytes) -> None:
     while not glob.player:

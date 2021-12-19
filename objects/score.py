@@ -3,11 +3,13 @@ import time
 import calendar
 from ext import glob
 from typing import Any
+from typing import Union
 import glob as builtin_glob
 from typing import Optional
 from datetime import datetime
 from objects.replay import Replay
 from objects.beatmap import Beatmap
+from objects.modifiedbeatmap import ModifiedBeatmap
 
 class BanchoScore:
     def __init__(self, bancho_score: dict[str, str]) -> None:
@@ -42,9 +44,11 @@ class Score:
         nkatu: int, nmiss: int,
         score: int, max_combo: int,
         perfect: bool, mods: int, time: int,
-        replay: Optional[Replay] = None, additional_mods: Optional[int] = None,
-        bmap: Optional[Beatmap] = None, acc: Optional[float] = None,
-        pp: Optional[float] = None, replay_md5: Optional[str] = None
+        replay: Optional[Replay] = None, 
+        additional_mods: Optional[int] = None,
+        bmap: Optional[Union[Beatmap, ModifiedBeatmap]] = None,
+        acc: Optional[float] = None, pp: Optional[float] = None, 
+        replay_md5: Optional[str] = None
     ) -> None:
         self.mode = mode
         self.md5 = md5
@@ -94,7 +98,10 @@ class Score:
 
     @classmethod
     def from_score_sub(cls) -> Optional['Score']:
-        if not glob.player:
+        if (
+            not glob.player or
+            not glob.replay_folder
+        ):
             return
         
         files = builtin_glob.iglob(

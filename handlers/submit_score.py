@@ -7,6 +7,7 @@ from utils import handler
 from objects import Score
 from objects import Beatmap
 from typing import Optional
+from objects import ModifiedBeatmap
 
 RANKED_PLAYS = dict[str, list[dict]]
 
@@ -53,7 +54,7 @@ async def submit_score() -> None:
     score = Score.from_score_sub()
     if not score:
         return
-    
+
     if score.name != glob.player.name:
         glob.player.queue += packets.notification(
             "Can't submit another person's replay!"
@@ -80,11 +81,19 @@ async def submit_score() -> None:
         glob.player.queue += packets.notification(
             "Can't submit failed replays!"
         )
-        return 
+        return
     
-    # TODO: refer to score sub web handler
-    # if not (bmap := ModifiedBeatmap.from_db(score.md5) or await Beatmap.from_md5(score.md5)):
-    if not (bmap := await Beatmap.from_md5(score.md5)):
+    if score.mode != 0:
+        glob.player.queue += packets.notification(
+            "Must be a standard score!"
+        )
+        return
+    
+    bmap = (
+        await ModifiedBeatmap.from_md5(score.md5) or
+        await Beatmap.from_md5(score.md5)
+    )
+    if not bmap:
         glob.player.queue += packets.notification("Map has to exist on bancho!")
         return
     
@@ -99,7 +108,7 @@ async def submit_score() -> None:
         return
 
     if not bmap.in_db:
-        bmap.add_to_db()
+        bmap.add_to_db() # type: ignore
 
     stars = oppai.diff_calc().calc(bmap.map_file, score.mods)
     pp, *_, acc_percent = oppai.ppv2(
@@ -180,4 +189,3 @@ async def submit_score() -> None:
         target = '#recent',
         userid = -1,
     )
-        

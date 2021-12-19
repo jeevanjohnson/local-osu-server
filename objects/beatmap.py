@@ -1,15 +1,10 @@
-import os
-import re
 import utils
 import config
-import hashlib
 import functools
 from ext import glob
 from typing import Any
 from typing import Union
 import pyttanko as oppai
-from pathlib import Path
-import glob as builtin_glob
 from typing import Optional
 
 parser = oppai.parser()
@@ -112,11 +107,12 @@ class Beatmap:
 
     def add_to_db(self) -> None:
         glob.beatmaps[self.file_md5] = self.as_dict()
+        glob.beatmaps[self.beatmap_id] = self.as_dict()
         utils.update_files()
 
     @classmethod
-    def from_db(cls, md5: str) -> Optional['Beatmap']:
-        bmap_dict: Optional[BMAP_DICT] = glob.beatmaps[md5]
+    def from_db(cls, value: Union[str, int]) -> Optional['Beatmap']:
+        bmap_dict: Optional[BMAP_DICT] = glob.beatmaps[value]
         if not bmap_dict:
             return
         
@@ -130,6 +126,36 @@ class Beatmap:
         for k, v in bmap_dict.items():
             bmap.__dict__[k] = v
 
+        return bmap
+    
+    @classmethod
+    async def from_id(cls, bmap_id: int) -> Optional['Beatmap']:
+        if bmap_id in glob.beatmaps:
+            return cls.from_db(bmap_id)
+        
+        if config.osu_api_key is None:
+            return None
+
+        params = {
+            'k': config.osu_api_key,
+            'b': bmap_id
+        }
+        async with glob.http.get(
+            url = f'{OSU_API_BASE}/get_beatmaps',
+            params = params
+        ) as resp:
+            if not resp or resp.status != 200:
+                return
+            
+            if not (json := await resp.json()):
+                return
+            
+            bmap_json: dict = json[0]
+        
+        bmap = cls()
+        for k, v in bmap_json.items():
+            bmap.__dict__[k] = real_type(v)
+        
         return bmap
 
     @classmethod

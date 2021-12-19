@@ -13,7 +13,7 @@ class JsonFile(UserDict):
 
         if not self.path.exists():
             self.path.write_bytes(b"{}")
-            super().__new__(UserDict)
+            super().__init__()
         else:
             data = orjson.loads(self.path.read_bytes() or b"{}")
             super().__init__(**data)

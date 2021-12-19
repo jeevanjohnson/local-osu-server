@@ -1,6 +1,8 @@
 # Local osu! server
 
-Just imagine normal bancho, but you can have multiple profiles and funorange speed up maps ranked (coming soon)!
+([This is the most stable version up to date](https://github.com/coverosu/local-osu-server/tree/9574a8f992d49f7aeab8284d6d605c7df1945e70), may not have all the features you want but when more errors and bugs get reported and fixed this will change :D)
+
+Just imagine normal bancho, but you can have multiple profiles and funorange speed up maps ranked! (fun orange part is 85% done? just need testers O_O)
 
 ---
 # Windows Setup
@@ -32,7 +34,7 @@ To make/play with different profiles, when logging in be sure to put the usernam
 
 (Not listed in any specifc order)
 
-- Funorange speed up map status
+- Funorange speed up map status (read above)
 - Updated PP system
 - Proper accuracy calc
 - Ingame menus (includes like change pfp button or smth)

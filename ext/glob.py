@@ -15,11 +15,13 @@ if TYPE_CHECKING:
     from objects.jsonfile import JsonFile
 
 pfps: 'JsonFile'
+modified_txt: Path
 http: ClientSession
 beatmaps: 'JsonFile'
 profiles: 'JsonFile'
 default_avatar: bytes
 lock = asyncio.Lock()
+modified_beatmaps: 'JsonFile'
 imgur: Optional[Imgur] = None
 player: Optional['Player'] = None
 osu_exe_path: Optional[Path] = None

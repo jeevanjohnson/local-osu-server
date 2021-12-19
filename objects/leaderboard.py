@@ -5,7 +5,6 @@ from typing import Optional
 from objects.score import Score
 from objects.beatmap import Beatmap
 from objects.score import BanchoScore
-# from objects.beatmap import ModifiedBeatmap
 
 ONLINE_PLAYS = dict[str, list[dict]]
 OSU_API_BASE = 'https://osu.ppy.sh/api'
@@ -75,7 +74,7 @@ class Leaderboard:
             setid = self.bmap.beatmapset_id,
             num_of_scores = len(self.scores),
             artist_unicode = self.bmap.artist_unicode or self.bmap.artist,
-            title_unicode = self.bmap.title_unicode or self.bmap.title_unicode
+            title_unicode = self.bmap.title_unicode or self.bmap.title
         ).encode()
 
     @property

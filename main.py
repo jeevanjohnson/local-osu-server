@@ -54,6 +54,9 @@ async def on_start_up() -> None:
     else:
         glob.imgur = None
 
+    if glob.songs_folder:
+        glob.modified_txt = glob.songs_folder / 'modified_mp3_list.txt'
+
     data_folder = Path.cwd() / '.data'
     if not data_folder.exists():
         data_folder.mkdir(exist_ok=True)
@@ -61,6 +64,7 @@ async def on_start_up() -> None:
     glob.pfps = JsonFile(data_folder / 'pfps.json')
     glob.beatmaps = JsonFile(data_folder / 'beatmaps.json')
     glob.profiles = JsonFile(data_folder / 'profiles.json')
+    glob.modified_beatmaps = JsonFile(data_folder / 'modified.json')
 
     async with glob.http.get('https://a.ppy.sh/') as resp:
         if not resp or resp.status != 200:

@@ -13,6 +13,7 @@ from server import Response
 import glob as builtin_glob
 from objects import Leaderboard
 import urllib.parse as urlparse
+from objects import ModifiedLeaderboard
 
 async def DEFAULT_RESPONSE_FUNC(request: Request) -> Response:
     return Response(200, b'')
@@ -127,13 +128,18 @@ async def get_replay(request: Request) -> Response:
     replay_frames = base64.b64decode(json["content"])
     return Response(200, replay_frames)
 
+MODIFIED_REGEXES = (
+    re.compile(r"(?P<rate>[0-9]{1,2}\.[0-9]{1,2}x) \((?P<bpm>[0-9]*bpm)\)"),
+    re.compile(r"(?P<rate>[0-9]{1,2}x) \((?P<bpm>[0-9]*bpm)\)")
+)
+
 @handler('/web/osu-osz2-getscores.php')
 async def leaderboard(request: Request) -> Response:
     if not glob.player:
         return Response(404, b'how')
 
     parsed_params = {
-        'filename': urlparse.unquote_plus(request.params['f']),
+        'filename': urlparse.unquote(request.params['f']).replace('+', ' ').replace('  ', '+ '),
         'mods': request.params['mods'],
         'mode': request.params['m'],
         'rank_type': request.params['v'],
@@ -141,11 +147,16 @@ async def leaderboard(request: Request) -> Response:
         'md5': request.params['c']
     }
 
-    # TODO: ranking speed ups are probably the hardest thing
-    # to do in this project
-    # for now im just gonna wait until i have more time to work on
-    # something as big as that instead of just rushing through it
-    if config.osu_api_key is not None:
+    regex_results = [
+        regex.search(parsed_params['filename']) for regex in MODIFIED_REGEXES
+    ]
+
+    if (
+        any(regex_results) and
+        glob.modified_txt.exists()
+    ):
+        lb = await ModifiedLeaderboard.from_client(parsed_params) # type: ignore
+    elif config.osu_api_key is not None:
         lb = await Leaderboard.from_bancho(**parsed_params)
     else:
         lb = await Leaderboard.from_offline(**parsed_params)
