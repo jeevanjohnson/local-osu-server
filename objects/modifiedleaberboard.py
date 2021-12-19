@@ -103,7 +103,7 @@ class ModifiedLeaderboard:
 
         if self.personal_score:
             if self.personal_score not in self.scores:
-                num_on_lb = 101
+                num_on_lb = 1
             else:
                 num_on_lb = self.scores.index(self.personal_score) + 1
 
