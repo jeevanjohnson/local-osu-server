@@ -107,12 +107,16 @@ class Beatmap:
 
     def add_to_db(self) -> None:
         glob.beatmaps[self.file_md5] = self.as_dict()
-        glob.beatmaps[self.beatmap_id] = self.as_dict()
+        glob.beatmaps[str(self.beatmap_id)] = self.as_dict()
         utils.update_files()
 
     @classmethod
     def from_db(cls, value: Union[str, int]) -> Optional['Beatmap']:
-        bmap_dict: Optional[BMAP_DICT] = glob.beatmaps[value]
+        if isinstance(value, int):
+            bmap_dict: Optional[BMAP_DICT] = glob.beatmaps[str(value)]
+        else:
+            bmap_dict: Optional[BMAP_DICT] = glob.beatmaps[value]
+        
         if not bmap_dict:
             return
         
