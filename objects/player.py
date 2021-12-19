@@ -126,8 +126,8 @@ class Player:
 
         if top_scores:
             acc = sum([s['acc'] * 0.95 ** i for i, s in enumerate(top_scores)])
-            acc += 416.6667 * (1 - (0.9994 ** len(scores)))
-            self.acc = round(acc)
+            bonus_acc = 100.0 / (20 * (1 - 0.95 ** len(scores)))
+            self.acc = (acc * bonus_acc) / 100
 
         all_plays: Optional[SCORES] = \
         glob.current_profile['plays']['all_plays']
