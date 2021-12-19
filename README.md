@@ -36,7 +36,6 @@ To make/play with different profiles, when logging in be sure to put the usernam
 
 - Funorange speed up map status (read above)
 - Updated PP system
-- Proper accuracy calc
 - Ingame menus (includes like change pfp button or smth)
 - Alternative to `glob`
 - Better logging

@@ -132,8 +132,6 @@ async def bancho(request: Request) -> Response:
     if not glob.player:
         return Response(200, packets.systemRestart())
 
-    # TODO: maybe find some hack to find a work around not having the body?
-    # its a local server anyways for fun so even if i don't find it its w/e
     if glob.player.queue:
         return Response(200, glob.player.clear())
     

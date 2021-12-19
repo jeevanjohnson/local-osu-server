@@ -22,9 +22,8 @@ class Player:
         self.queue = bytearray()
         self.login_time = time.time()
 
-        # TODO: update/change these eventually
-        self.rank: int = 1 # TODO: change depending on pp compared to bancho ranking
-        self.acc: float = 100.0
+        self.rank: int = 9999999
+        self.acc: float = 0.0
         self.playcount: int = 0 
         self.total_score: int = 0
         self.ranked_score: int = 0
