@@ -14,9 +14,12 @@ APPROVED_PLAYS = RANKED_PLAYS
 OSU_DAILY_API = 'https://osudaily.net/api'
 
 class Player:
-    def __init__(self, name: str) -> None:
+    def __init__(self, name: str, from_login: bool = False) -> None:
         self.name = name
-        if name not in glob.profiles:
+        if (
+            name not in glob.profiles
+            and from_login
+        ):
             self.init_db()
         
         self.queue = bytearray()
@@ -67,7 +70,7 @@ class Player:
         glob.current_profile = glob.profiles[self.name]
 
     async def get_rank(self) -> int:
-        if config.osu_daily_api_key is None:
+        if not config.osu_daily_api_key:
             return 1
         
         url = f'{OSU_DAILY_API}/pp.php'
@@ -128,12 +131,9 @@ class Player:
             acc = sum([s['acc'] * 0.95 ** i for i, s in enumerate(top_scores)])
             bonus_acc = 100.0 / (20 * (1 - 0.95 ** len(scores)))
             self.acc = (acc * bonus_acc) / 100
-
-        all_plays: Optional[SCORES] = \
-        glob.current_profile['plays']['all_plays']
         
-        if all_plays is not None:
-            self.playcount = len(all_plays)
+        if 'playcount' in glob.current_profile:
+            self.playcount = glob.current_profile['playcount']
         
         self.rank = await self.get_rank()
 

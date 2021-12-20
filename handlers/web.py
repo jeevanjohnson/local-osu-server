@@ -81,7 +81,10 @@ DEFAULT_CHARTS = '\n'.join([
 @handler('/web/osu-submit-modular-selector.php')
 async def score_sub(request: Request) -> Response:
     global REMINDER
-    if not glob.player:
+    if (
+        not glob.player or 
+        not glob.current_profile
+    ):
         return Response(200, b"error: no")
     
     if REMINDER is None:
@@ -97,6 +100,14 @@ async def score_sub(request: Request) -> Response:
         REMINDER = 0
     
     REMINDER += 1
+    
+    if 'playcount' in glob.current_profile:
+        glob.current_profile['playcount'] += 1
+    else:
+        glob.current_profile['playcount'] = 1
+    
+    utils.update_files()
+
     glob.player.queue += packets.userStats(glob.player)
     return Response(200, DEFAULT_CHARTS)
 
@@ -156,7 +167,7 @@ async def leaderboard(request: Request) -> Response:
         glob.modified_txt.exists()
     ):
         lb = await ModifiedLeaderboard.from_client(parsed_params) # type: ignore
-    elif config.osu_api_key is not None:
+    elif config.osu_api_key:
         lb = await Leaderboard.from_bancho(**parsed_params)
     else:
         lb = await Leaderboard.from_offline(**parsed_params)
@@ -213,7 +224,7 @@ DIRECT_TO_MIRROR_MODE = {
 DIRECT_BASE_API = 'https://beatconnect.io/api'
 @handler('/web/osu-search.php')
 async def direct(request: Request) -> Response:
-    if config.beatconnect_api_key is None:
+    if not config.beatconnect_api_key:
         utils.add_to_player_queue(
             packets.notification("No api key given for direct!")
         )

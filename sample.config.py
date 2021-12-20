@@ -3,7 +3,7 @@ Just a note, you will have to rename this file to
 config.py in order for it to work!
 """
 
-from typing import Union
+from typing import Iterable
 from typing import Optional
 
 # Just a note
@@ -56,7 +56,7 @@ osu_daily_api_key: Optional[str] = ''
 # if `None` then direct won't work/will be disabled
 beatconnect_api_key: Optional[str] = '' 
 
-# list of urls, example: ('https://dsada.png', https://dsad11a.png)
+# list of urls, example: ['https://dsada.png', https://dsad11a.png]
 # if `None` then it will just show no background
 # unless you have the skin background inabled
-seasonal_bgs: Optional[Union[tuple[str], list[str]]] = []
+seasonal_bgs: Optional[Iterable[str]] = []

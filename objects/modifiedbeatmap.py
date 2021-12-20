@@ -31,6 +31,7 @@ class ModifiedBeatmap:
         self.file_path: Path
         self.rank_status: int
         self.file_content: bytes
+        self.original_bmap: Beatmap
         self.title_unicode: Optional[str]
         self.artist_unicode: Optional[str]
     
@@ -39,6 +40,22 @@ class ModifiedBeatmap:
         return parser.map(
             osu_file = self.file_content.decode().splitlines()
         )
+
+    def as_dict(self) -> dict:
+        bmap = self.__dict__.copy()
+        if 'file_content' in bmap:
+            bmap['file_content'] = f"{bmap['file_content']}"
+       
+        try: del bmap['map_file']
+        except: pass
+
+        if 'file_path' in bmap:
+            bmap['file_path'] = str(bmap['file_path'])
+        
+        if 'original_bmap' in bmap:
+            bmap['original_bmap'] = bmap['original_bmap'].as_dict()
+
+        return bmap
 
     @property
     def in_db(self) -> bool:
@@ -74,6 +91,9 @@ class ModifiedBeatmap:
         bmap_dict['file_content'] = locals()['get_bytes']()
 
         bmap_dict['file_path'] = Path(bmap_dict['file_path'])
+        bmap_dict['original_bmap'] = await Beatmap.from_id(
+            bmap_dict['id']
+        )
 
         return cls(**bmap_dict)
     
@@ -102,7 +122,8 @@ class ModifiedBeatmap:
             'file_path': str(path_to_modified),
             'file_content': f'{path_to_modified.read_bytes()}',
             'max_combo': bmap.max_combo,
-            'version': version
+            'version': version,
+            'original_bmap': bmap.as_dict()
         }
 
         utils.update_files()

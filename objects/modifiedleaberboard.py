@@ -71,28 +71,28 @@ class ModifiedLeaderboard:
     def __init__(self) -> None:
         self.scores: list[Score] = []
         self.personal_score: Optional[Score] = None
-        self.orignal_bmap: Optional[Union[Beatmap, ModifiedBeatmap]] = None
+        self.original_bmap: Optional[Union[Beatmap, ModifiedBeatmap]] = None
 
     @property
     def lb_base_fmt(self) -> Optional[bytes]:
-        if not self.orignal_bmap:
+        if not self.original_bmap:
             return
         
         return STARTING_LB_FORMAT.format(
-            rankedstatus = FROM_API_TO_SERVER_STATUS[self.orignal_bmap.approved],
-            mapid = self.orignal_bmap.beatmap_id,
-            setid = self.orignal_bmap.beatmapset_id,
+            rankedstatus = FROM_API_TO_SERVER_STATUS[self.original_bmap.approved],
+            mapid = self.original_bmap.beatmap_id,
+            setid = self.original_bmap.beatmapset_id,
             num_of_scores = len(self.scores),
-            artist_unicode = self.orignal_bmap.artist_unicode or self.orignal_bmap.artist,
-            title_unicode = self.orignal_bmap.title_unicode or self.orignal_bmap.title
+            artist_unicode = self.original_bmap.artist_unicode or self.original_bmap.artist,
+            title_unicode = self.original_bmap.title_unicode or self.original_bmap.title
         ).encode()
 
     @property
     def as_binary(self) -> bytes:
-        if not self.orignal_bmap:
+        if not self.original_bmap:
             return b'0|false'
         
-        r = FROM_API_TO_SERVER_STATUS[self.orignal_bmap.approved]
+        r = FROM_API_TO_SERVER_STATUS[self.original_bmap.approved]
         if r not in VALID_LB_STATUESES:
             return f'{r}|false'.encode()
 
@@ -182,12 +182,15 @@ class ModifiedLeaderboard:
             orignal_value: Optional[Union[int, str]] = None
             for line in set_path.read_bytes().splitlines():
                 try:
-                    k,v = line.decode().lower().strip().split(':', 1)
+                    k, v = line.decode().lower().strip().split(':', 1)
                     if k != 'beatmapid':
                         continue
                     
-                    orignal_value = int(v)
-                    break
+                    v = int(v)
+
+                    if v > 0:
+                        orignal_value = v
+                        break
                 except:
                     continue
             
@@ -209,16 +212,16 @@ class ModifiedLeaderboard:
                 return lb
             
             if isinstance(orignal_value, int):
-                lb.orignal_bmap = bmap = await Beatmap.from_id(orignal_value)
+                lb.original_bmap = bmap = await Beatmap.from_id(orignal_value)
             else:
-                lb.orignal_bmap = bmap = await Beatmap.from_md5(orignal_value)
+                lb.original_bmap = bmap = await Beatmap.from_md5(orignal_value)
             
             if not bmap:
                 return lb
             
             ModifiedBeatmap.add_to_db(bmap, params, set_path)
         else:
-            lb.orignal_bmap = bmap = await ModifiedBeatmap.from_md5(params['md5'])
+            lb.original_bmap = bmap = await ModifiedBeatmap.from_md5(params['md5'])
             if not bmap:
                 return lb
 

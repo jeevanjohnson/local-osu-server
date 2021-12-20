@@ -15,16 +15,22 @@ WELCOME_MSG = '\n'.join([
     'Below you can find some useful buttons to enhance your gaming experience B)'
 ])
 
-CHANNELS: list[tuple[str, str]] = [
+CHANNEL = tuple[str, str]
+CHANNELS: list[CHANNEL] = [
     # name, desc
     ('#osu', 'x'),
     ('#recent', 'shows recently submitted scores!'),
     ('#tops', 'shows top plays, as well as updates them!')
 ]
 
-BUTTONS: list[tuple[str, str]] = [
+BUTTON = tuple[str, str]
+BUTTONS: list[BUTTON] = [
     # url, name
-    ('http://127.0.0.1:5000/change_avatar', 'change avatar')
+    ('http://127.0.0.1:5000/api/v1/client/tops?limit=100', 'view tops'),
+    ('http://127.0.0.1:5000/api/v1/client/recent?limit=10', 'view recent'),
+    ('http://127.0.0.1:5000/api/v1/client/recalc', 'recalc plays'),
+    ('http://127.0.0.1:5000/api/v1/client/profile', 'view profile'),
+    ('http://127.0.0.1:5000/api/v1/client/change_avatar', 'change avatar'),
 ]
 
 CHO_TOKEN = str
@@ -48,7 +54,7 @@ async def login() -> tuple[BODY, CHO_TOKEN]:
     wait_loops = 0
 
     while (
-        profile_name == None and
+        profile_name is None and
         wait_loops < 5
     ):
         await asyncio.sleep(0.2)
@@ -62,7 +68,7 @@ async def login() -> tuple[BODY, CHO_TOKEN]:
 
         return body, 'fail'
 
-    glob.player = p = Player(profile_name)
+    glob.player = p = Player(profile_name, from_login=True)
     glob.current_profile = glob.profiles[p.name]
 
     body += packets.userID(p.userid)
@@ -71,7 +77,11 @@ async def login() -> tuple[BODY, CHO_TOKEN]:
     body += packets.banchoPrivs(p)
     body += packets.friendsList(0)
 
-    if config.menu_icon is not None:
+    if (
+        config.menu_icon and
+        config.menu_icon['image_link'] and
+        config.menu_icon['click_link']
+    ):
         body += packets.menuIcon(
             tuple(config.menu_icon.values())
         )

@@ -5,6 +5,7 @@ def init_profile(name: str) -> dict[str, Union[int, list[str], dict]]:
         name: {
             'pp': 0,
             'acc': 0,
+            'playcount': 0,
             'plays': {
                 'ranked_plays': {},
                 'loved_plays': {},

@@ -193,7 +193,7 @@ class Leaderboard:
         if ranked_status not in VALID_LB_STATUESES:
             return lb
         
-        if config.osu_api_key is not None:
+        if config.osu_api_key:
             params = {
                 'k': config.osu_api_key,
                 'b': bmap.beatmap_id,
@@ -252,44 +252,3 @@ class Leaderboard:
         lb.personal_score = player_score
 
         return lb   
-    
-    """
-    @classmethod
-    async def from_modified(
-        cls, filename: str, mods: int,
-        mode: int, rank_type: int,
-        set_id: int, md5: str
-    ) -> 'Leaderboard':
-        lb = cls()
-
-        if not glob.player:
-            return lb
-
-        if glob.db.is_in(md5, ['beatmaps']):
-           bmap = ModifiedBeatmap.from_db(md5)
-        else:
-           bmap = await ModifiedBeatmap.from_params(filename, set_id, md5)
-
-        if not bmap:
-            return lb
-
-        ranked_status = FROM_API_TO_SERVER_STATUS[bmap.approved]
-        if ranked_status not in VALID_LB_STATUESES:
-            return lb
-        
-        if not bmap.in_db:
-            bmap.add_to_db()
-        
-        lb.bmap = bmap
-
-        key = f'{status_to_db[bmap.approved]}_plays'
-        path_to_type_plays = ['profiles', glob.player.name, 'plays', key]
-        if glob.db.is_in(bmap.file_md5, path_to_type_plays):
-            path_to_type_plays.append(bmap.file_md5)
-            t = glob.db.search(path_to_type_plays)
-            print
-        else:
-            return lb
-        
-        #lb.scores = [Score.from_dict(x) for x in ]
-    """

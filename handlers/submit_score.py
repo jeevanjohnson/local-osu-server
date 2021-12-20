@@ -110,19 +110,7 @@ async def submit_score() -> None:
     if not bmap.in_db:
         bmap.add_to_db() # type: ignore
 
-    stars = oppai.diff_calc().calc(bmap.map_file, score.mods)
-    pp, *_, acc_percent = oppai.ppv2(
-        aim_stars = stars.aim, 
-        speed_stars = stars.speed, 
-        bmap = bmap.map_file, 
-        mods = score.mods,
-        n300 = score.n300,
-        n100 = score.n100, 
-        n50 = score.n50,
-        nmiss = score.nmiss,
-        combo = score.max_combo
-    )
-
+    pp, acc_percent = utils.calculator(score, bmap)
     score.acc = acc_percent
     score.bmap = bmap
     score.pp = pp

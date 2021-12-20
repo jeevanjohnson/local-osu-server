@@ -1,5 +1,7 @@
 import re
 import time
+
+import orjson
 import packets
 import asyncio
 from ext import glob
@@ -49,7 +51,7 @@ async def on_start_up() -> None:
             None
         )
 
-    if config.imgur_client_id is not None:
+    if config.imgur_client_id:
         glob.imgur = pyimgur.Imgur(config.imgur_client_id)
     else:
         glob.imgur = None
@@ -95,13 +97,13 @@ async def osu(request: Request) -> Response:
 
     for handler in glob.handlers:
         if isinstance(handler, str):
-            if handler == path:
-                st = time.time()
-                resp = await glob.handlers[handler](request)
-                print(f'{time.time()-st:.3f} time took to handle', path)
-                return resp
-            else:
+            if handler != path:
                 continue
+            
+            st = time.time()
+            resp = await glob.handlers[handler](request)
+            print(f'{time.time()-st:.3f} time took to handle', path)
+            return resp
         
         if (m := handler.match(path)):
             request.args |= m.groupdict()
@@ -145,6 +147,24 @@ async def avatar(request: Request) -> Response:
         int(request.args['userid'])
     )
 
+DEFAULT_API_RESPONSE = Response(
+    code = 200,
+    body = orjson.dumps({
+        'status': 'failed',
+        'message': "unknown api path!"
+    }),
+    headers = {'Content-type': 'application/json charset=utf-8'}
+)
+@server.get(
+    path = re.compile(r'\/api\/v1\/(?P<path>.*)')
+)
+async def apiv1(request: Request) -> Response:
+    api_path = f"/api/v1/{request.args['path']}"
+    if api_path not in glob.handlers:
+        return DEFAULT_API_RESPONSE
+    else:
+        return await glob.handlers[api_path](request)
+
 @server.get(
     path = re.compile(r'\/(?P<path>.*)')
 )
@@ -153,11 +173,7 @@ async def website(request: Request) -> Response:
         f"/{request.args['path']}"
     ](request)
 
-from handlers import cho
-from handlers import web
-from handlers import ava
-from handlers import submit_score
-from handlers import website as _
+import handlers # load all handlers
 
 if __name__ == '__main__':
     server.run(

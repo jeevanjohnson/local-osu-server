@@ -73,7 +73,6 @@ class Score:
     
     def as_dict(self) -> dict[str, Any]:
         score = self.__dict__.copy()
-        score['replay_md5'] = self.replay.replay_md5 # type: ignore
         del score['replay']
         del score['bmap']
         return score
