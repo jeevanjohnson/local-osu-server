@@ -1,6 +1,5 @@
 pipreqs
 pyimgur
-WebLamp
 pyttanko
 aiohttp
 borgor
