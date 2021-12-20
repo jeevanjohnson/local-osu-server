@@ -48,7 +48,8 @@ class Score:
         additional_mods: Optional[int] = None,
         bmap: Optional[Union[Beatmap, ModifiedBeatmap]] = None,
         acc: Optional[float] = None, pp: Optional[float] = None, 
-        replay_md5: Optional[str] = None
+        replay_md5: Optional[str] = None, scoreid: Optional[int] = None,
+        replay_frames: Optional[bytes] = None
     ) -> None:
         self.mode = mode
         self.md5 = md5
@@ -70,11 +71,14 @@ class Score:
         self.pp = pp
         self.replay_md5 = replay_md5
         self.time = time
+        self.scoreid = scoreid
+        self.replay_frames = replay_frames
     
     def as_dict(self) -> dict[str, Any]:
         score = self.__dict__.copy()
         del score['replay']
         del score['bmap']
+        score['replay_frames'] = f"{score['replay_frames']}"
         return score
 
     @property
@@ -116,15 +120,21 @@ class Score:
             replay.katu, replay.miss, replay.total_score, # type: ignore
             replay.combo, bool(replay.perfect), int(replay.mods), # type: ignore
             int(time.time()), replay, int(replay.additional_mods or 0),
-            replay_md5 = replay.replay_md5 # type: ignore
+            replay_md5 = replay.replay_md5, # type: ignore
+            replay_frames = replay.raw_frames # type: ignore
         )
 
         return s
 
     @property
     def as_leaderboard_score(self) -> dict:
+        if self.scoreid:
+            sid = -self.scoreid
+        else:
+            sid = 0
+
         return {
-            'score_id': 0,
+            'score_id': sid,
             'username': self.name,
             'score': self.score,
             'maxcombo': self.max_combo,

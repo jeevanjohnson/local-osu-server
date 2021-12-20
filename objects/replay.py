@@ -115,6 +115,7 @@ class Replay:
         self.score_id: Optional[int] = None
         self.additional_mods: Optional[int] = None
         self.frames: Optional[list[Frame]] = None
+        self.raw_frames: Optional[bytes] = None
     
     @property
     def data(self) -> bytes:
@@ -152,8 +153,9 @@ class Replay:
         self.bar_graph = [LifeBar.from_raw_bar(x) for x in self.read_string().split('|')]
         self.timestamp = self.read_long_long()
         
-        raw_frames: list[bytes] = lzma.decompress(self.read_raw(self.read_int())).split(b',')
-        self.frames = [Frame.from_raw_frame(x) for x in raw_frames if x]
+        self.raw_frames = raw_frames = self.read_raw(self.read_int())
+        decoded_frames: list[bytes] = lzma.decompress(raw_frames).split(b',')
+        self.frames = [Frame.from_raw_frame(x) for x in decoded_frames if x]
 
         self.scoreid = self.read_long_long()
         

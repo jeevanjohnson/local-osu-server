@@ -134,7 +134,9 @@ async def tops(request: Request) -> Response:
             play['bmap'] = bmap_dict
         else:
             play['bmap'] = None
-
+        
+        try: del play['replay_frames']
+        except: pass
         response_json['plays'].append(play)
 
     return Response(
@@ -212,6 +214,8 @@ async def recent(request: Request) -> Response:
         else:
             play['bmap'] = None
 
+        try: del play['replay_frames']
+        except: pass
         response_json['plays'].append(play)
 
     return Response(

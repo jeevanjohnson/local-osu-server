@@ -122,22 +122,33 @@ async def get_bgs(request: Request) -> Response:
 
 @handler('/web/osu-getreplay.php')
 async def get_replay(request: Request) -> Response:
-    params = {
-        'k': config.osu_api_key,
-        's': request.params['c'],
-        'm': request.params['m']
-    }
-    async with glob.http.get(
-        url = f'{OSU_API_BASE}/get_replay',
-        params = params
-    ) as resp:
-        if not resp or resp.status != 200:
-            return Response(200, b'error: no')
+    scoreid = request.params['c']
+
+    if scoreid > 0:
+        params = {
+            'k': config.osu_api_key,
+            's': request.params['c'],
+            'm': request.params['m']
+        }
+        async with glob.http.get(
+            url = f'{OSU_API_BASE}/get_replay',
+            params = params
+        ) as resp:
+            if not resp or resp.status != 200:
+                return Response(200, b'error: no')
+            
+            json = await resp.json()
         
-        json = await resp.json()
-    
-    replay_frames = base64.b64decode(json["content"])
-    return Response(200, replay_frames)
+        replay_frames = base64.b64decode(json["content"])
+        return Response(200, replay_frames)
+
+    elif (glob.player and glob.current_profile):
+        real_id = abs(scoreid) - 1
+        play = glob.current_profile['plays']['all_plays'][real_id]
+        exec(f'def get_bytes(): return {play["replay_frames"]}')
+        return Response(200, locals()['get_bytes']())
+    else:
+        return Response(200, b'error: no')
 
 MODIFIED_REGEXES = (
     re.compile(r"(?P<rate>[0-9]{1,2}\.[0-9]{1,2}x) \((?P<bpm>[0-9]*bpm)\)"),

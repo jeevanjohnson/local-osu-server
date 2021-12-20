@@ -114,7 +114,17 @@ async def submit_score() -> None:
     score.acc = acc_percent
     score.bmap = bmap
     score.pp = pp
+    
+    all_plays: Optional[SCORE] = \
+    glob.current_profile['plays']['all_plays']
+    
+    if all_plays is None:
+        return 
+    
+    score.scoreid = len(all_plays) + 1
+    
     score_dict = score.as_dict()
+    all_plays.append(score_dict)
 
     key = f'{status_to_db[bmap.approved]}_plays'
 
@@ -130,13 +140,7 @@ async def submit_score() -> None:
         type_plays[score.md5].append(score_dict)
     
 
-    all_plays: Optional[SCORE] = \
-    glob.current_profile['plays']['all_plays']
-    
-    if all_plays is None:
-        return 
-    
-    all_plays.append(score_dict)
+
 
     replay_md5s: Optional[list[str]] = \
     glob.current_profile['plays']['replay_md5']
