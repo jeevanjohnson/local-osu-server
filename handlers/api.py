@@ -1,6 +1,7 @@
 import utils
 import orjson
 from ext import glob
+import pyttanko as oppai
 from utils import handler
 from objects import Score
 from server import Request
@@ -126,6 +127,9 @@ async def tops(request: Request) -> Response:
             await Beatmap.from_md5(play['md5'])
         )
 
+        mods_str = oppai.mods_str(play['mods']).upper()
+        play['mods_str'] = 'NM' if mods_str == 'NOMOD' else mods_str
+        
         if bmap:
             bmap_dict = bmap.as_dict()
             try: del bmap_dict['file_content']
@@ -137,6 +141,7 @@ async def tops(request: Request) -> Response:
         
         try: del play['replay_frames']
         except: pass
+
         response_json['plays'].append(play)
 
     return Response(
@@ -205,6 +210,9 @@ async def recent(request: Request) -> Response:
             await Beatmap.from_md5(play['md5'])
         )
 
+        mods_str = oppai.mods_str(play['mods']).upper()
+        play['mods_str'] = 'NM' if mods_str == 'NOMOD' else mods_str
+
         if bmap:
             bmap_dict = bmap.as_dict()
             try: del bmap_dict['file_content']
@@ -216,6 +224,7 @@ async def recent(request: Request) -> Response:
 
         try: del play['replay_frames']
         except: pass
+    
         response_json['plays'].append(play)
 
     return Response(

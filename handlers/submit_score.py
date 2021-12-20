@@ -138,9 +138,6 @@ async def submit_score() -> None:
         type_plays[score.md5] = [score_dict]
     else:
         type_plays[score.md5].append(score_dict)
-    
-
-
 
     replay_md5s: Optional[list[str]] = \
     glob.current_profile['plays']['replay_md5']
