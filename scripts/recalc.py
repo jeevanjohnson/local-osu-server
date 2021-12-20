@@ -1,3 +1,4 @@
+PATH_TO_MODIFIED_BEATMAPS = r''
 PATH_TO_PROFILES = r''
 OSU_API_KEY = r''
 
@@ -43,41 +44,47 @@ class Score(TypedDict):
     time: float
 
 file = JsonFile(PATH_TO_PROFILES)
+modified_bmaps = JsonFile(PATH_TO_MODIFIED_BEATMAPS)
 
 http: aiohttp.ClientSession
 parser = oppai.parser()
 async def recalc(md5: str, score: Score) -> Score:
-    params = {
-        'k': OSU_API_KEY,
-        'h': md5
-    }
-    async with http.get(
-        url = f'{OSU_API_BASE}/get_beatmaps',
-        params = params
-    ) as resp:
-        if not resp or resp.status != 200:
-            score['pp'] = 0.0
-            return score
+    if md5 in modified_bmaps:
+        bmap_dict = modified_bmaps[md5].copy()
+        exec(f'def get_bytes(): return {bmap_dict["file_content"]}')
+        content = locals()['get_bytes']()
+    else:
+        params = {
+            'k': OSU_API_KEY,
+            'h': md5
+        }
+        async with http.get(
+            url = f'{OSU_API_BASE}/get_beatmaps',
+            params = params
+        ) as resp:
+            if not resp or resp.status != 200:
+                score['pp'] = 0.0
+                return score
+            
+            if not (json := await resp.json()):
+                score['pp'] = 0.0
+                return score
+            
+            bmap_json: dict = json[0]
         
-        if not (json := await resp.json()):
-            score['pp'] = 0.0
-            return score
-        
-        bmap_json: dict = json[0]
-    
-    url = f'https://osu.ppy.sh/osu/{bmap_json["beatmap_id"]}'
-    async with http.get(url) as resp:
-        if not resp or resp.status != 200:
-            score['pp'] = 0.0
-            return score
-        
-        if not (content := await resp.content.read()):
-            score['pp'] = 0.0
-            return score
-        
-        if not content:
-            score['pp'] = 0.0
-            return score
+        url = f'https://osu.ppy.sh/osu/{bmap_json["beatmap_id"]}'
+        async with http.get(url) as resp:
+            if not resp or resp.status != 200:
+                score['pp'] = 0.0
+                return score
+            
+            if not (content := await resp.content.read()):
+                score['pp'] = 0.0
+                return score
+            
+            if not content:
+                score['pp'] = 0.0
+                return score
     
     bmap = parser.map(
         osu_file = content.decode().splitlines()
@@ -92,7 +99,8 @@ async def recalc(md5: str, score: Score) -> Score:
         n300 = score["n300"],
         n100 = score["n100"], 
         n50 = score["n50"],
-        nmiss = score["nmiss"]
+        nmiss = score["nmiss"],
+        combo = score['max_combo']
     )
 
     score['pp'] = pp

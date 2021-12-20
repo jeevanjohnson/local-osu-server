@@ -119,7 +119,8 @@ async def submit_score() -> None:
         n300 = score.n300,
         n100 = score.n100, 
         n50 = score.n50,
-        nmiss = score.nmiss
+        nmiss = score.nmiss,
+        combo = score.max_combo
     )
 
     score.acc = acc_percent
