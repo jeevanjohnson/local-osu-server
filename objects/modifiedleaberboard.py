@@ -1,4 +1,5 @@
 import os
+import asyncio
 import hashlib
 from ext import glob
 from pathlib import Path
@@ -146,11 +147,31 @@ class ModifiedLeaderboard:
                 _, file_path = split
 
                 fpath = Path(file_path)
-                if params['filename'] != fpath.parts[-1]:
-                    continue
 
-                set_path = fpath
-                break
+                if glob.using_wsl:
+                    filename = fpath.name.split("\\")[-1]
+                else:
+                    filename = fpath.parts[-1]
+
+                if params['filename'] == filename:
+                    set_path = fpath
+
+                    if glob.using_wsl:
+                        # call wslpath to get their linux path from the windows one
+                        # TODO: this can be done manually (without wslpath),
+                        #       to avoid the subprocess
+                        wslpath_proc = await asyncio.subprocess.create_subprocess_exec(
+                            "wslpath",
+                            set_path,
+                            stdin=asyncio.subprocess.DEVNULL,
+                            stdout=asyncio.subprocess.PIPE,
+                            stderr=asyncio.subprocess.DEVNULL,
+                        )
+                        stdin, _ = await wslpath_proc.communicate()
+
+                        set_path = Path(stdin.decode().removesuffix('\n'))
+
+                    break
 
             if (
                 not set_path or
