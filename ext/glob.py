@@ -34,6 +34,6 @@ current_profile: Optional[dict[str, Any]] = None
 handlers: dict[Union[str, re.Pattern], Callable] = {}
 
 using_wsl = (
-    sys.platform == "win32" and
-    "microsoft-standard-WSL" in os.uname().release
+    sys.platform == 'win32' and
+    'microsoft-standard-WSL' in os.uname().release
 )
