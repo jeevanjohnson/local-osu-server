@@ -1,4 +1,6 @@
+import os
 import re
+import sys
 import asyncio
 from typing import Any
 from pathlib import Path
@@ -30,3 +32,8 @@ replay_folder: Optional['File'] = None
 screenshot_folder: Optional[Path] = None
 current_profile: Optional[dict[str, Any]] = None
 handlers: dict[Union[str, re.Pattern], Callable] = {}
+
+using_wsl = (
+    sys.platform == 'win32' and
+    'microsoft-standard-WSL' in os.uname().release
+)
