@@ -11,6 +11,8 @@ from objects.replay import Replay
 from objects.beatmap import Beatmap
 from objects.modifiedbeatmap import ModifiedBeatmap
 
+BEATMAP = Union[Beatmap, ModifiedBeatmap]
+
 class BanchoScore:
     def __init__(self, bancho_score: dict[str, str]) -> None:
         self.score_id = bancho_score['score_id']
@@ -46,7 +48,7 @@ class Score:
         perfect: bool, mods: int, time: int,
         replay: Optional[Replay] = None, 
         additional_mods: Optional[int] = None,
-        bmap: Optional[Union[Beatmap, ModifiedBeatmap]] = None,
+        bmap: Optional[BEATMAP] = None,
         acc: Optional[float] = None, pp: Optional[float] = None, 
         replay_md5: Optional[str] = None, scoreid: Optional[int] = None,
         replay_frames: Optional[bytes] = None

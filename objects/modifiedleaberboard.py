@@ -67,11 +67,12 @@ class Params(TypedDict):
     set_id: int
     md5: str
 
+BEATMAP = Union[Beatmap, ModifiedBeatmap]
 class ModifiedLeaderboard:
     def __init__(self) -> None:
         self.scores: list[Score] = []
         self.personal_score: Optional[Score] = None
-        self.original_bmap: Optional[Union[Beatmap, ModifiedBeatmap]] = None
+        self.original_bmap: Optional[BEATMAP] = None
 
     @property
     def lb_base_fmt(self) -> Optional[bytes]:

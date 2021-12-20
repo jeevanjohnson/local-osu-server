@@ -55,13 +55,12 @@ SCORE_FORMAT = (
 )
 VALID_LB_STATUESES = (LOVED, QUALIFIED, RANKED, APPROVED)
 
+SCORE = Union[Score, BanchoScore]
 class Leaderboard:
     def __init__(self) -> None:
-        self.personal_score: Optional[Score] = None
-        self.scores: list[Union[Score, BanchoScore]] = []
-        
+        self.scores: list[SCORE] = []
         self.bmap: Optional[Beatmap] = None
-        # self.bmap: Optional[Union[Beatmap, ModifiedBeatmap]] = None
+        self.personal_score: Optional[Score] = None
     
     @property
     def lb_base_fmt(self) -> Optional[bytes]:
@@ -206,11 +205,11 @@ class Leaderboard:
                 url = f'{OSU_API_BASE}/get_scores',
                 params = params
             ) as resp:            
-                scores: list[Union[Score, BanchoScore]] = [
+                scores: list[SCORE] = [
                     BanchoScore(x) for x in await resp.json()
                 ]
         else:
-            scores: list[Union[Score, BanchoScore]] = []
+            scores: list[SCORE] = []
 
         lb.scores = scores
         if (
