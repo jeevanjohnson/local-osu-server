@@ -161,7 +161,7 @@ class ModifiedLeaderboard:
                         # TODO: this can be done manually (without wslpath),
                         #       to avoid the subprocess
                         wslpath_proc = await asyncio.subprocess.create_subprocess_exec(
-                            "wslpath",
+                            'wslpath',
                             set_path,
                             stdin=asyncio.subprocess.DEVNULL,
                             stdout=asyncio.subprocess.PIPE,
