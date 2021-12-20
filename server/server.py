@@ -1,4 +1,5 @@
 import re
+import http
 import socket
 import asyncio
 from typing import Any
@@ -6,7 +7,13 @@ from typing import Union
 from typing import Callable
 from typing import Optional
 from typing import TypedDict
-from WebLamp.utils import http_status_codes
+
+# https://datatracker.ietf.org/doc/html/rfc7231#section-6s
+HTTP_STATUS_CODES = {
+	# {418: "I'm a Teapot"}
+	status.value: status.phrase
+	for status in http.HTTPStatus
+}
 
 # TODO: define more types?
 class Request:
@@ -70,7 +77,7 @@ class Response:
 
     def to_bytes(self) -> bytes:        
         resp = bytearray((
-            f'HTTP/1.1 {self.code} {http_status_codes[self.code]}\r\n'
+            f'HTTP/1.1 {self.code} {HTTP_STATUS_CODES[self.code]}\r\n'
             f'Content-Length: {len(self.body)}\r\n'
         ).encode())
 
