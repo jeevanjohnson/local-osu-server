@@ -158,7 +158,7 @@ async def submit_score() -> None:
 
     score_str = (
         f'{bmap.artist} - {bmap.title} [{bmap.version}]\n'
-        f'+{mods_str} {score.acc:.2f}%\n'
+        f'+{score.mods_str} {score.acc:.2f}%\n'
         f'{get_grade(score)} {score.pp:.0f}PP {score.nmiss}x\n'
         f'was successfully submitted!'
     )
@@ -168,7 +168,7 @@ async def submit_score() -> None:
     """Sends score to recent channel"""
     msg = (
         f'{bmap.artist} - {bmap.title} [{bmap.version}]\n'
-        f'+{mods_str} {score.acc:.2f}% {get_grade(score)} {score.pp:.0f}PP '
+        f'+{score.mods_str} {score.acc:.2f}% {get_grade(score)} {score.pp:.0f}PP '
         f'{score.max_combo}x/{bmap.max_combo}x {score.nmiss}X'
     )
     if config.ping_user_when_recent_score:
