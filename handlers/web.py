@@ -153,7 +153,7 @@ async def get_replay(request: Request) -> Response:
 
     elif (glob.player and glob.current_profile):
         real_id = abs(scoreid) - 1
-        play = glob.current_profile['plays']['all_plays'][real_id]
+        play = glob.current_profile['plays']['all_plays'][real_id].copy()
 
         if (
             'replay_frames' not in play or

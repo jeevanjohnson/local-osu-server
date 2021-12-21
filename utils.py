@@ -99,6 +99,6 @@ def filter_top_scores(_scores: list[dict]) -> list[dict]:
 
     return scores
 
-def log(*message: str, color: str = Color.WHITE):
+def log(*message: str, color: str = Color.WHITE) -> None:
     print(f"{color}{' '.join(message)}")
     return

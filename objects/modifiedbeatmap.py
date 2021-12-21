@@ -153,4 +153,6 @@ class ModifiedBeatmap:
         utils.update_files()
 
         if return_modified:
-            return ModifiedBeatmap.from_dict(_dict)
+            return ModifiedBeatmap.from_dict(
+                _dict = _dict.copy()
+            )
