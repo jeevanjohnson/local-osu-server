@@ -88,7 +88,10 @@ async def while_server_running() -> None:
     
     while await asyncio.sleep(0.5, result=True):
         if glob.replay_folder.is_changed() and glob.player:
-            await glob.handlers['score_sub']() 
+            try:
+                await glob.handlers['score_sub']() 
+            except Exception as e:
+                log(str(e), color = Color.RED)
 
 server = Server()
 DEFAULT_RESPONSE = Response(200, b'')
