@@ -51,7 +51,7 @@ class Score:
         bmap: Optional[BEATMAP] = None,
         acc: Optional[float] = None, pp: Optional[float] = None, 
         replay_md5: Optional[str] = None, scoreid: Optional[int] = None,
-        replay_frames: Optional[bytes] = None
+        replay_frames: Optional[bytes] = None, mods_str: Optional[str] = None
     ) -> None:
         self.mode = mode
         self.md5 = md5
@@ -75,6 +75,7 @@ class Score:
         self.time = time
         self.scoreid = scoreid
         self.replay_frames = replay_frames
+        self.mods_str = mods_str
     
     def as_dict(self) -> dict[str, Any]:
         score = self.__dict__.copy()
