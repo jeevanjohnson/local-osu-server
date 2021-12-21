@@ -16,6 +16,7 @@ OSU_DAILY_API = 'https://osudaily.net/api'
 class Player:
     def __init__(self, name: str, from_login: bool = False) -> None:
         self.name = name
+        self.from_login = from_login
         if (
             name not in glob.profiles
             and from_login
@@ -136,5 +137,6 @@ class Player:
             self.playcount = glob.current_profile['playcount']
         
         self.rank = await self.get_rank()
-
-        self.queue += packets.userStats(self)
+        
+        if self.from_login:
+            self.queue += packets.userStats(self)

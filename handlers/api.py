@@ -133,8 +133,9 @@ async def tops(request: Request) -> Response:
             await Beatmap.from_md5(play['md5'])
         )
 
-        mods_str = oppai.mods_str(play['mods']).upper()
-        play['mods_str'] = 'NM' if mods_str == 'NOMOD' else mods_str
+        if 'mods_str' not in play:
+            mods_str = oppai.mods_str(play['mods']).upper()
+            play['mods_str'] = 'NM' if mods_str == 'NOMOD' else mods_str
 
         if bmap:
             bmap_dict = bmap.as_dict()
@@ -215,8 +216,9 @@ async def recent(request: Request) -> Response:
             await Beatmap.from_md5(play['md5'])
         )
 
-        mods_str = oppai.mods_str(play['mods']).upper()
-        play['mods_str'] = 'NM' if mods_str == 'NOMOD' else mods_str
+        if 'mods_str' not in play:
+            mods_str = oppai.mods_str(play['mods']).upper()
+            play['mods_str'] = 'NM' if mods_str == 'NOMOD' else mods_str
 
         if bmap:
             bmap_dict = bmap.as_dict()

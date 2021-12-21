@@ -71,29 +71,29 @@ BEATMAP = Union[Beatmap, ModifiedBeatmap]
 class ModifiedLeaderboard:
     def __init__(self) -> None:
         self.scores: list[Score] = []
+        self.bmap: Optional[BEATMAP] = None
         self.personal_score: Optional[Score] = None
-        self.original_bmap: Optional[BEATMAP] = None
 
     @property
     def lb_base_fmt(self) -> Optional[bytes]:
-        if not self.original_bmap:
+        if not self.bmap:
             return
         
         return STARTING_LB_FORMAT.format(
-            rankedstatus = FROM_API_TO_SERVER_STATUS[self.original_bmap.approved],
-            mapid = self.original_bmap.beatmap_id,
-            setid = self.original_bmap.beatmapset_id,
+            rankedstatus = FROM_API_TO_SERVER_STATUS[self.bmap.approved],
+            mapid = self.bmap.beatmap_id,
+            setid = self.bmap.beatmapset_id,
             num_of_scores = len(self.scores),
-            artist_unicode = self.original_bmap.artist_unicode or self.original_bmap.artist,
-            title_unicode = self.original_bmap.title_unicode or self.original_bmap.title
+            artist_unicode = self.bmap.artist_unicode or self.bmap.artist,
+            title_unicode = self.bmap.title_unicode or self.bmap.title
         ).encode()
 
     @property
     def as_binary(self) -> bytes:
-        if not self.original_bmap:
+        if not self.bmap:
             return b'0|false'
         
-        r = FROM_API_TO_SERVER_STATUS[self.original_bmap.approved]
+        r = FROM_API_TO_SERVER_STATUS[self.bmap.approved]
         if r not in VALID_LB_STATUESES:
             return f'{r}|false'.encode()
 
@@ -213,16 +213,22 @@ class ModifiedLeaderboard:
                 return lb
             
             if isinstance(orignal_value, int):
-                lb.original_bmap = bmap = await Beatmap.from_id(orignal_value)
+                bmap = await Beatmap.from_id(orignal_value)
             else:
-                lb.original_bmap = bmap = await Beatmap.from_md5(orignal_value)
+                bmap = await Beatmap.from_md5(orignal_value)
             
             if not bmap:
                 return lb
             
-            ModifiedBeatmap.add_to_db(bmap, params, set_path)
+            lb.bmap = bmap = ModifiedBeatmap.add_to_db(
+                bmap, params, set_path, return_modified = True
+            )
+
+            if not bmap:
+                return lb
+
         else:
-            lb.original_bmap = bmap = await ModifiedBeatmap.from_md5(params['md5'])
+            lb.bmap = bmap = await ModifiedBeatmap.from_md5(params['md5'])
             if not bmap:
                 return lb
 

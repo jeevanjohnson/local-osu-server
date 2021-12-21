@@ -68,7 +68,7 @@ class Beatmap:
         self.diff_aim: float
         self.diff_speed: float
         self.difficultyrating: float
-        self.file_content: bytes
+        self.file_content: Optional[bytes]
     
     def as_dict(self) -> dict:
         bmap = self.__dict__.copy()
@@ -83,7 +83,7 @@ class Beatmap:
     @functools.cached_property
     def map_file(self) -> oppai.beatmap:
         return parser.map(
-            osu_file = self.file_content.decode().splitlines()
+            osu_file = self.file_content.decode().splitlines() # type: ignore
         )
     
     async def get_file(self) -> Optional[bytes]:
@@ -109,6 +109,17 @@ class Beatmap:
         glob.beatmaps[self.file_md5] = self.as_dict()
         glob.beatmaps[str(self.beatmap_id)] = self.as_dict()
         utils.update_files()
+    
+    @classmethod
+    def from_dict(cls, _dict: dict[str, Any]) -> 'Beatmap':
+        bmap = cls()
+        bmap.__dict__.update(**_dict)
+
+        if 'file_content' in _dict:
+            exec(f'def get_bytes(): return {bmap.file_content}')
+            bmap.file_content = locals()['get_bytes']()
+
+        return bmap
 
     @classmethod
     def from_db(cls, value: Union[str, int]) -> Optional['Beatmap']:

@@ -1,6 +1,7 @@
 import utils
 import functools
 from ext import glob
+from typing import Any
 from pathlib import Path
 import pyttanko as oppai
 from typing import Optional
@@ -91,14 +92,37 @@ class ModifiedBeatmap:
         bmap_dict['file_content'] = locals()['get_bytes']()
 
         bmap_dict['file_path'] = Path(bmap_dict['file_path'])
-        bmap_dict['original_bmap'] = await Beatmap.from_id(
-            bmap_dict['id']
-        )
+
+        if 'original_bmap' not in bmap_dict:
+            bmap_dict['original_bmap'] = await Beatmap.from_id(
+                bmap_dict['id']
+            )
+        else:
+            bmap_dict['original_bmap'] = Beatmap.from_dict(
+                bmap_dict['original_bmap']
+            )
 
         return cls(**bmap_dict)
     
+    @classmethod
+    def from_dict(cls, _dict: dict[str, Any]) -> 'ModifiedBeatmap':
+        bmap = cls()
+        bmap.__dict__.update(**_dict)
+
+        bmap.file_path = Path(bmap.file_path)
+
+        exec(f'def get_bytes(): return {bmap.file_content}')
+        bmap.file_content = locals()['get_bytes']()
+
+        bmap.original_bmap = Beatmap.from_dict(bmap.original_bmap) # type: ignore
+
+        return bmap
+
     @staticmethod
-    def add_to_db(bmap: Beatmap, params: Params, path_to_modified: Path) -> None:
+    def add_to_db(
+        bmap: Beatmap, params: Params, 
+        path_to_modified: Path, return_modified: bool = False
+    ) -> Optional['ModifiedBeatmap']:
         if (md5 := params['md5']) in glob.modified_beatmaps:
             return
 
@@ -110,7 +134,7 @@ class ModifiedBeatmap:
         split = lower_filename.split(url_parsed)        
         version = f"[{bmap.version}{split[-1][:-4]}"
         
-        glob.modified_beatmaps[md5] = {
+        glob.modified_beatmaps[md5] = _dict = {
             'md5': md5,
             'rank_status': bmap.approved,
             'id': bmap.beatmap_id,
@@ -127,3 +151,6 @@ class ModifiedBeatmap:
         }
 
         utils.update_files()
+
+        if return_modified:
+            return ModifiedBeatmap.from_dict(_dict)

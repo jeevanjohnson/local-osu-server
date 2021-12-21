@@ -116,6 +116,9 @@ async def submit_score() -> None:
     score.acc = acc_percent
     score.bmap = bmap
     score.pp = pp
+
+    mods_str = oppai.mods_str(score.mods).upper()
+    score.mods_str = 'NM' if mods_str == 'NOMOD' else mods_str
     
     all_plays: Optional[SCORE] = \
     glob.current_profile['plays']['all_plays']
@@ -152,10 +155,6 @@ async def submit_score() -> None:
 
     utils.update_files()
     await glob.player.update()
-
-    """Sends notification to the user"""
-    mods_str = oppai.mods_str(score.mods).upper()
-    mods_str = 'NM' if mods_str == 'NOMOD' else mods_str
 
     score_str = (
         f'{bmap.artist} - {bmap.title} [{bmap.version}]\n'
