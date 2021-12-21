@@ -154,14 +154,25 @@ async def get_replay(request: Request) -> Response:
     elif (glob.player and glob.current_profile):
         real_id = abs(scoreid) - 1
         play = glob.current_profile['plays']['all_plays'][real_id]
-        exec(f'def get_bytes(): return {play["replay_frames"]}')
-        
-        log(
-            f"{glob.player.name}'s replay was handled", 
-            color = Color.LIGHTGREEN_EX
-        )
 
-        return Response(200, locals()['get_bytes']())
+        if (
+            'replay_frames' not in play or
+            play['replay_frames'] is None
+        ):
+            log(
+                f'no replay frames were found for scoreid: {real_id}',
+                color = Color.RED
+            )
+            return Response(200, b'error: no')
+        else:
+            exec(f'def get_bytes(): return {play["replay_frames"]}')
+
+            log(
+                f"{glob.player.name}'s replay was handled", 
+                color = Color.LIGHTGREEN_EX
+            )
+
+            return Response(200, locals()['get_bytes']())
     else:
         log('error handling replay', color = Color.RED)
         return Response(200, b'error: no')

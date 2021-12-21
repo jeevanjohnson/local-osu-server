@@ -100,6 +100,10 @@ class Score:
         if 'time' not in dictionary:
             dictionary['time'] = time.time()
         
+        if 'replay_frames' in dictionary:
+            exec(f'def get_bytes(): return {dictionary["replay_frames"]}')
+            dictionary['replay_frames'] = locals()['get_bytes']()
+
         return Score(**dictionary)
 
     @classmethod
