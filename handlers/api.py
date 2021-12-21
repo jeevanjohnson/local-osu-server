@@ -28,7 +28,7 @@ async def client_handlers(request: Request) -> Response:
             f'handling {path.split("/")[-1]} button for client',
             color = Color.GREEN
         )
-    
+
     return await glob.handlers[path](request)
 
 @handler('/api/v1/profile')
@@ -48,7 +48,7 @@ async def profile(request: Request) -> Response:
             }),
             headers = {'Content-type': 'application/json charset=utf-8'}
         )
-    
+
     p = Player(params['u'])
     await p.update()
 
@@ -86,7 +86,7 @@ async def tops(request: Request) -> Response:
             }),
             headers = {'Content-type': 'application/json charset=utf-8'}
         )
-    
+
     if 'limit' not in params:
         limit = 100
     else:
@@ -102,7 +102,7 @@ async def tops(request: Request) -> Response:
             }),
             headers = {'Content-type': 'application/json charset=utf-8'}
         )
-    
+
     profile = glob.profiles[name]
     response_json = {
         'status': 'success!',
@@ -117,12 +117,12 @@ async def tops(request: Request) -> Response:
 
     approved_plays: Optional[APPROVED_PLAYS] = \
     profile['plays']['approved_plays']
-    
+
     for plays in (ranked_plays, approved_plays):
         if plays:
             for v in plays.values():
                 scores.extend(v)
-    
+
     scores.sort(key = lambda s: s['pp'], reverse = True)
     top_scores = utils.filter_top_scores(scores[:limit])
     top_scores.sort(key = lambda s: s['pp'], reverse = True)
@@ -135,16 +135,16 @@ async def tops(request: Request) -> Response:
 
         mods_str = oppai.mods_str(play['mods']).upper()
         play['mods_str'] = 'NM' if mods_str == 'NOMOD' else mods_str
-        
+
         if bmap:
             bmap_dict = bmap.as_dict()
             try: del bmap_dict['file_content']
             except: pass
-            
+
             play['bmap'] = bmap_dict
         else:
             play['bmap'] = None
-        
+
         try: del play['replay_frames']
         except: pass
 
@@ -173,7 +173,7 @@ async def recent(request: Request) -> Response:
             }),
             headers = {'Content-type': 'application/json charset=utf-8'}
         )
-    
+
     name: str = params['u']
     if name not in glob.profiles:
         Response(
@@ -184,12 +184,12 @@ async def recent(request: Request) -> Response:
             }),
             headers = {'Content-type': 'application/json charset=utf-8'}
         )
-    
+
     if 'limit' not in params:
         limit = 100
     else:
         limit = params['limit']
-    
+
     profile = glob.profiles[name]
     response_json = {
         'status': 'success!',
@@ -202,11 +202,10 @@ async def recent(request: Request) -> Response:
 
     if not scores:
         scores = []
-    
+
     scores.sort(
-        key = lambda s: s['time'] 
-        if 'time' in s else 0, 
-        
+        key = lambda s: s['time']
+        if 'time' in s else 0,
         reverse = True
     )
 
@@ -223,14 +222,14 @@ async def recent(request: Request) -> Response:
             bmap_dict = bmap.as_dict()
             try: del bmap_dict['file_content']
             except: pass
-            
+
             play['bmap'] = bmap_dict
         else:
             play['bmap'] = None
 
         try: del play['replay_frames']
         except: pass
-    
+
         response_json['plays'].append(play)
 
     return Response(
@@ -246,12 +245,12 @@ async def _recalc(md5: str, score: Score) -> dict:
     )
 
     if (
-        not bmap or 
+        not bmap or
         not await bmap.get_file()
     ):
         score.pp = 0.0
         return score.as_dict()
-    
+
     pp, acc = utils.calculator(score, bmap)
 
     score.pp = pp
@@ -269,7 +268,7 @@ async def recalc(request: Request) -> Response:
             f'{index_of_profile}/{len(profiles)}', 'profiles calculated.',
             color = Color.LIGHTMAGENTA_EX
         )
-    
+
         profile = profiles[profile_name]
 
         for index_of_type_plays, map_status in enumerate(ACCEPTED_PLAYS):
@@ -284,28 +283,28 @@ async def recalc(request: Request) -> Response:
             for index_of_maps, (md5, map_plays) in enumerate(plays.items()):
                 for idx, play in enumerate(map_plays):
                     map_plays[idx] = await _recalc(
-                        md5 = md5, 
+                        md5 = md5,
                         score = Score.from_dict(play)
                     )
 
                     log(
-                        f'{idx+1}/{len(map_plays)}', 
+                        f'{idx+1}/{len(map_plays)}',
                         'plays in this map calculated.',
                         color = Color.LIGHTMAGENTA_EX
                     )
-            
+
                 log(
                     f'{index_of_maps + 1}/{len(plays.values())}',
                     'maps calculated.', color = Color.LIGHTMAGENTA_EX
                 )
-    
+
     utils.update_files()
     response_msg = {
-        'status': 'success!', 
+        'status': 'success!',
         'message': 'all profiles were calculated!'
     }
     return Response(
-        code = 200, 
+        code = 200,
         body = JSON(response_msg),
         headers = {'Content-type': 'application/json charset=utf-8'}
     )
