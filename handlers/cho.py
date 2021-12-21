@@ -75,7 +75,11 @@ async def login() -> tuple[BODY, CHO_TOKEN]:
     glob.current_profile = glob.profiles[p.name]
 
     body += packets.userID(p.userid)
-    body += packets.notification('have fun!')
+    body += packets.notification((
+        'When it comes to funorange speed up maps, '
+        'you might have to recreate a map in order for it to '
+        'show proper rankings, other then that have fun!'
+    ))
     body += packets.protocolVersion()
     body += packets.banchoPrivs(p)
     body += packets.friendsList(0)
