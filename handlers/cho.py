@@ -2,6 +2,8 @@ import config
 import packets
 import asyncio
 from ext import glob
+from utils import log
+from utils import Color
 from utils import handler
 from server import Request
 from objects import Player
@@ -43,7 +45,8 @@ profile_name: Optional[str] = None
 @handler('/web/bancho_connect.php')
 async def bancho_connect(request: Request) -> Response:
     global profile_name
-    profile_name = urlparse.unquote(request.params['u'])
+    profile_name = urlparse.unquote(request.params['u']).strip()
+    log('Got a player name of', profile_name, color = Color.LIGHTBLUE_EX)
     return Response(200, b'')
 
 @handler('login')
@@ -65,7 +68,7 @@ async def login() -> tuple[BODY, CHO_TOKEN]:
         body += packets.notification(
             'Please restart your game to login!'
         )
-
+        log('Player needs to restart game!', color = Color.YELLOW)
         return body, 'fail'
 
     glob.player = p = Player(profile_name, from_login=True)
@@ -114,4 +117,5 @@ async def login() -> tuple[BODY, CHO_TOKEN]:
             userid = -1,
         )
 
+    log(glob.player.name, 'successfully logged in!', color = Color.GREEN)
     return body, 'success'

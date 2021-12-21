@@ -1,10 +1,11 @@
 import re
-import time
 
 import orjson
 import packets
 import asyncio
 from ext import glob
+from utils import log
+from utils import Color
 from server import Server
 from server import Request
 from server import Response
@@ -12,6 +13,7 @@ from server import Response
 import utils
 import config
 import pyimgur
+import colorama
 from objects import File
 from pathlib import Path
 from aiohttp import ClientSession
@@ -20,6 +22,7 @@ from objects.jsonfile import JsonFile
 # TODO: simplify path init
 async def on_start_up() -> None:
     glob.http = ClientSession()
+    colorama.init(autoreset=True)
 
     if config.paths['osu! path'] is not None:
         osu_path = Path(config.paths['osu! path'])
@@ -100,21 +103,17 @@ async def osu(request: Request) -> Response:
             if handler != path:
                 continue
             
-            st = time.time()
             resp = await glob.handlers[handler](request)
-            print(f'{time.time()-st:.3f} time took to handle', path)
             return resp
         
         if (m := handler.match(path)):
             request.args |= m.groupdict()
-            st = time.time()
             resp = await glob.handlers[handler](request)
-            print(f'{time.time()-st:.3f} time took to handle', path)
             return resp
         
         continue
         
-    print(path, 'not handled')
+    log(path, "isn't handled", color = Color.RED)
     return DEFAULT_RESPONSE
 
 @server.get(
@@ -176,6 +175,12 @@ async def website(request: Request) -> Response:
 import handlers # load all handlers
 
 if __name__ == '__main__':
+    try:
+        import uvloop # type: ignore
+        uvloop.install()
+    except:
+        pass
+
     server.run(
         bind = ('127.0.0.1', 5000),
         listening = 16,

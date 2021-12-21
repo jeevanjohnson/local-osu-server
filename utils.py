@@ -3,6 +3,7 @@ import asyncio
 from pathlib import Path
 import pyttanko as oppai
 from typing import Union
+from colorama import Fore
 from typing import Literal
 from typing import Callable
 from typing import TYPE_CHECKING
@@ -16,6 +17,8 @@ try:
     from ext import glob
 except ImportError:
     pass
+
+Color = Fore
 
 PP = float
 ACCURACY = float
@@ -95,3 +98,7 @@ def filter_top_scores(_scores: list[dict]) -> list[dict]:
             scores.append(s)
 
     return scores
+
+def log(*message: str, color: str = Color.WHITE):
+    print(f"{color}{' '.join(message)}")
+    return

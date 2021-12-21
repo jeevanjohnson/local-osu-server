@@ -1,9 +1,11 @@
-pipreqs
-pyimgur
-pyttanko
-aiohttp
 borgor
 orjson
+uvloop
+aiohttp
+pipreqs
+pyimgur
+colorama
+pyttanko
 pydantic
 colorama
 pyperclip

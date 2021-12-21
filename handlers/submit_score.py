@@ -2,6 +2,8 @@ import utils
 import config
 import packets
 from ext import glob
+from utils import log
+from utils import Color
 import pyttanko as oppai
 from utils import handler
 from objects import Score
@@ -179,3 +181,5 @@ async def submit_score() -> None:
         target = '#recent',
         userid = -1,
     )
+
+    log(glob.player.name, 'has successfully submitted a score!', color = Color.GREEN)

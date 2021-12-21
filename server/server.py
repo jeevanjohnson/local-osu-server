@@ -239,7 +239,9 @@ class Server:
             sock.listen(listening)
             sock.setblocking(False)
 
-            print('server is running!')
+            print(
+                f'Server is up and running on port {bind[1]}!'
+            )
 
             try:
                 while True:

@@ -34,14 +34,10 @@ To make/play with different profiles, when logging in be sure to put the usernam
 
 (Not listed in any specifc order)
 
-- Funorange speed up map status (read above)
 - Updated PP system
-- Ingame menus (includes like change pfp button or smth)
 - Alternative to `glob`
 - Better logging
 
 # Maybes
 
 - Support other modes?
-- Local API for other external program uses (programs that do this are gosumemory)
-- Local website for viewing profile? (Would take a while because frontend knowledge is not high)

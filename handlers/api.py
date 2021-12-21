@@ -1,6 +1,8 @@
 import utils
 import orjson
 from ext import glob
+from utils import log
+from utils import Color
 import pyttanko as oppai
 from utils import handler
 from objects import Score
@@ -22,6 +24,10 @@ async def client_handlers(request: Request) -> Response:
 
     if glob.player:
         request.params['u'] = glob.player.name
+        log(
+            f'handling {path.split("/")[-1]} button for client',
+            color = Color.GREEN
+        )
     
     return await glob.handlers[path](request)
 
@@ -259,7 +265,10 @@ async def recalc(request: Request) -> Response:
 
     profiles = glob.profiles
     for index_of_profile, profile_name in enumerate(profiles):
-        print(f'{index_of_profile}/{len(profiles)}', 'profiles calculated.')
+        log(
+            f'{index_of_profile}/{len(profiles)}', 'profiles calculated.',
+            color = Color.LIGHTMAGENTA_EX
+        )
     
         profile = profiles[profile_name]
 
@@ -269,7 +278,7 @@ async def recalc(request: Request) -> Response:
                 f'{index_of_type_plays + 1}/2 calculated.'
             )
 
-            print(msg)
+            log(msg, color = Color.LIGHTMAGENTA_EX)
             plays: dict[str, list[dict]] = profile['plays'][map_status]
 
             for index_of_maps, (md5, map_plays) in enumerate(plays.items()):
@@ -279,13 +288,18 @@ async def recalc(request: Request) -> Response:
                         score = Score.from_dict(play)
                     )
 
-                    print(f'{idx+1}/{len(map_plays)}', 'plays in this map calculated.')
+                    log(
+                        f'{idx+1}/{len(map_plays)}', 
+                        'plays in this map calculated.',
+                        color = Color.LIGHTMAGENTA_EX
+                    )
             
-                print(
+                log(
                     f'{index_of_maps + 1}/{len(plays.values())}',
-                    'maps calculated.'
+                    'maps calculated.', color = Color.LIGHTMAGENTA_EX
                 )
     
+    utils.update_files()
     response_msg = {
         'status': 'success!', 
         'message': 'all profiles were calculated!'

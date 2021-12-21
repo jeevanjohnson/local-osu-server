@@ -7,6 +7,8 @@ import base64
 import packets
 import pyperclip
 from ext import glob
+from utils import log
+from utils import Color
 from utils import handler
 from server import Request
 from server import Response
@@ -109,6 +111,12 @@ async def score_sub(request: Request) -> Response:
     utils.update_files()
 
     glob.player.queue += packets.userStats(glob.player)
+
+    log(
+        f"{glob.player.name}'s playcount increased!", 
+        color = Color.GREEN
+    )
+    
     return Response(200, DEFAULT_CHARTS)
 
 @handler('/web/osu-getseasonal.php')
@@ -140,14 +148,22 @@ async def get_replay(request: Request) -> Response:
             json = await resp.json()
         
         replay_frames = base64.b64decode(json["content"])
+        log('bancho replay handled', color = Color.LIGHTGREEN_EX)
         return Response(200, replay_frames)
 
     elif (glob.player and glob.current_profile):
         real_id = abs(scoreid) - 1
         play = glob.current_profile['plays']['all_plays'][real_id]
         exec(f'def get_bytes(): return {play["replay_frames"]}')
+        
+        log(
+            f"{glob.player.name}'s replay was handled", 
+            color = Color.LIGHTGREEN_EX
+        )
+
         return Response(200, locals()['get_bytes']())
     else:
+        log('error handling replay', color = Color.RED)
         return Response(200, b'error: no')
 
 MODIFIED_REGEXES = (
@@ -178,28 +194,47 @@ async def leaderboard(request: Request) -> Response:
         glob.modified_txt.exists()
     ):
         lb = await ModifiedLeaderboard.from_client(parsed_params) # type: ignore
+        log(
+            f'handled funorange map of {parsed_params["filename"]}', 
+            color = Color.GREEN
+        )
     elif config.osu_api_key:
         lb = await Leaderboard.from_bancho(**parsed_params)
+        log(
+            f'handled bancho map of setid: {parsed_params["set_id"]}', 
+            color = Color.GREEN
+        )
     else:
         lb = await Leaderboard.from_offline(**parsed_params)
-        
-    return Response(200, lb.as_binary) # type: ignores
+        log(
+            f'handled beatmap while offline: {parsed_params["filename"]}', 
+            color = Color.GREEN
+        )
+
+    return Response(200, lb.as_binary)
 
 BASE_URL = 'https://beatconnect.io'
 @handler(re.compile(r'/d/(?P<setid>[0-9]*)'))
 async def download(request: Request) -> Response:
-    url = '{base_url}/b/{setid}'.format(
-        base_url = BASE_URL,
-        setid = request.args['setid']
-    )
+    setid = request.args['setid']
+    url = f'{BASE_URL}/b/{setid}'
+
     async with glob.http.get(url) as resp:
         if (
             not resp or
             resp.status != 200 or
             not (osz_binary := await resp.content.read())
         ):
+            log(
+                f"can't downloaded map set, id: {setid}", 
+                color = Color.RED
+            )   
             return Response(200, b'')
 
+    log(
+        f'succesfully downloaded map set, id: {setid}', 
+        color = Color.GREEN
+    )
     return Response(
         code = 200,
         body = osz_binary,
@@ -245,8 +280,9 @@ async def direct(request: Request) -> Response:
         'token': config.beatconnect_api_key,
     }
     client_params = request.params
+    client_params['q'] = query = urlparse.unquote_plus(client_params['q'])
 
-    if client_params['q'] not in ("Newest", "Top+Rated", "Most+Played"):
+    if client_params['q'] not in ("Newest", "Top Rated", "Most Played"):
         beatconnect_params['q'] = urlparse.unquote_plus(client_params['q'])
     
     if client_params['m'] != -1:
@@ -263,6 +299,7 @@ async def direct(request: Request) -> Response:
             resp.status != 200 or 
             not (resp_dict := await resp.json())
         ):
+            log('no maps found', color = Color.RED)
             return Response(200, b'0') # no maps found
 
     maps = resp_dict['beatmaps']
@@ -277,4 +314,5 @@ async def direct(request: Request) -> Response:
         diffs = ','.join(diffs)
         bmaps.append(DIRECT_SET_FORMAT.format(**bmap, diffs=diffs)) 
 
+    log(f'maps loaded for query: `{query}` !', color = Color.GREEN)
     return Response(200, '\n'.join(bmaps).encode())
