@@ -1,7 +1,5 @@
 # Local osu! server
 
-([This is the most stable version up to date](https://github.com/coverosu/local-osu-server/tree/efb54f5cb9b2bf7f87e9caa76ab54c94874d1c44), may not have all the features you want but when more errors and bugs get reported and fixed this will change :D)
-
 Just imagine normal bancho, but you can have multiple profiles and funorange speed up maps ranked! (fun orange part is 85% done? just need testers O_O)
 
 ---
