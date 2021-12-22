@@ -37,7 +37,7 @@ menu_icon: dict[str, Optional[str]] = {
 
 """Server Config"""
 # needed for loading leaderboards
-# you can find your's here https://old.ppy.sh/p/api
+# you can find your's here https://old.ppy.sh/p/api/
 # if `None` then leaderboards won't load nor score submission
 osu_api_key: Optional[str] = '' 
 
