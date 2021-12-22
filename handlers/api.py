@@ -294,7 +294,9 @@ async def recalc(request: Request) -> Response:
                 for idx, play in enumerate(map_plays):
                     map_plays[idx] = await _recalc(
                         md5 = md5,
-                        score = Score.from_dict(play)
+                        score = Score.from_dict(
+                            play, ignore_binascii_errors = True
+                        )
                     )
 
                     log(

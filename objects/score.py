@@ -2,6 +2,7 @@ import os
 import time
 import utils
 import calendar
+import binascii
 from ext import glob
 from typing import Any
 from typing import Union
@@ -83,7 +84,10 @@ class Score:
         del score['replay']
         del score['bmap']
 
-        if self.replay_frames:
+        if (
+            self.replay_frames and 
+            isinstance(self.replay_frames, bytes)
+        ):
             score['replay_frames'] = utils.bytes_to_string(
                 score['replay_frames']
             )
@@ -102,7 +106,10 @@ class Score:
         return False
 
     @classmethod
-    def from_dict(cls, _dict: dict) -> 'Score':
+    def from_dict(
+        cls, _dict: dict,
+        ignore_binascii_errors: bool = False
+    ) -> 'Score':
         dictionary = _dict.copy()
 
         if 'time' not in dictionary:
@@ -116,9 +123,17 @@ class Score:
                 exec(f'def get_bytes(): return {dictionary["replay_frames"]}')
                 dictionary['replay_frames'] = locals()['get_bytes']()
             else:
-                dictionary['replay_frames'] = utils.string_to_bytes(
-                    dictionary['replay_frames']
-                )
+                if not ignore_binascii_errors:
+                    dictionary['replay_frames'] = utils.string_to_bytes(
+                        dictionary['replay_frames']
+                    )
+                else:
+                    try:
+                        dictionary['replay_frames'] = utils.string_to_bytes(
+                            dictionary['replay_frames']
+                        )
+                    except binascii.Error:
+                        pass
 
         return Score(**dictionary)
 
