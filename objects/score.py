@@ -6,7 +6,6 @@ import binascii
 from ext import glob
 from typing import Any
 from typing import Union
-import glob as builtin_glob
 from typing import Optional
 from datetime import datetime
 from objects.replay import Replay
@@ -145,10 +144,7 @@ class Score:
         ):
             return
         
-        files = builtin_glob.iglob(
-            str(glob.replay_folder / '*.osr')
-        )
-
+        files = glob.replay_folder.glob('*.osr')
         replay_path = glob.replay_folder / max(files , key=os.path.getctime)
         replay = Replay.from_file(str(replay_path))
         

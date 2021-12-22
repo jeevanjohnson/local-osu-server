@@ -11,7 +11,6 @@ from utils import Color
 from utils import handler
 from server import Request
 from server import Response
-import glob as builtin_glob
 from objects import Leaderboard
 import urllib.parse as urlparse
 from objects import ModifiedLeaderboard
@@ -51,10 +50,7 @@ async def osu_screenshots(request: Request) -> Response:
     ):
         return Response(200, b'img_err')
     else:
-        screenshots = builtin_glob.iglob(
-            str(glob.screenshot_folder / '*')
-        )
-
+        screenshots = glob.screenshot_folder.glob('*')
         latest_screenshot = glob.screenshot_folder / max(screenshots , key=os.path.getctime)
         
         uploaded_image = glob.imgur.upload_image(
