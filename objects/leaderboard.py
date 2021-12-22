@@ -153,7 +153,7 @@ class Leaderboard:
         if md5 not in _player_scores:
             return lb
 
-        player_scores = _player_scores[md5]
+        player_scores = _player_scores[md5].copy()
 
         player_scores.sort(key = lambda s: s['score'], reverse = True)
 

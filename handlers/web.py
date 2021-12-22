@@ -3,7 +3,6 @@ import os
 import utils
 import orjson
 import config
-import base64
 import packets
 import pyperclip
 from ext import glob
@@ -147,7 +146,7 @@ async def get_replay(request: Request) -> Response:
             
             json = await resp.json()
         
-        replay_frames = base64.b64decode(json["content"])
+        replay_frames = utils.string_to_bytes(json["content"])
         log('bancho replay handled', color = Color.LIGHTGREEN_EX)
         return Response(200, replay_frames)
 
@@ -165,14 +164,21 @@ async def get_replay(request: Request) -> Response:
             )
             return Response(200, b'error: no')
         else:
-            exec(f'def get_bytes(): return {play["replay_frames"]}')
-
             log(
                 f"{glob.player.name}'s replay was handled", 
                 color = Color.LIGHTGREEN_EX
             )
 
-            return Response(200, locals()['get_bytes']())
+            if "b\'" == play['replay_frames'][:2]:
+                exec(f'def get_bytes(): return {play["replay_frames"]}')
+                replay: bytes = locals()['get_bytes']()
+            else:
+                replay = utils.string_to_bytes(play['replay_frames'])
+
+            return Response(
+                code = 200, 
+                body = replay
+            )
     else:
         log('error handling replay', color = Color.RED)
         return Response(200, b'error: no')

@@ -1,5 +1,6 @@
 import os
 import time
+import utils
 import calendar
 from ext import glob
 from typing import Any
@@ -81,7 +82,12 @@ class Score:
         score = self.__dict__.copy()
         del score['replay']
         del score['bmap']
-        score['replay_frames'] = f"{score['replay_frames']}"
+
+        if self.replay_frames:
+            score['replay_frames'] = utils.bytes_to_string(
+                score['replay_frames']
+            )
+        
         return score
 
     @property
@@ -96,13 +102,23 @@ class Score:
         return False
 
     @classmethod
-    def from_dict(cls, dictionary: dict) -> 'Score':
+    def from_dict(cls, _dict: dict) -> 'Score':
+        dictionary = _dict.copy()
+
         if 'time' not in dictionary:
             dictionary['time'] = time.time()
-        
-        if 'replay_frames' in dictionary:
-            exec(f'def get_bytes(): return {dictionary["replay_frames"]}')
-            dictionary['replay_frames'] = locals()['get_bytes']()
+
+        if (
+            'replay_frames' in dictionary and
+            dictionary['replay_frames']
+        ):
+            if "b\'" == dictionary['replay_frames'][:2]:
+                exec(f'def get_bytes(): return {dictionary["replay_frames"]}')
+                dictionary['replay_frames'] = locals()['get_bytes']()
+            else:
+                dictionary['replay_frames'] = utils.string_to_bytes(
+                    dictionary['replay_frames']
+                )
 
         return Score(**dictionary)
 
@@ -135,7 +151,7 @@ class Score:
 
     @property
     def as_leaderboard_score(self) -> dict:
-        if self.scoreid:
+        if self.scoreid and self.replay_frames:
             sid = -self.scoreid
         else:
             sid = 0
@@ -155,5 +171,5 @@ class Score:
             'enabled_mods': self.mods,
             'user_id': 2,
             'time': self.time,
-            'replay_available': 1
+            'replay_available': 1 if sid != 0 else 0
         }

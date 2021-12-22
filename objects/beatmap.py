@@ -68,13 +68,10 @@ class Beatmap:
         self.diff_aim: float
         self.diff_speed: float
         self.difficultyrating: float
-        self.file_content: Optional[bytes]
+        self.file_content: Optional[str]
     
     def as_dict(self) -> dict:
         bmap = self.__dict__.copy()
-        if 'file_content' in bmap:
-            bmap['file_content'] = f"{bmap['file_content']}"
-       
         try: del bmap['map_file']
         except: pass
         
@@ -83,10 +80,10 @@ class Beatmap:
     @functools.cached_property
     def map_file(self) -> oppai.beatmap:
         return parser.map(
-            osu_file = self.file_content.decode().splitlines() # type: ignore
+            osu_file = self.file_content.splitlines() # type: ignore
         )
     
-    async def get_file(self) -> Optional[bytes]:
+    async def get_file(self) -> Optional[str]:
         if 'file_content' in self.__dict__:
             return self.file_content
         
@@ -95,10 +92,14 @@ class Beatmap:
             if not resp or resp.status != 200:
                 return
             
-            if not (content := await resp.content.read()):
+            content = (
+                await resp.content.read()
+            ).decode(errors='ignore')
+            
+            if not content:
                 return
             
-            self.file_content = content
+            self.file_content = content 
             return content
 
     @property
@@ -114,11 +115,6 @@ class Beatmap:
     def from_dict(cls, _dict: dict[str, Any]) -> 'Beatmap':
         bmap = cls()
         bmap.__dict__.update(**_dict)
-
-        if 'file_content' in _dict:
-            exec(f'def get_bytes(): return {bmap.file_content}')
-            bmap.file_content = locals()['get_bytes']()
-
         return bmap
 
     @classmethod
@@ -132,10 +128,6 @@ class Beatmap:
             return
         
         bmap_dict = bmap_dict.copy()
-
-        if 'file_content' in bmap_dict:
-            exec(f'def get_bytes(): return {bmap_dict["file_content"]}')
-            bmap_dict['file_content'] = locals()['get_bytes']()
         
         bmap = cls()
         for k, v in bmap_dict.items():

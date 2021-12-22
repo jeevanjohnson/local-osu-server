@@ -1,4 +1,5 @@
 import re
+import base64
 import asyncio
 from pathlib import Path
 import pyttanko as oppai
@@ -102,3 +103,9 @@ def filter_top_scores(_scores: list[dict]) -> list[dict]:
 def log(*message: str, color: str = Color.WHITE) -> None:
     print(f"{color}{' '.join(message)}")
     return
+
+def bytes_to_string(b: bytes) -> str:
+    return base64.b64encode(b).decode('ascii')
+
+def string_to_bytes(s: str):
+    return base64.b64decode(s.encode('ascii'))

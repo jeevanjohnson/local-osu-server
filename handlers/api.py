@@ -1,5 +1,6 @@
 import utils
 import orjson
+import queries
 from ext import glob
 from utils import log
 from utils import Color
@@ -17,7 +18,8 @@ JSON = orjson.dumps
 
 @handler(
     ('/api/v1/client/tops', '/api/v1/client/recalc', # type: ignore
-    '/api/v1/client/recent', '/api/v1/client/profile') # type: ignore
+    '/api/v1/client/recent', '/api/v1/client/profile', # type: ignore
+    '/api/v1/client/wipe') # type: ignore
 )
 async def client_handlers(request: Request) -> Response:
     path = request.path.replace('/client', '')
@@ -310,6 +312,57 @@ async def recalc(request: Request) -> Response:
     response_msg = {
         'status': 'success!',
         'message': 'all profiles were calculated!'
+    }
+    return Response(
+        code = 200,
+        body = JSON(response_msg),
+        headers = {'Content-type': 'application/json charset=utf-8'}
+    )
+
+@handler('/api/v1/wipe')
+async def wipe_profile(request: Request) -> Response:
+    if (
+        not (params := request.params) or
+        'u' not in params
+    ):
+        return Response(
+            code = 200,
+            body = JSON({
+                'status': 'failed',
+                'message': (
+                    'please provide a profile name in parameters\n'
+                    'example: http://127.0.0.1:5000/api/v1/client/wipe?u=profile name'
+                )
+            }),
+            headers = {'Content-type': 'application/json charset=utf-8'}
+        )
+
+    name: str = params['u']
+    if name not in glob.profiles:
+        Response(
+            code = 200,
+            body = JSON({
+                'status': 'failed',
+                'message': "profile can't be found!"
+            }),
+            headers = {'Content-type': 'application/json charset=utf-8'}
+        )
+
+    glob.profiles.update(
+        queries.init_profile(name)
+    )
+
+    utils.update_files()
+
+    if (
+        glob.player and
+        glob.player.name == name
+    ):
+        await glob.player.update()
+
+    response_msg = {
+        'status': 'success!',
+        'message': f'{name} was wiped!'
     }
     return Response(
         code = 200,

@@ -31,7 +31,7 @@ class ModifiedBeatmap:
         self.max_combo: int
         self.file_path: Path
         self.rank_status: int
-        self.file_content: bytes
+        self.file_content: str
         self.original_bmap: Beatmap
         self.title_unicode: Optional[str]
         self.artist_unicode: Optional[str]
@@ -39,14 +39,11 @@ class ModifiedBeatmap:
     @functools.cached_property
     def map_file(self) -> oppai.beatmap:
         return parser.map(
-            osu_file = self.file_content.decode().splitlines()
+            osu_file = self.file_content.splitlines()
         )
 
     def as_dict(self) -> dict:
         bmap = self.__dict__.copy()
-        if 'file_content' in bmap:
-            bmap['file_content'] = f"{bmap['file_content']}"
-       
         try: del bmap['map_file']
         except: pass
 
@@ -78,7 +75,7 @@ class ModifiedBeatmap:
     def approved(self) -> int:
         return self.rank_status
     
-    async def get_file(self) -> bytes:
+    async def get_file(self) -> str:
         return self.file_content
     
     @classmethod
@@ -87,10 +84,6 @@ class ModifiedBeatmap:
             return
         
         bmap_dict = glob.modified_beatmaps[md5].copy()
-
-        exec(f'def get_bytes(): return {bmap_dict["file_content"]}')
-        bmap_dict['file_content'] = locals()['get_bytes']()
-
         bmap_dict['file_path'] = Path(bmap_dict['file_path'])
 
         if 'original_bmap' not in bmap_dict:
@@ -110,10 +103,6 @@ class ModifiedBeatmap:
         bmap.__dict__.update(**_dict)
 
         bmap.file_path = Path(bmap.file_path)
-
-        exec(f'def get_bytes(): return {bmap.file_content}')
-        bmap.file_content = locals()['get_bytes']()
-
         bmap.original_bmap = Beatmap.from_dict(bmap.original_bmap) # type: ignore
 
         return bmap
@@ -133,7 +122,8 @@ class ModifiedBeatmap:
         ])
         split = lower_filename.split(url_parsed)        
         version = f"[{bmap.version}{split[-1][:-4]}"
-        
+
+        file_content = path_to_modified.read_bytes().decode(errors='ignore')
         glob.modified_beatmaps[md5] = _dict = {
             'md5': md5,
             'rank_status': bmap.approved,
@@ -144,7 +134,7 @@ class ModifiedBeatmap:
             'title_unicode': bmap.title_unicode,
             'artist_unicode': bmap.artist_unicode,
             'file_path': str(path_to_modified),
-            'file_content': f'{path_to_modified.read_bytes()}',
+            'file_content': file_content,
             'max_combo': bmap.max_combo,
             'version': version,
             'original_bmap': bmap.as_dict()

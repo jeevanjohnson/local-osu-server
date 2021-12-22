@@ -33,6 +33,7 @@ BUTTONS: list[BUTTON] = [
     ('http://127.0.0.1:5000/api/v1/client/recalc', 'recalc plays'),
     ('http://127.0.0.1:5000/api/v1/client/profile', 'view profile'),
     ('http://127.0.0.1:5000/api/v1/client/change_avatar', 'change avatar'),
+    ('http://127.0.0.1:5000/api/v1/client/wipe', 'wipe profile')
 ]
 
 CHO_TOKEN = str
