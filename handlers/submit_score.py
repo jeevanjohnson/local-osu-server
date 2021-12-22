@@ -45,6 +45,12 @@ status_to_db = {
     3: 'qualified',
     4: 'loved'
 }
+
+if config.allow_relax:
+    INVALID_MODS = 4204544
+else:
+    INVALID_MODS = 4204672
+
 @handler('score_sub')
 async def submit_score() -> None:
     if not glob.player:
@@ -73,7 +79,7 @@ async def submit_score() -> None:
         return 
     
     # if cinema, autopilot, cinema, or relax in mods
-    if score.mods & 4204672:
+    if score.mods & INVALID_MODS:
         glob.player.queue += packets.notification(
             "Invalid mods to submit!"
         )
