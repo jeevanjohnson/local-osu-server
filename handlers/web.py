@@ -273,7 +273,7 @@ async def leaderboard(request: Request) -> Response:
             )
         else:
             log(
-                f'handled unknown map of {parsed_params["filename"]}', 
+                f'handled bancho(?) map of {parsed_params["filename"]}', 
                 color = Color.GREEN
             )
     else:
