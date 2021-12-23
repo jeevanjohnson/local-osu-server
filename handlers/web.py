@@ -171,8 +171,7 @@ async def get_replay(request: Request) -> Response:
             )
 
             if "b\'" == play['replay_frames'][:2]:
-                exec(f'def get_bytes(): return {play["replay_frames"]}')
-                replay: bytes = locals()['get_bytes']()
+                replay: bytes = eval(play["replay_frames"])
             else:
                 replay = utils.string_to_bytes(play['replay_frames'])
 
@@ -246,7 +245,6 @@ async def leaderboard(request: Request) -> Response:
             asyncio.create_task(glob.player.update(glob.mode))
             utils.render_menu('#osu', 'Mode was switched to vanilla!', BUTTONS)
 
-    
     if config.osu_api_key:
         lb = await Leaderboard.from_bancho(parsed_params)
     else:
@@ -271,6 +269,11 @@ async def leaderboard(request: Request) -> Response:
             lb = await ModifiedLeaderboard.from_client(parsed_params) # type: ignore
             log(
                 f'handled funorange map of {parsed_params["filename"]}', 
+                color = Color.GREEN
+            )
+        else:
+            log(
+                f'handled unknown map of {parsed_params["filename"]}', 
                 color = Color.GREEN
             )
     else:

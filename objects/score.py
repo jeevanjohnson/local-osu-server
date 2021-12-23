@@ -140,8 +140,7 @@ class Score:
             dictionary['replay_frames']
         ):
             if "b\'" == dictionary['replay_frames'][:2]:
-                exec(f'def get_bytes(): return {dictionary["replay_frames"]}')
-                dictionary['replay_frames'] = locals()['get_bytes']()
+                dictionary['replay_frames'] = eval(dictionary["replay_frames"])
             else:
                 if not ignore_binascii_errors:
                     dictionary['replay_frames'] = utils.string_to_bytes(
