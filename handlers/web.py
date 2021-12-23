@@ -244,40 +244,37 @@ async def leaderboard(request: Request) -> Response:
             asyncio.create_task(glob.player.update(glob.mode))
             utils.render_menu('#osu', 'Mode was switched to vanilla!', BUTTONS)
 
-    regex_results = [
-        r.search(filename) 
-        for r in regex.modified_regexes
-    ]
-
-    name_data = regex.filename_parser.search(filename)
-    if name_data and (diff_name := name_data['diff_name']):
-        regex_results.extend([
-            r.search(diff_name) 
-            for r in regex.attribute_edits
-        ])
-
-    if (
-        any(regex_results) and
-        glob.modified_txt.exists()
-    ):
-        lb = await ModifiedLeaderboard.from_client(parsed_params) # type: ignore
-        log(
-            f'handled funorange map of {parsed_params["filename"]}', 
-            color = Color.GREEN
-        )
-    elif config.osu_api_key:
+    
+    if config.osu_api_key:
         lb = await Leaderboard.from_bancho(**parsed_params)
-        log(
-            f'handled bancho map of setid: {parsed_params["set_id"]}', 
-            color = Color.GREEN
-        )
     else:
         lb = await Leaderboard.from_offline(**parsed_params)
+
+    if not lb.bmap or lb.bmap.approved not in (1, 2, 3, 4):
+        regex_results = [
+            r.search(filename) 
+            for r in regex.modified_regexes
+        ]
+
+        name_data = regex.filename_parser.search(filename)
+        if name_data and (diff_name := name_data['diff_name']):
+            regex_results.extend([
+                r.search(diff_name) 
+                for r in regex.attribute_edits
+            ])
+        
+        if any(regex_results) and glob.modified_txt.exists():
+            lb = await ModifiedLeaderboard.from_client(parsed_params) # type: ignore
+            log(
+                f'handled funorange map of {parsed_params["filename"]}', 
+                color = Color.GREEN
+            )
+    else:
         log(
-            f'handled beatmap while offline: {parsed_params["filename"]}', 
+            f'handled map of setid: {parsed_params["set_id"]}', 
             color = Color.GREEN
         )
-
+    
     return Response(200, lb.as_binary)
 
 BASE_URL = 'https://beatconnect.io'
