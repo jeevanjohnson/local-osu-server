@@ -4,7 +4,7 @@ import packets
 from ext import glob
 from utils import log
 from utils import Color
-import pyttanko as oppai
+from objects import Mods
 from utils import handler
 from objects import Score
 from objects import Beatmap
@@ -45,12 +45,6 @@ status_to_db = {
     3: 'qualified',
     4: 'loved'
 }
-
-if config.allow_relax:
-    INVALID_MODS = 4204544
-else:
-    INVALID_MODS = 4204672
-
 @handler('score_sub')
 async def submit_score() -> None:
     if not glob.player:
@@ -79,7 +73,7 @@ async def submit_score() -> None:
         return 
     
     # if cinema, autopilot, cinema, or relax in mods
-    if score.mods & INVALID_MODS:
+    if score.mods & glob.invalid_mods:
         glob.player.queue += packets.notification(
             "Invalid mods to submit!"
         )
@@ -123,8 +117,7 @@ async def submit_score() -> None:
     score.bmap = bmap
     score.pp = pp
 
-    mods_str = oppai.mods_str(score.mods).upper()
-    score.mods_str = 'NM' if mods_str == 'NOMOD' else mods_str
+    score.mods_str = repr(Mods(score.mods))
     
     all_plays: Optional[SCORE] = \
     glob.current_profile['plays']['all_plays']
@@ -160,7 +153,7 @@ async def submit_score() -> None:
         replay_md5s.append(score.replay_md5)
 
     utils.update_files()
-    await glob.player.update()
+    await glob.player.update(glob.mode)
 
     score_str = (
         f'{bmap.artist} - {bmap.title} [{bmap.version}]\n'

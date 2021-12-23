@@ -1,5 +1,4 @@
-import re
-
+import regex
 import orjson
 import packets
 import asyncio
@@ -96,7 +95,7 @@ async def while_server_running() -> None:
 server = Server()
 DEFAULT_RESPONSE = Response(200, b'')
 @server.get(
-    path = re.compile(r'\/osu\/(?P<handler>.*)')
+    path = regex.osu_web_handler
 )
 async def osu(request: Request) -> Response:
     path = f"/{request.args['handler']}"
@@ -120,7 +119,7 @@ async def osu(request: Request) -> Response:
     return DEFAULT_RESPONSE
 
 @server.get(
-    path = re.compile(r'\/((c[4-6e])|(c))\/(?P<handler>.*)'),
+    path = regex.cho_handler,
 )
 async def bancho(request: Request) -> Response:
     if 'osu_token' not in request:
@@ -142,7 +141,7 @@ async def bancho(request: Request) -> Response:
     return DEFAULT_RESPONSE
 
 @server.get(
-    path = re.compile(r'\/a\/(?P<userid>[0-9]*)')
+    path = regex.avatar_handler
 )
 async def avatar(request: Request) -> Response:
     return await glob.handlers['avatar'](
@@ -158,7 +157,7 @@ DEFAULT_API_RESPONSE = Response(
     headers = {'Content-type': 'application/json charset=utf-8'}
 )
 @server.get(
-    path = re.compile(r'\/api\/v1\/(?P<path>.*)')
+    path = regex.api_v1_handler
 )
 async def apiv1(request: Request) -> Response:
     api_path = f"/api/v1/{request.args['path']}"
@@ -168,7 +167,7 @@ async def apiv1(request: Request) -> Response:
         return await glob.handlers[api_path](request)
 
 @server.get(
-    path = re.compile(r'\/(?P<path>.*)')
+    path = regex.website_handler
 )
 async def website(request: Request) -> Response:
     return await glob.handlers[

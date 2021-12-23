@@ -1,7 +1,9 @@
+import utils
 import config
 from ext import glob
 from typing import Union
 from typing import Optional
+from objects.mods import Mods
 from objects.score import Score
 from objects.beatmap import Beatmap
 from objects.score import BanchoScore
@@ -155,8 +157,19 @@ class Leaderboard:
 
         player_scores = _player_scores[md5].copy()
 
-        player_scores.sort(key = lambda s: s['score'], reverse = True)
-
+        if glob.mode:
+            player_scores = [x for x in player_scores if x['mods'] & glob.mode]
+        else:
+            player_scores = [
+                x for x in player_scores if
+                not x['mods'] & (Mods.RELAX | Mods.AUTOPILOT)
+            ]
+        
+        if config.pp_leaderboard or glob.mode:
+            player_scores.sort(key = lambda s: s['pp'], reverse = True)
+        else:
+            player_scores.sort(key = lambda s: s['score'], reverse = True)
+        
         if rank_type == MODS:
             player_scores = [x for x in player_scores if x['mods'] & mods]
             if not player_scores:
@@ -167,7 +180,17 @@ class Leaderboard:
             player_score = Score.from_dict(player_scores[0])
 
         lb.scores.append(player_score)
-        lb.scores.sort(key = lambda s: int(s.score), reverse = True)
+
+        if config.pp_leaderboard:
+            lb.scores.sort(
+                key = lambda s: int(s.pp), # type: ignore
+                reverse = True
+            )
+        else:
+            lb.scores.sort(
+                key = lambda s: int(s.score), 
+                reverse = True
+            )
         
         if lb.scores.index(player_score) == 100:
             lb.scores.remove(player_score)
@@ -211,6 +234,13 @@ class Leaderboard:
         else:
             scores: list[SCORE] = []
 
+        if config.pp_leaderboard:
+            await bmap.get_file()
+            scores.sort(
+                key = lambda s: utils.calculator(s, bmap)[0], 
+                reverse = True
+            )
+
         lb.scores = scores
         if (
             not glob.player or 
@@ -230,8 +260,23 @@ class Leaderboard:
             return lb
 
         player_scores = _player_scores[md5]
+        if glob.mode:
+            player_scores = [
+                x for x in player_scores if x['mods'] & glob.mode
+            ]
+        else:
+            player_scores = [
+                x for x in player_scores if
+                not x['mods'] & (Mods.RELAX | Mods.AUTOPILOT)
+            ]
 
-        player_scores.sort(key = lambda s: s['score'], reverse = True)
+        if not player_scores:
+            return lb
+
+        if config.pp_leaderboard or glob.mode:
+            player_scores.sort(key = lambda s: s['pp'], reverse = True)
+        else:
+            player_scores.sort(key = lambda s: s['score'], reverse = True)
 
         if rank_type == MODS:
             player_scores = [x for x in player_scores if x['mods'] == mods]
@@ -243,7 +288,17 @@ class Leaderboard:
             player_score = Score.from_dict(player_scores[0])
 
         lb.scores.append(player_score)
-        lb.scores.sort(key = lambda s: int(s.score), reverse = True)
+
+        if config.pp_leaderboard:
+            lb.scores.sort(
+                key = lambda s: int(s.pp), # type: ignore
+                reverse = True
+            )
+        else:
+            lb.scores.sort(
+                key = lambda s: int(s.score),
+                reverse = True
+            )
 
         if lb.scores.index(player_score) == 100:
             lb.scores.remove(player_score)

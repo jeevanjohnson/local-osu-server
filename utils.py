@@ -1,17 +1,21 @@
 import re
 import base64
 import asyncio
-from pathlib import Path
+import packets
 import pyttanko as oppai
 from typing import Union
+from pathlib import Path
 from colorama import Fore
 from typing import Literal
+from typing import Optional
 from typing import Callable
+from constants import BUTTON
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from objects import Score
     from objects import Beatmap
+    from objects import BanchoScore
     from objects import ModifiedBeatmap
 
 try:
@@ -23,8 +27,10 @@ Color = Fore
 
 PP = float
 ACCURACY = float
+SCORE = Union['Score', 'BanchoScore']
 def calculator(
-    score: 'Score', bmap: Union['Beatmap', 'ModifiedBeatmap', oppai.beatmap]
+    score: SCORE, bmap: Union['Beatmap', 'ModifiedBeatmap', oppai.beatmap],
+    stars: Optional[oppai.diff_calc] = None
 ) -> tuple[PP, ACCURACY]:
     """PP calculator (easy to work with and change whenever needed)"""
     if not isinstance(bmap, oppai.beatmap):
@@ -32,18 +38,39 @@ def calculator(
     else:
         file = bmap
     
-    stars = oppai.diff_calc().calc(file, score.mods)
-    pp, *_, acc_percent = oppai.ppv2(
-        aim_stars = stars.aim, 
-        speed_stars = stars.speed, 
-        bmap = file, 
-        mods = score.mods,
-        n300 = score.n300,
-        n100 = score.n100, 
-        n50 = score.n50,
-        nmiss = score.nmiss,
-        combo = score.max_combo
-    )
+    if 'BanchoScore' not in str(type(score)): # avoids merge conflicts
+        if not stars:
+            stars = oppai.diff_calc().calc(file, score.mods)
+        
+        pp, *_, acc_percent = oppai.ppv2(
+            aim_stars = stars.aim, 
+            speed_stars = stars.speed, 
+            bmap = file, 
+            mods = score.mods,
+            n300 = score.n300,
+            n100 = score.n100, 
+            n50 = score.n50,
+            nmiss = score.nmiss,
+            combo = score.max_combo
+        )
+    else:
+        mods = int(score.enabled_mods)
+        if not stars:
+            stars = oppai.diff_calc().calc(file, mods)
+        
+        pp, *_, acc_percent = oppai.ppv2(
+            aim_stars = stars.aim, 
+            speed_stars = stars.speed, 
+            bmap = file, 
+            mods = mods,
+            n300 = int(score.count300),
+            n100 = int(score.count100), 
+            n50 = int(score.count50),
+            nmiss = int(score.countmiss),
+            combo = int(score.maxcombo)
+        )
+
+        score.pp = pp
 
     return (pp, acc_percent)
 
@@ -109,3 +136,38 @@ def bytes_to_string(b: bytes) -> str:
 
 def string_to_bytes(s: str):
     return base64.b64decode(s.encode('ascii'))
+
+def render_menu(
+    channel_name: str, 
+    description: str,
+    buttons: list[BUTTON]
+):
+    body = bytearray()
+    
+    body += packets.userSilenced(-1)
+    body += packets.sendMsg(
+        client = 'local',
+        msg = description,
+        target = '#osu',
+        userid = -1,
+    )
+
+    for url, name in buttons:
+        if r'{mode}' in url:
+            if glob.mode:
+                m = repr(glob.mode).lower()
+            else:
+                m = 'vn'
+            
+            url = url.format(
+                mode = m
+            )
+        
+        body += packets.sendMsg(
+            client = 'local',
+            msg = f'[{url} {name}]',
+            target = channel_name,
+            userid = -1,
+        )
+    
+    add_to_player_queue(body)

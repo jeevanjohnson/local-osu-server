@@ -1,18 +1,21 @@
-import re
 import os
 import utils
+import regex
 import orjson
 import config
 import packets
+import asyncio
 import pyperclip
 from ext import glob
 from utils import log
 from utils import Color
+from objects import Mods
 from utils import handler
 from server import Request
 from server import Response
-from objects import Leaderboard
+from constants import BUTTONS
 import urllib.parse as urlparse
+from objects import Leaderboard
 from objects import ModifiedLeaderboard
 
 async def DEFAULT_RESPONSE_FUNC(request: Request) -> Response:
@@ -21,6 +24,7 @@ async def DEFAULT_RESPONSE_FUNC(request: Request) -> Response:
 # unusable or unused handlers
 for hand in [
     '/web/lastfm.php',
+    '/web/osu-rate.php',
     '/web/osu-error.php',
     '/difficulty-rating',
     '/web/osu-session.php',
@@ -31,7 +35,7 @@ for hand in [
 
 OSU_API_BASE = 'https://osu.ppy.sh/api'
 
-@handler(re.compile(r'\/ss\/(?P<link>.*)'))
+@handler(regex.screenshot_web_path)
 async def web_screenshot(request: Request) -> Response:
     if request.args['link'] == 'img_err':
         return Response(200, b"Can't upload to imgur!")
@@ -61,7 +65,7 @@ async def osu_screenshots(request: Request) -> Response:
         pyperclip.copy(uploaded_image.link)
         return Response(200, uploaded_image.link.encode())
 
-@handler(re.compile(r'\/(beatmaps|beatmapsets)\/(?P<path>.*)'))
+@handler(regex.bmap_web_path)
 async def bmap_web(request: Request) -> Response:
     return Response(
         code = 301, 
@@ -179,18 +183,13 @@ async def get_replay(request: Request) -> Response:
         log('error handling replay', color = Color.RED)
         return Response(200, b'error: no')
 
-MODIFIED_REGEXES = (
-    re.compile(r"(?P<rate>[0-9]{1,2}\.[0-9]{1,2}x) \((?P<bpm>[0-9]*bpm)\)"),
-    re.compile(r"(?P<rate>[0-9]{1,2}x) \((?P<bpm>[0-9]*bpm)\)")
-)
-
 @handler('/web/osu-osz2-getscores.php')
 async def leaderboard(request: Request) -> Response:
     if not glob.player:
-        return Response(404, b'how')
+        return Response(404, b'')
 
     parsed_params = {
-        'filename': urlparse.unquote(request.params['f']).replace('+', ' ').replace('  ', '+ '),
+        'filename': urlparse.unquote_plus(request.params['f']),
         'mods': request.params['mods'],
         'mode': request.params['m'],
         'rank_type': request.params['v'],
@@ -198,9 +197,64 @@ async def leaderboard(request: Request) -> Response:
         'md5': request.params['c']
     }
 
+    filename = parsed_params['filename']
+    mods = request.params['mods']
+
+    if mods & Mods.RELAX:
+        if (
+            not glob.mode or 
+            not glob.mode & Mods.RELAX
+        ):
+            glob.mode = Mods.RELAX
+            glob.invalid_mods = (
+                Mods.AUTOPILOT | Mods.AUTOPLAY | 
+                Mods.CINEMA | Mods.TARGET
+            )._value_
+            glob.player.queue += packets.notification(
+                'Mode was switched to rx!'
+            )
+            asyncio.create_task(glob.player.update(glob.mode))
+            utils.render_menu('#osu', 'Mode was switched to rx!', BUTTONS)
+    elif mods & Mods.AUTOPILOT:
+        if (
+            not glob.mode or 
+            not glob.mode & Mods.AUTOPILOT
+        ):
+            glob.mode = Mods.AUTOPILOT
+            glob.invalid_mods = (
+                Mods.RELAX | Mods.AUTOPLAY | 
+                Mods.CINEMA | Mods.TARGET
+            )._value_
+            glob.player.queue += packets.notification(
+                'Mode was switched to ap!'
+            )
+            asyncio.create_task(glob.player.update(glob.mode))
+            utils.render_menu('#osu', 'Mode was switched to ap!', BUTTONS)
+    elif not mods & (Mods.RELAX | Mods.AUTOPILOT):
+        if glob.mode:
+            glob.mode = None
+            glob.invalid_mods = (
+                Mods.AUTOPILOT | Mods.RELAX | 
+                Mods.AUTOPLAY | Mods.CINEMA | 
+                Mods.TARGET
+            )._value_
+            glob.player.queue += packets.notification(
+                'Mode was switched to vanilla!'
+            )
+            asyncio.create_task(glob.player.update(glob.mode))
+            utils.render_menu('#osu', 'Mode was switched to vanilla!', BUTTONS)
+
     regex_results = [
-        regex.search(parsed_params['filename']) for regex in MODIFIED_REGEXES
+        r.search(filename) 
+        for r in regex.modified_regexes
     ]
+
+    name_data = regex.filename_parser.search(filename)
+    if name_data and (diff_name := name_data['diff_name']):
+        regex_results.extend([
+            r.search(diff_name) 
+            for r in regex.attribute_edits
+        ])
 
     if (
         any(regex_results) and
@@ -227,7 +281,7 @@ async def leaderboard(request: Request) -> Response:
     return Response(200, lb.as_binary)
 
 BASE_URL = 'https://beatconnect.io'
-@handler(re.compile(r'/d/(?P<setid>[0-9]*)'))
+@handler(regex.download_web_path)
 async def download(request: Request) -> Response:
     setid = request.args['setid']
     url = f'{BASE_URL}/b/{setid}'

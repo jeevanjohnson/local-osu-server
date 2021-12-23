@@ -7,6 +7,7 @@ import packets
 from ext import glob
 from typing import Union
 from typing import Optional
+from objects.mods import Mods
 
 SCORES = list[dict]
 RANKED_PLAYS = dict[str, list[dict]]
@@ -103,7 +104,9 @@ class Player:
             
         return json['rank']
     
-    async def update(self) -> None:
+    async def update(
+        self, filter_mod: Optional[Mods] = None
+    ) -> None:
         scores: SCORES = []
 
         if not glob.current_profile:
@@ -120,6 +123,17 @@ class Player:
                 for v in plays.values():
                     scores.extend(v)
         
+        if filter_mod:
+            scores = [
+                x for x in scores if 
+                x['mods'] & filter_mod
+            ]
+        else:
+            scores = [
+                x for x in scores if
+                not x['mods'] & (Mods.RELAX | Mods.AUTOPILOT)
+            ]
+
         scores.sort(key = lambda s: s['pp'], reverse = True)
         top_scores = utils.filter_top_scores(scores[:100])
         top_scores.sort(key = lambda s: s['pp'], reverse = True)

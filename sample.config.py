@@ -27,9 +27,16 @@ paths: dict[str, Optional[str]] = {
 }
 
 """Ingame Config"""
+# please keep this as false as it is unusable atm
+# TODO: use api v2 to get lb scores rather then v1
+# as if i remember it returns a pp value for each
+# score making it so the server can be faster
+pp_leaderboard: bool = False
+
 # change to `False` if you don't want to be highlighted
-allow_relax: bool = False
 ping_user_when_recent_score: bool = True
+
+# ingame menu icon you see under the osu! logo
 menu_icon: dict[str, Optional[str]] = {
     'image_link': '',
     'click_link': '',
@@ -37,7 +44,7 @@ menu_icon: dict[str, Optional[str]] = {
 
 """Server Config"""
 # needed for loading leaderboards
-# you can find your's here https://old.ppy.sh/p/api
+# you can find your's here https://old.ppy.sh/p/api/
 # if `None` then leaderboards won't load nor score submission
 osu_api_key: Optional[str] = '' 
 

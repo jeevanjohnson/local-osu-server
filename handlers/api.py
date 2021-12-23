@@ -4,7 +4,7 @@ import queries
 from ext import glob
 from utils import log
 from utils import Color
-import pyttanko as oppai
+from objects import Mods
 from utils import handler
 from objects import Score
 from server import Request
@@ -52,7 +52,20 @@ async def profile(request: Request) -> Response:
         )
 
     p = Player(params['u'])
-    await p.update()
+
+    filter_mod = None
+    m = 'vn'
+    if 'm' in params:
+        m = params['m'].lower().strip()
+        if m == 'rx':
+            filter_mod = Mods.RELAX
+        elif m == 'ap':
+            filter_mod = Mods.AUTOPILOT
+        else:
+            m = 'vn'
+            filter_mod = None
+    
+    await p.update(filter_mod)
 
     response_json = {
         'status': 'success!',
@@ -60,6 +73,7 @@ async def profile(request: Request) -> Response:
         'rank': p.rank,
         'playcount': p.playcount,
         'pp': p.pp,
+        'mode': m
     }
 
     return Response(
@@ -94,6 +108,11 @@ async def tops(request: Request) -> Response:
     else:
         limit = params['limit']
 
+    if 'm' not in params:
+        filter_mod = None
+    else:
+        filter_mod = Mods.from_str(params['m'])
+
     name: str = params['u']
     if name not in glob.profiles:
         Response(
@@ -109,6 +128,7 @@ async def tops(request: Request) -> Response:
     response_json = {
         'status': 'success!',
         'name': name,
+        'mode': 'unknown' if 'm' not in params else params['m'],
         'plays': []
     }
 
@@ -125,6 +145,17 @@ async def tops(request: Request) -> Response:
             for v in plays.values():
                 scores.extend(v)
 
+    if filter_mod:
+        scores = [
+            x for x in scores if 
+            x['mods'] & filter_mod
+        ]
+    else:
+        scores = [
+            x for x in scores if 
+            not x['mods'] & (Mods.RELAX | Mods.AUTOPILOT)
+        ]
+
     scores.sort(key = lambda s: s['pp'], reverse = True)
     top_scores = utils.filter_top_scores(scores[:limit])
     top_scores.sort(key = lambda s: s['pp'], reverse = True)
@@ -139,8 +170,7 @@ async def tops(request: Request) -> Response:
             'mods_str' not in play or
             play['mods_str'] is None
         ):
-            mods_str = oppai.mods_str(play['mods']).upper()
-            play['mods_str'] = 'NM' if mods_str == 'NOMOD' else mods_str
+            play['mods_str'] = repr(Mods(play['mods']))
 
         if bmap:
             bmap_dict = bmap.as_dict()
@@ -196,10 +226,16 @@ async def recent(request: Request) -> Response:
     else:
         limit = params['limit']
 
+    if 'm' not in params:
+        filter_mod = None
+    else:
+        filter_mod = Mods.from_str(params['m'])
+
     profile = glob.profiles[name]
     response_json = {
         'status': 'success!',
         'name': name,
+        'mode': 'unknown' if 'm' not in params else params['m'],
         'plays': []
     }
 
@@ -208,6 +244,17 @@ async def recent(request: Request) -> Response:
 
     if not scores:
         scores = []
+
+    if filter_mod:
+        scores = [
+            x for x in scores if 
+            x['mods'] & filter_mod
+        ]
+    else:
+        scores = [
+            x for x in scores if 
+            not x['mods'] & (Mods.RELAX | Mods.AUTOPILOT)
+        ]
 
     scores.sort(
         key = lambda s: s['time']
@@ -225,8 +272,7 @@ async def recent(request: Request) -> Response:
             'mods_str' not in play or
             play['mods_str'] is None
         ):
-            mods_str = oppai.mods_str(play['mods']).upper()
-            play['mods_str'] = 'NM' if mods_str == 'NOMOD' else mods_str
+            play['mods_str'] = repr(Mods(play['mods']))
 
         if bmap:
             bmap_dict = bmap.as_dict()
@@ -333,8 +379,35 @@ async def wipe_profile(request: Request) -> Response:
                 'status': 'failed',
                 'message': (
                     'please provide a profile name in parameters\n'
-                    'example: http://127.0.0.1:5000/api/v1/client/wipe?u=profile name'
+                    'example: http://127.0.0.1:5000/api/v1/wipe?u=profile name'
                 )
+            }),
+            headers = {'Content-type': 'application/json charset=utf-8'}
+        )
+    
+    if 'yes' not in params:
+        return Response(
+            code = 200,
+            body = JSON({
+                'status': '1/2 done',
+                'message': (
+                    'CURRENTLY IT WILL WIPE ALL YOUR STATS INCLUDING RX, AP, VN ON\n'
+                    'YOUR CURRENT PROFILE YOU ARE TRYING TO WIPE\n'
+                    'TODO: check and wipe for different modes\n'
+                    'if you are sure you want to wipe\n'
+                    'type the following at the end of the url and click enter\n'
+                    '&yes=yes'
+                )
+            }),
+            headers = {'Content-type': 'application/json charset=utf-8'}
+        )
+    
+    if params['yes'] != 'yes':
+        return Response(
+            code = 200,
+            body = JSON({
+                'status': 'fail',
+                'message': "yes didn't equal yes!"
             }),
             headers = {'Content-type': 'application/json charset=utf-8'}
         )
@@ -360,7 +433,7 @@ async def wipe_profile(request: Request) -> Response:
         glob.player and
         glob.player.name == name
     ):
-        await glob.player.update()
+        await glob.player.update(glob.mode)
 
     response_msg = {
         'status': 'success!',

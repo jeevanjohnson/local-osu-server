@@ -1,3 +1,4 @@
+import utils
 import config
 import packets
 import asyncio
@@ -11,33 +12,11 @@ from typing import Optional
 from server import Response
 import urllib.parse as urlparse
 
-WELCOME_MSG = '\n'.join([
-    'Welcome {name}!',
-    '',
-    'Below you can find some useful buttons to enhance your gaming experience B)'
-])
-
-CHANNEL = tuple[str, str]
-CHANNELS: list[CHANNEL] = [
-    # name, desc
-    ('#osu', 'x'),
-    ('#recent', 'shows recently submitted scores!'),
-    ('#tops', 'shows top plays, as well as updates them!')
-]
-
-BUTTON = tuple[str, str]
-BUTTONS: list[BUTTON] = [
-    # url, name
-    ('http://127.0.0.1:5000/api/v1/client/tops?limit=100', 'view tops'),
-    ('http://127.0.0.1:5000/api/v1/client/recent?limit=10', 'view recent'),
-    ('http://127.0.0.1:5000/api/v1/client/recalc', 'recalc plays'),
-    ('http://127.0.0.1:5000/api/v1/client/profile', 'view profile'),
-    ('http://127.0.0.1:5000/api/v1/client/change_avatar', 'change avatar'),
-    ('http://127.0.0.1:5000/api/v1/client/wipe', 'wipe profile')
-]
-
-CHO_TOKEN = str
-BODY = bytearray
+from constants import BODY
+from constants import BUTTONS
+from constants import CHANNELS
+from constants import CHO_TOKEN
+from constants import WELCOME_MSG
 
 profile_name: Optional[str] = None
 
@@ -103,24 +82,15 @@ async def login() -> tuple[BODY, CHO_TOKEN]:
     for channel in CHANNELS:
         body += packets.channelJoin(channel[0])
 
-    await glob.player.update()
+    await glob.player.update(glob.mode)
     body += packets.userPresence(p)
     profile_name = None
 
-    glob.player.queue += packets.sendMsg(
-        client = 'local',
-        msg = WELCOME_MSG.format(name=glob.player.name),
-        target = '#osu',
-        userid = -1,
+    utils.render_menu(
+        channel_name = '#osu',
+        description = WELCOME_MSG.format(name=glob.player.name),
+        buttons = BUTTONS
     )
-
-    for url, name in BUTTONS:
-        glob.player.queue += packets.sendMsg(
-            client = 'local',
-            msg = f'[{url} {name}]',
-            target = '#osu',
-            userid = -1,
-        )
-
+    
     log(glob.player.name, 'successfully logged in!', color = Color.GREEN)
     return body, 'success'

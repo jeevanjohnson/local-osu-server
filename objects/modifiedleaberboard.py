@@ -1,4 +1,6 @@
 import os
+import regex
+import config
 import asyncio
 import hashlib
 from ext import glob
@@ -6,7 +8,9 @@ from pathlib import Path
 from typing import Union
 from typing import Optional
 from typing import TypedDict
+from objects.mods import Mods
 from objects.score import Score
+import urllib.parse as urlparse
 from objects.beatmap import Beatmap
 from objects.modifiedbeatmap import ModifiedBeatmap
 
@@ -153,7 +157,7 @@ class ModifiedLeaderboard:
                     filename = fpath.name.split("\\")[-1]
                 else:
                     filename = fpath.parts[-1]
-
+                
                 if params['filename'] == filename:
                     set_path = fpath
 
@@ -174,42 +178,69 @@ class ModifiedLeaderboard:
 
                     break
 
-            if (
-                not set_path or
-                not set_path.exists()
-            ):
-                return lb
-
             orignal_value: Optional[Union[int, str]] = None
-            for line in set_path.read_bytes().splitlines():
-                try:
-                    k, v = line.decode().lower().strip().split(':', 1)
-                    if k != 'beatmapid':
-                        continue
-                    
-                    v = int(v)
+            if set_path and set_path.exists():
+                for line in set_path.read_bytes().splitlines():
+                    try:
+                        k, v = line.decode().lower().strip().split(':', 1)
+                        if k != 'beatmapid':
+                            continue
+                        
+                        v = int(v)
 
-                    if v > 0:
-                        orignal_value = v
-                        break
-                except:
-                    continue
+                        if v > 0:
+                            orignal_value = v
+                            break
+                    except:
+                        continue
             
             if not orignal_value:
-                map_folder = '/'.join(set_path.parts[:-1])
-                for fname in os.listdir(map_folder):
-                    if not fname.endswith('.osu'):
-                        continue
+                path_exists = set_path and set_path.exists()
+                if (
+                    not path_exists
+                    and glob.songs_folder
+                ):
+                    if params['set_id'] > 0:
+                        pattern = f'{params["set_id"]}*'
+                        folders = glob.songs_folder.glob(pattern)
+                    elif (name_data := regex.filename_parser.search(params['filename'])):
+                        pattern = f'* {name_data["artist"]} - {name_data["song_name"]}*'
+                        folders = glob.songs_folder.glob(pattern)  
+                    else:
+                        folders = []
+                elif set_path:
+                    folders = (set_path.parent,)
+                else:
+                    folders = []
+
+                for map_folder in folders:
+                    for fname in os.listdir(str(map_folder)):
+                        if orignal_value and set_path:
+                            break
+                            
+                        if not fname.endswith('.osu'):
+                            continue
+                        
+                        fname = urlparse.unquote_plus(fname)
+                        if params['filename'].lower() == fname.lower():
+                            set_path = map_folder / fname
+                            continue
+                        
+                        if (
+                            fname[:-5].lower() in params['filename'].lower() and 
+                            params['filename'].lower() != fname.lower()
+                        ):
+                            orignal_map = map_folder / fname
+                            orignal_value = hashlib.md5(orignal_map.read_bytes()).hexdigest()
                     
-                    if (
-                        fname[:-5].lower() in params['filename'].lower() and 
-                        params['filename'].lower() != fname.lower()
-                    ):
-                        orignal_map = Path(map_folder) / fname
-                        orignal_value = hashlib.md5(orignal_map.read_bytes()).hexdigest()
+                    if orignal_value and set_path:
                         break
 
-            if not orignal_value:
+            path_exists = set_path and set_path.exists()
+            if (
+                not orignal_value or 
+                not path_exists
+            ):
                 return lb
             
             if isinstance(orignal_value, int):
@@ -221,7 +252,8 @@ class ModifiedLeaderboard:
                 return lb
             
             lb.bmap = bmap = ModifiedBeatmap.add_to_db(
-                bmap, params, set_path, return_modified = True
+                bmap, params, set_path, # type: ignore
+                return_modified = True
             )
 
             if not bmap:
@@ -254,7 +286,24 @@ class ModifiedLeaderboard:
             return lb
 
         player_scores = _player_scores[bmap.file_md5]
-        player_scores.sort(key = lambda s: s['score'], reverse = True)
+        
+        if glob.mode:
+            player_scores = [
+                x for x in player_scores if x['mods'] & glob.mode
+            ]
+        else:
+            player_scores = [
+                x for x in player_scores if
+                not x['mods'] & (Mods.RELAX | Mods.AUTOPILOT)
+            ]
+
+        if not player_scores:
+            return lb
+
+        if config.pp_leaderboard or glob.mode:
+            player_scores.sort(key = lambda s: s['pp'], reverse = True)
+        else:
+            player_scores.sort(key = lambda s: s['score'], reverse = True)
 
         if params['rank_type'] == MODS:
             player_scores = [

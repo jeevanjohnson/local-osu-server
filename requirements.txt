@@ -1,6 +1,5 @@
 borgor
 orjson
-uvloop
 aiohttp
 pipreqs
 pyimgur

@@ -8,6 +8,7 @@ from typing import Union
 from pyimgur import Imgur
 from typing import Callable
 from typing import Optional
+from objects.mods import Mods
 from typing import TYPE_CHECKING
 from aiohttp import ClientSession
 
@@ -37,3 +38,10 @@ using_wsl = (
     sys.platform == 'linux' and
     'microsoft-standard-WSL' in os.uname().release # type: ignore
 )
+
+mode: Optional[Mods] = None
+invalid_mods: int = (
+    Mods.AUTOPILOT | Mods.RELAX | 
+    Mods.AUTOPLAY | Mods.CINEMA | 
+    Mods.TARGET
+)._value_

@@ -1,6 +1,7 @@
 import os
 import time
 import utils
+import config
 import calendar
 import binascii
 from ext import glob
@@ -15,7 +16,10 @@ from objects.modifiedbeatmap import ModifiedBeatmap
 BEATMAP = Union[Beatmap, ModifiedBeatmap]
 
 class BanchoScore:
-    def __init__(self, bancho_score: dict[str, str]) -> None:
+    def __init__(
+        self, bancho_score: dict[str, str], 
+        bmap: Optional[Beatmap] = None
+    ) -> None:
         self.score_id = bancho_score['score_id']
         self.username = bancho_score['username']
         self.score = bancho_score['score']
@@ -34,9 +38,26 @@ class BanchoScore:
         )
         self.replay_available = bancho_score['replay_available']
 
+        self.bmap = bmap
+        self.pp: Optional[float] = None
+
     @property
     def as_leaderboard_score(self) -> dict:
-        return self.__dict__.copy()
+        _dict = self.__dict__.copy()
+        
+        try: del _dict['bmap']
+        except: pass
+
+        _dict['score'] = (
+            f"{_dict['pp']:.0f}" 
+            if config.pp_leaderboard and _dict['pp'] else 
+            _dict['score']
+        )
+
+        try: del _dict['pp']
+        except: pass
+        
+        return _dict
 
 class Score:
     def __init__(
@@ -170,7 +191,7 @@ class Score:
         return {
             'score_id': sid,
             'username': self.name,
-            'score': self.score,
+            'score': int(self.pp) if config.pp_leaderboard or glob.mode else self.score, # type: ignore
             'maxcombo': self.max_combo,
             'count50': self.n50,
             'count100': self.n100,
