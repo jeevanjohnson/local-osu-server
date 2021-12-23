@@ -9,6 +9,7 @@ from typing import Any
 from typing import Union
 from typing import Optional
 from datetime import datetime
+from objects.mods import Mods
 from objects.replay import Replay
 from objects.beatmap import Beatmap
 from objects.modifiedbeatmap import ModifiedBeatmap
@@ -116,7 +117,8 @@ class Score:
 
     @property
     def is_failed(self) -> bool:
-        if self.mods & 1: # if user has nf
+        # if has certain mods were u don't fail
+        if self.mods & (Mods.RELAX | Mods.AUTOPILOT | Mods.NOFAIL):
             return False
 
         for lifebar in self.replay.bar_graph: # type: ignore
