@@ -1,6 +1,7 @@
 import utils
 import orjson
 import queries
+import asyncio
 from ext import glob
 from utils import log
 from utils import Color
@@ -318,48 +319,53 @@ ACCEPTED_PLAYS = ('ranked_plays', 'approved_plays')
 async def recalc(request: Request) -> Response:
     # TODO: make use of the params
 
-    profiles = glob.profiles
-    for index_of_profile, profile_name in enumerate(profiles):
-        log(
-            f'{index_of_profile}/{len(profiles)}', 'profiles calculated.',
-            color = Color.LIGHTMAGENTA_EX
-        )
-
-        profile = profiles[profile_name]
-
-        for index_of_type_plays, map_status in enumerate(ACCEPTED_PLAYS):
-            msg = (
-                f"calculating {map_status[:-6]} maps of {profile_name}\n"
-                f'{index_of_type_plays + 1}/2 calculated.'
+    async def background_recalc() -> None:
+        profiles = glob.profiles
+        for index_of_profile, profile_name in enumerate(profiles):
+            log(
+                f'{index_of_profile}/{len(profiles)}', 'profiles calculated.',
+                color = Color.LIGHTMAGENTA_EX
             )
 
-            log(msg, color = Color.LIGHTMAGENTA_EX)
-            plays: dict[str, list[dict]] = profile['plays'][map_status]
+            profile = profiles[profile_name]
 
-            for index_of_maps, (md5, map_plays) in enumerate(plays.items()):
-                for idx, play in enumerate(map_plays):
-                    map_plays[idx] = await _recalc(
-                        md5 = md5,
-                        score = Score.from_dict(
-                            play, ignore_binascii_errors = True
-                        )
-                    )
-
-                    log(
-                        f'{idx+1}/{len(map_plays)}',
-                        'plays in this map calculated.',
-                        color = Color.LIGHTMAGENTA_EX
-                    )
-
-                log(
-                    f'{index_of_maps + 1}/{len(plays.values())}',
-                    'maps calculated.', color = Color.LIGHTMAGENTA_EX
+            for index_of_type_plays, map_status in enumerate(ACCEPTED_PLAYS):
+                msg = (
+                    f"calculating {map_status[:-6]} maps of {profile_name}\n"
+                    f'{index_of_type_plays + 1}/2 calculated.'
                 )
 
-    utils.update_files()
+                log(msg, color = Color.LIGHTMAGENTA_EX)
+                plays: dict[str, list[dict]] = profile['plays'][map_status]
+
+                for index_of_maps, (md5, map_plays) in enumerate(plays.items()):
+                    for idx, play in enumerate(map_plays):
+                        map_plays[idx] = await _recalc(
+                            md5 = md5,
+                            score = Score.from_dict(
+                                play, ignore_binascii_errors = True
+                            )
+                        )
+
+                        log(
+                            f'{idx+1}/{len(map_plays)}',
+                            'plays in this map calculated.',
+                            color = Color.LIGHTMAGENTA_EX
+                        )
+
+                    log(
+                        f'{index_of_maps + 1}/{len(plays.values())}',
+                        'maps calculated.', color = Color.LIGHTMAGENTA_EX
+                    )
+
+        log('finished recalcing!', color = Color.LIGHTMAGENTA_EX)
+        utils.update_files()
+
+    asyncio.create_task(background_recalc())
+
     response_msg = {
         'status': 'success!',
-        'message': 'all profiles were calculated!'
+        'message': 'All profiles are being calculated!'
     }
     return Response(
         code = 200,
