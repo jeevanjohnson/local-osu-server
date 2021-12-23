@@ -8,10 +8,11 @@ from server import Request
 from utils import log_error
 from server import Response
 
+import sys
 import utils
 import config
-import pyimgur
 import updater
+import pyimgur
 from objects import File
 from pathlib import Path
 from aiohttp import ClientSession
@@ -26,6 +27,7 @@ async def on_start_up() -> None:
         await updater.needs_updating()
     ):
         await updater.update()
+        sys.exit(0)
 
     if config.paths['osu! path'] is not None:
         osu_path = Path(config.paths['osu! path'])
@@ -187,12 +189,15 @@ def main() -> int:
     except:
         pass
 
-    server.run(
-        bind = ('127.0.0.1', 5000),
-        listening = 16,
-        before_startup = on_start_up,
-        background_tasks = [while_server_running]
-    )
+    try:
+        server.run(
+            bind = ('127.0.0.1', 5000),
+            listening = 16,
+            before_startup = on_start_up,
+            background_tasks = [while_server_running]
+        )
+    except SystemExit:
+        pass
 
     return 0
 

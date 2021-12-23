@@ -75,4 +75,3 @@ async def update() -> None:
         'successfully updated the server!\n',
         'restart the server to run again!'
     ))
-    sys.exit(0)

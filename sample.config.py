@@ -45,6 +45,7 @@ menu_icon: dict[str, Optional[str]] = {
 """Server Config"""
 # will automatically update the sever
 # whenever there are new updates added
+# updater is not 100% tested, but should work safely
 auto_update: bool = False
 
 # needed for loading leaderboards
