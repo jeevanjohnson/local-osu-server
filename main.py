@@ -43,19 +43,19 @@ async def on_start_up() -> None:
     else:
         glob.songs_folder = (
             Path(config.paths['songs']) if 
-            config.paths['songs'] is not None else 
+            config.paths['songs'] else 
             None
         )
 
         glob.replay_folder = (
             File(config.paths['replay']) if 
-            config.paths['replay'] is not None else 
+            config.paths['replay'] else 
             None
         )
     
         glob.screenshot_folder = (
             Path(config.paths['screenshots']) if 
-            config.paths['screenshots'] is not None else 
+            config.paths['screenshots'] else 
             None
         )
 
