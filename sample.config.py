@@ -13,14 +13,14 @@ from typing import Optional
 # good. Only change if testing and I probably won't provide
 # little support on setting that up
 
-# To make/play with different profiles, 
-# when logging in be sure to put the username 
-# of the profile you want to play/make and 
+# To make/play with different profiles,
+# when logging in be sure to put the username
+# of the profile you want to play/make and
 # it will automaticly make/go onto the profile.
 paths: dict[str, Optional[str]] = {
     'osu! path': r'', # if provided no need to fill in below
-                      # unless songs, replay, and ss folder are somewhere else 
- 
+                      # unless songs, replay, and ss folder are somewhere else
+
     'songs': None, # osu! songs folder
     'replay': None, # osu! replay folder
     'screenshots': None # osu! screenshot folder
@@ -50,7 +50,7 @@ auto_update: bool = False
 # needed for loading leaderboards
 # you can find your's here https://old.ppy.sh/p/api/
 # if `None` then leaderboards won't load nor score submission
-osu_api_key: Optional[str] = '' 
+osu_api_key: Optional[str] = ''
 
 # TODO: probably gonna remove this and
 # find a way to just copy the image into your clip board
@@ -66,7 +66,7 @@ osu_daily_api_key: Optional[str] = ''
 
 # sign up for one right here https://beatconnect.io/accounts/privatesignup/
 # if `None` then direct won't work/will be disabled
-beatconnect_api_key: Optional[str] = '' 
+beatconnect_api_key: Optional[str] = ''
 
 # list of urls, example: ['https://dsada.png', https://dsad11a.png]
 # if `None` then it will just show no background

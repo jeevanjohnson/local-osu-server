@@ -41,7 +41,7 @@ using_wsl = (
 
 mode: Optional[Mods] = None
 invalid_mods: int = (
-    Mods.AUTOPILOT | Mods.RELAX | 
-    Mods.AUTOPLAY | Mods.CINEMA | 
+    Mods.AUTOPILOT | Mods.RELAX |
+    Mods.AUTOPLAY | Mods.CINEMA |
     Mods.TARGET
 )._value_

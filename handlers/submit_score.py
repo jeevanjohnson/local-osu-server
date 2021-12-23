@@ -18,22 +18,22 @@ def get_grade(score: Score) -> str:
     n300_percent = score.n300 / total
     using_hdfl = score.mods & 1032
     nomiss = score.nmiss == 0
-    
+
     if n300_percent > 0.9:
         if nomiss and (score.n50 / total) < 0.1:
             return 'SH' if using_hdfl else 'S'
         else:
             return 'A'
-    
+
     if n300_percent > 0.8:
         return 'A' if nomiss else 'B'
-    
+
     if n300_percent > 0.7:
         return 'B' if nomiss else 'C'
 
     if n300_percent > 0.6:
         return 'C'
-    
+
     return 'D'
 
 SCORE = list[dict]
@@ -49,10 +49,10 @@ status_to_db = {
 async def submit_score() -> None:
     if not glob.player:
         return
-    
+
     if not glob.current_profile:
         return
-    
+
     score = Score.from_score_sub()
     if not score:
         return
@@ -61,8 +61,8 @@ async def submit_score() -> None:
         glob.player.queue += packets.notification(
             "Can't submit another person's replay!"
         )
-        return 
-    
+        return
+
     if (
         score.replay_md5 in
         glob.current_profile['plays']['replay_md5']
@@ -70,27 +70,27 @@ async def submit_score() -> None:
         glob.player.queue += packets.notification(
             "Can't submit the same replay!"
         )
-        return 
-    
+        return
+
     # if cinema, autopilot, cinema, or relax in mods
     if score.mods & glob.invalid_mods:
         glob.player.queue += packets.notification(
             "Invalid mods to submit!"
         )
-        return 
-    
+        return
+
     if score.is_failed:
         glob.player.queue += packets.notification(
             "Can't submit failed replays!"
         )
         return
-    
+
     if score.mode != 0:
         glob.player.queue += packets.notification(
             "Must be a standard score!"
         )
         return
-    
+
     bmap = (
         await ModifiedBeatmap.from_md5(score.md5) or
         await Beatmap.from_md5(score.md5)
@@ -98,11 +98,11 @@ async def submit_score() -> None:
     if not bmap:
         glob.player.queue += packets.notification("Map has to exist on bancho!")
         return
-    
+
     if bmap.approved not in leaderboard_worthy:
         glob.player.queue += packets.notification("Map can't be unranked!")
         return
-    
+
     if not await bmap.get_file():
         glob.player.queue += packets.notification(
             "Can't seem to get .osu file for this map!"
@@ -118,15 +118,15 @@ async def submit_score() -> None:
     score.pp = pp
 
     score.mods_str = repr(Mods(score.mods))
-    
+
     all_plays: Optional[SCORE] = \
     glob.current_profile['plays']['all_plays']
-    
+
     if all_plays is None:
-        return 
-    
+        return
+
     score.scoreid = len(all_plays) + 1
-    
+
     score_dict = score.as_dict()
     all_plays.append(score_dict)
 
@@ -145,10 +145,10 @@ async def submit_score() -> None:
 
     replay_md5s: Optional[list[str]] = \
     glob.current_profile['plays']['replay_md5']
-    
+
     if replay_md5s is None:
-        return 
-    
+        return
+
     if score.replay_md5:
         replay_md5s.append(score.replay_md5)
 
@@ -172,7 +172,7 @@ async def submit_score() -> None:
     )
     if config.ping_user_when_recent_score:
         msg += f'\nachieved by {glob.player.name}'
-    
+
     glob.player.queue += packets.sendMsg(
         client = 'local',
         msg = msg,

@@ -18,7 +18,7 @@ class JsonFile(UserDict):
             data = orjson.loads(self.path.read_bytes() or b"{}")
             super().__init__(**data)
 
-    def __getitem__(self, key: Any) -> Any:        
+    def __getitem__(self, key: Any) -> Any:
         return self.data[key]
 
     def update_file(self) -> None:

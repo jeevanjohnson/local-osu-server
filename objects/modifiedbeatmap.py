@@ -35,7 +35,7 @@ class ModifiedBeatmap:
         self.original_bmap: Beatmap
         self.title_unicode: Optional[str]
         self.artist_unicode: Optional[str]
-    
+
     @functools.cached_property
     def map_file(self) -> oppai.beatmap:
         return parser.map(
@@ -43,13 +43,13 @@ class ModifiedBeatmap:
         )
 
     def as_dict(self) -> dict:
-        bmap = self.__dict__.copy()
-        try: del bmap['map_file']
-        except: pass
+        bmap = utils.delete_keys(
+            self.__dict__.copy(), 'map_file'
+        )
 
         if 'file_path' in bmap:
             bmap['file_path'] = str(bmap['file_path'])
-        
+
         if 'original_bmap' in bmap:
             bmap['original_bmap'] = bmap['original_bmap'].as_dict()
 
@@ -62,7 +62,7 @@ class ModifiedBeatmap:
     @property
     def beatmap_id(self) -> int:
         return self.id
-    
+
     @property
     def beatmapset_id(self) -> int:
         return self.setid
@@ -74,15 +74,15 @@ class ModifiedBeatmap:
     @property
     def approved(self) -> int:
         return self.rank_status
-    
+
     async def get_file(self) -> str:
         return self.file_content
-    
+
     @classmethod
     async def from_md5(cls, md5: str) -> Optional['ModifiedBeatmap']:
         if md5 not in glob.modified_beatmaps:
             return
-        
+
         bmap_dict = glob.modified_beatmaps[md5].copy()
         bmap_dict['file_path'] = Path(bmap_dict['file_path'])
 
@@ -96,7 +96,7 @@ class ModifiedBeatmap:
             )
 
         return cls(**bmap_dict)
-    
+
     @classmethod
     def from_dict(cls, _dict: dict[str, Any]) -> 'ModifiedBeatmap':
         bmap = cls()
@@ -109,18 +109,19 @@ class ModifiedBeatmap:
 
     @staticmethod
     def add_to_db(
-        bmap: Beatmap, params: Params, 
+        bmap: Beatmap, params: Params,
         path_to_modified: Path, return_modified: bool = False
     ) -> Optional['ModifiedBeatmap']:
         if (md5 := params['md5']) in glob.modified_beatmaps:
             return
 
+        # TODO: fix version name
         lower_filename = params['filename'].lower()
         url_parsed =  ''.join([
-            x.lower() for x in bmap.version 
+            x.lower() for x in bmap.version
             if x.isalpha() or x == ' '
         ])
-        split = lower_filename.split(url_parsed)        
+        split = lower_filename.split(url_parsed)
         version = f"[{bmap.version}{split[-1][:-4]}"
 
         file_content = path_to_modified.read_bytes().decode(errors='ignore')

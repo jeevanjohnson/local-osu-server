@@ -10,10 +10,10 @@ else:
 class File(base): # type: ignore
     def __init__(self, path: str) -> None:
         self._cached_stamp = None
-        
+
         super().__new__(base, path)
         self.is_changed()
-    
+
     def is_changed(self) -> bool:
         stamp = self.stat().st_mtime
 

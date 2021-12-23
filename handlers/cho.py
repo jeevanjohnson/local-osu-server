@@ -76,9 +76,9 @@ async def login() -> tuple[BODY, CHO_TOKEN]:
     for channel in CHANNELS:
         cname, cdesc = channel
         body += packets.channelInfo(cname, cdesc, 1)
-    
+
     body += packets.channelInfoEnd()
-    
+
     for channel in CHANNELS:
         body += packets.channelJoin(channel[0])
 
@@ -91,6 +91,6 @@ async def login() -> tuple[BODY, CHO_TOKEN]:
         description = WELCOME_MSG.format(name=glob.player.name),
         buttons = BUTTONS
     )
-    
+
     log(glob.player.name, 'successfully logged in!', color = Color.GREEN)
     return body, 'success'

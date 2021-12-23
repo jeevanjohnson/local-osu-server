@@ -40,15 +40,15 @@ def calculator(
         file = bmap.map_file
     else:
         file = bmap
-    
+
     if 'BanchoScore' not in str(type(score)): # avoids merge conflicts
         if not stars:
             stars = oppai.diff_calc().calc(file, score.mods) # type: ignore
-        
+
         pp, *_, acc_percent = oppai.ppv2(
-            aim_stars = stars.aim, 
-            speed_stars = stars.speed, 
-            bmap = file, 
+            aim_stars = stars.aim,
+            speed_stars = stars.speed,
+            bmap = file,
             mods = score.mods, # type: ignore
             n300 = score.n300, # type: ignore
             n100 = score.n100, # type: ignore
@@ -60,11 +60,11 @@ def calculator(
         mods = int(score.enabled_mods) # type: ignore
         if not stars:
             stars = oppai.diff_calc().calc(file, mods)
-        
+
         pp, *_, acc_percent = oppai.ppv2(
-            aim_stars = stars.aim, 
-            speed_stars = stars.speed, 
-            bmap = file, 
+            aim_stars = stars.aim,
+            speed_stars = stars.speed,
+            bmap = file,
             mods = mods,
             n300 = int(score.count300), # type: ignore
             n100 = int(score.count100), # type: ignore
@@ -81,8 +81,8 @@ def calculator(
 # starting to see flaws
 iterators = (list, tuple)
 PATH = Union[
-    str, re.Pattern, 
-    list[Union[str, re.Pattern]], 
+    str, re.Pattern,
+    list[Union[str, re.Pattern]],
     tuple[Union[str, re.Pattern]]
 ]
 def handler(target: PATH) -> Callable:
@@ -112,7 +112,7 @@ def update_files() -> None:
 async def _add_to_player_queue(packets: bytes) -> None:
     while not glob.player:
         await asyncio.sleep(1)
-    
+
     glob.player.queue += packets
 
 def add_to_player_queue(packets: bytes) -> None:
@@ -140,16 +140,16 @@ log_success = lambda *m: log(*m, color = Color.GREEN)
 def bytes_to_string(b: bytes) -> str:
     return base64.b64encode(b).decode('ascii')
 
-def string_to_bytes(s: str):
+def string_to_bytes(s: str) -> bytes:
     return base64.b64decode(s.encode('ascii'))
 
 def render_menu(
-    channel_name: str, 
+    channel_name: str,
     description: str,
     buttons: list[BUTTON]
-):
+) -> None:
     body = bytearray()
-    
+
     body += packets.userSilenced(-1)
     body += packets.sendMsg(
         client = 'local',
@@ -164,16 +164,35 @@ def render_menu(
                 m = repr(glob.mode).lower()
             else:
                 m = 'vn'
-            
+
             url = url.format(
                 mode = m
             )
-        
+
         body += packets.sendMsg(
             client = 'local',
             msg = f'[{url} {name}]',
             target = channel_name,
             userid = -1,
         )
-    
+
     add_to_player_queue(body)
+
+async def str_to_wslpath(path: str) -> Path:
+    wslpath_proc = await asyncio.subprocess.create_subprocess_exec(
+        'wslpath', path,
+        stdin = asyncio.subprocess.DEVNULL,
+        stdout = asyncio.subprocess.PIPE,
+        stderr = asyncio.subprocess.DEVNULL,
+    )
+    stdin, _ = await wslpath_proc.communicate()
+
+    return Path(stdin.decode().removesuffix('\n'))
+
+def delete_keys(_dict: dict, *keys: str) -> dict:
+    _dict_copy = _dict.copy()
+    for k in keys:
+        try: del _dict_copy[k]
+        except: pass
+
+    return _dict_copy

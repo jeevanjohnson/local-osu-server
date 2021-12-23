@@ -1,7 +1,7 @@
 # don't touch this file just leave it here 
 # for updater lol
 
-version = '1.0.0'
+version = '1.1.0'
 
 file_structure = [
     '.gitignore',

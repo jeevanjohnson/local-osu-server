@@ -23,13 +23,13 @@ class Player:
             and from_login
         ):
             self.init_db()
-        
+
         self.queue = bytearray()
         self.login_time = time.time()
 
         self.rank: int = 9999999
         self.acc: float = 0.0
-        self.playcount: int = 0 
+        self.playcount: int = 0
         self.total_score: int = 0
         self.ranked_score: int = 0
         self.pp: Union[float, int] = 0
@@ -46,12 +46,12 @@ class Player:
         self.info_text = ''
         self.location = (0.0, 0.0)
         self.bancho_privs = 63
-    
+
     def clear(self) -> bytearray:
         _queue = self.queue.copy()
         self.queue.clear()
-        return _queue 
-    
+        return _queue
+
     def init_db(self) -> None:
         if (
             not glob.pfps or
@@ -61,20 +61,20 @@ class Player:
             glob.pfps.update({self.name: None})
 
         if (
-            not glob.profiles or 
+            not glob.profiles or
             self.name not in glob.profiles
         ):
             glob.profiles.update(
                 queries.init_profile(self.name)
             )
-        
+
         utils.update_files()
         glob.current_profile = glob.profiles[self.name]
 
     async def get_rank(self) -> int:
         if not config.osu_daily_api_key:
             return 1
-        
+
         url = f'{OSU_DAILY_API}/pp.php'
         params = {
             'k': config.osu_daily_api_key,
@@ -86,24 +86,24 @@ class Player:
         async with glob.http.get(url, params=params) as resp:
             if not resp or resp.status != 200:
                 return 1
-            
+
             json = orjson.loads(await resp.content.read())
             if not json:
                 return 1
-        
+
         if 'rank' not in json:
             input((
                 'Hey!\n'
-                'If you have a valid osu!daily api key and end up\n' 
+                'If you have a valid osu!daily api key and end up\n'
                 'Seeing this error please send this to cover on discord!\n'
                 f'With the following info: {json}\n'
                 '(At this point, set `config.osu_daily_api_key` to `None`)\n'
                 'click enter to continue however :)'
             ))
             return 1
-            
+
         return json['rank']
-    
+
     async def update(
         self, filter_mod: Optional[Mods] = None
     ) -> None:
@@ -117,15 +117,15 @@ class Player:
 
         approved_plays: Optional[APPROVED_PLAYS] = \
         glob.current_profile['plays']['approved_plays']
-        
+
         for plays in (ranked_plays, approved_plays):
             if plays:
                 for v in plays.values():
                     scores.extend(v)
-        
+
         if filter_mod:
             scores = [
-                x for x in scores if 
+                x for x in scores if
                 x['mods'] & filter_mod
             ]
         else:
@@ -146,11 +146,11 @@ class Player:
             acc = sum([s['acc'] * 0.95 ** i for i, s in enumerate(top_scores)])
             bonus_acc = 100.0 / (20 * (1 - 0.95 ** len(scores)))
             self.acc = (acc * bonus_acc) / 100
-        
+
         if 'playcount' in glob.current_profile:
             self.playcount = glob.current_profile['playcount']
-        
+
         self.rank = await self.get_rank()
-        
+
         if self.from_login:
             self.queue += packets.userStats(self)

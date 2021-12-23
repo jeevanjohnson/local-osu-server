@@ -16,6 +16,7 @@ from server import Response
 from constants import BUTTONS
 import urllib.parse as urlparse
 from objects import Leaderboard
+from constants import ParsedParams
 from objects import ModifiedLeaderboard
 
 async def DEFAULT_RESPONSE_FUNC(request: Request) -> Response:
@@ -188,14 +189,15 @@ async def leaderboard(request: Request) -> Response:
     if not glob.player:
         return Response(404, b'')
 
-    parsed_params = {
-        'filename': urlparse.unquote_plus(request.params['f']),
-        'mods': request.params['mods'],
-        'mode': request.params['m'],
-        'rank_type': request.params['v'],
-        'set_id': request.params['i'],
-        'md5': request.params['c']
-    }
+    parsed_params = ParsedParams(
+        filename = urlparse.unquote_plus(request.params['f']),
+        mods = request.params['mods'],
+        mode = request.params['m'],
+        rank_type = request.params['v'],
+        set_id = request.params['i'],
+        md5 = request.params['c'],
+        name_data =  None
+    )
 
     filename = parsed_params['filename']
     mods = request.params['mods']
@@ -246,9 +248,9 @@ async def leaderboard(request: Request) -> Response:
 
     
     if config.osu_api_key:
-        lb = await Leaderboard.from_bancho(**parsed_params)
+        lb = await Leaderboard.from_bancho(parsed_params)
     else:
-        lb = await Leaderboard.from_offline(**parsed_params)
+        lb = await Leaderboard.from_offline(parsed_params)
 
     if not lb.bmap or lb.bmap.approved not in (1, 2, 3, 4):
         regex_results = [
@@ -262,8 +264,10 @@ async def leaderboard(request: Request) -> Response:
                 r.search(diff_name) 
                 for r in regex.attribute_edits
             ])
+
+            parsed_params['name_data'] = name_data
         
-        if any(regex_results) and glob.modified_txt.exists():
+        if any(regex_results):
             lb = await ModifiedLeaderboard.from_client(parsed_params) # type: ignore
             log(
                 f'handled funorange map of {parsed_params["filename"]}', 

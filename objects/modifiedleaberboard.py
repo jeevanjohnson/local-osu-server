@@ -1,17 +1,12 @@
-import os
-import regex
 import config
-import asyncio
-import hashlib
 from ext import glob
-from pathlib import Path
 from typing import Union
 from typing import Optional
-from typing import TypedDict
 from objects.mods import Mods
 from objects.score import Score
-import urllib.parse as urlparse
+from constants import ParsedParams
 from objects.beatmap import Beatmap
+from objects.modifiedfinder import ModifiedFinder
 from objects.modifiedbeatmap import ModifiedBeatmap
 
 ONLINE_PLAYS = dict[str, list[dict]]
@@ -63,14 +58,7 @@ SCORE_FORMAT = (
 )
 VALID_LB_STATUESES = (LOVED, QUALIFIED, RANKED, APPROVED)
 
-class Params(TypedDict):
-    filename: str
-    mods: int
-    mode: int
-    rank_type: int
-    set_id: int
-    md5: str
-
+BMAPID_OR_MD5 = Union[int, str]
 BEATMAP = Union[Beatmap, ModifiedBeatmap]
 class ModifiedLeaderboard:
     def __init__(self) -> None:
@@ -82,7 +70,7 @@ class ModifiedLeaderboard:
     def lb_base_fmt(self) -> Optional[bytes]:
         if not self.bmap:
             return
-        
+
         return STARTING_LB_FORMAT.format(
             rankedstatus = FROM_API_TO_SERVER_STATUS[self.bmap.approved],
             mapid = self.bmap.beatmap_id,
@@ -96,14 +84,14 @@ class ModifiedLeaderboard:
     def as_binary(self) -> bytes:
         if not self.bmap:
             return b'0|false'
-        
+
         r = FROM_API_TO_SERVER_STATUS[self.bmap.approved]
         if r not in VALID_LB_STATUESES:
             return f'{r}|false'.encode()
 
         if not self.lb_base_fmt:
             return f'{r}|false'.encode()
-        
+
         buffer = bytearray()
         buffer += self.lb_base_fmt
 
@@ -123,7 +111,7 @@ class ModifiedLeaderboard:
             self.personal_score.score = score
         else:
             buffer += b'\n'
-        
+
         len_scores = len(self.scores)
         for idx, s in enumerate(self.scores):
             idx += 1
@@ -134,127 +122,48 @@ class ModifiedLeaderboard:
             ).encode()
             if idx != len_scores:
                 buffer += b'\n'
-        
+
         return bytes(buffer)
-    
+
     @classmethod
     async def from_client(
-        cls, params: Params
+        cls, params: ParsedParams
     ) -> 'ModifiedLeaderboard':
         lb = cls()
+
         if params['md5'] not in glob.modified_beatmaps:
-            modified_maps = tuple(glob.modified_txt.read_text().splitlines())
-            
-            set_path: Optional[Path] = None
-            for map in modified_maps:
-                split = map.split('.mp3 | ', 1)
-                if len(split) < 2:
-                    continue
-                
-                _, file_path = split
+            finder = ModifiedFinder(
+                params['md5'],
+                params['filename'],
+                params['set_id'],
+                params['name_data']
+            )
 
-                fpath = Path(file_path)
+            md5_or_id: Optional[BMAPID_OR_MD5] = None
+            funorange_map = await finder.modified_txt_search()
+            if funorange_map:
+                md5_or_id = finder.get_bmap_id()
 
-                if glob.using_wsl:
-                    filename = fpath.name.split("\\")[-1]
-                else:
-                    filename = fpath.parts[-1]
-                
-                if params['filename'] == filename:
-                    set_path = fpath
+            if not funorange_map or not md5_or_id:
+                md5_or_id = finder.get_original_md5()
+                funorange_map = finder.funorange_map_path
 
-                    if glob.using_wsl:
-                        # call wslpath to get their linux path from the windows one
-                        # TODO: this can be done manually (without wslpath),
-                        #       to avoid the subprocess
-                        wslpath_proc = await asyncio.subprocess.create_subprocess_exec(
-                            'wslpath',
-                            set_path,
-                            stdin=asyncio.subprocess.DEVNULL,
-                            stdout=asyncio.subprocess.PIPE,
-                            stderr=asyncio.subprocess.DEVNULL,
-                        )
-                        stdin, _ = await wslpath_proc.communicate()
-
-                        set_path = Path(stdin.decode().removesuffix('\n'))
-
-                    break
-
-            orignal_value: Optional[Union[int, str]] = None
-            if set_path and set_path.exists():
-                for line in set_path.read_bytes().splitlines():
-                    try:
-                        k, v = line.decode().lower().strip().split(':', 1)
-                        if k != 'beatmapid':
-                            continue
-                        
-                        v = int(v)
-
-                        if v > 0:
-                            orignal_value = v
-                            break
-                    except:
-                        continue
-            
-            if not orignal_value:
-                path_exists = set_path and set_path.exists()
-                if (
-                    not path_exists
-                    and glob.songs_folder
-                ):
-                    if params['set_id'] > 0:
-                        pattern = f'{params["set_id"]}*'
-                        folders = glob.songs_folder.glob(pattern)
-                    elif (name_data := regex.filename_parser.search(params['filename'])):
-                        pattern = f'* {name_data["artist"]} - {name_data["song_name"]}*'
-                        folders = glob.songs_folder.glob(pattern)  
-                    else:
-                        folders = []
-                elif set_path:
-                    folders = (set_path.parent,)
-                else:
-                    folders = []
-
-                for map_folder in folders:
-                    for fname in os.listdir(str(map_folder)):
-                        if orignal_value and set_path:
-                            break
-                            
-                        if not fname.endswith('.osu'):
-                            continue
-                        
-                        fname = urlparse.unquote_plus(fname)
-                        if params['filename'].lower() == fname.lower():
-                            set_path = map_folder / fname
-                            continue
-                        
-                        if (
-                            fname[:-5].lower() in params['filename'].lower() and 
-                            params['filename'].lower() != fname.lower()
-                        ):
-                            orignal_map = map_folder / fname
-                            orignal_value = hashlib.md5(orignal_map.read_bytes()).hexdigest()
-                    
-                    if orignal_value and set_path:
-                        break
-
-            path_exists = set_path and set_path.exists()
             if (
-                not orignal_value or 
-                not path_exists
+                not funorange_map or
+                not md5_or_id
             ):
                 return lb
-            
-            if isinstance(orignal_value, int):
-                bmap = await Beatmap.from_id(orignal_value)
+
+            if isinstance(md5_or_id, int):
+                bmap = await Beatmap.from_id(md5_or_id)
             else:
-                bmap = await Beatmap.from_md5(orignal_value)
-            
+                bmap = await Beatmap.from_md5(md5_or_id)
+
             if not bmap:
                 return lb
-            
+
             lb.bmap = bmap = ModifiedBeatmap.add_to_db(
-                bmap, params, set_path, # type: ignore
+                bmap, params, funorange_map,
                 return_modified = True
             )
 
@@ -269,26 +178,26 @@ class ModifiedLeaderboard:
         ranked_status = FROM_API_TO_SERVER_STATUS[bmap.approved]
         if ranked_status not in VALID_LB_STATUESES:
             return lb
-        
+
         if (
-            not glob.player or 
+            not glob.player or
             not glob.current_profile
         ):
             return lb
 
         key = f'{status_to_db[bmap.approved]}_plays'
-        
+
         _player_scores: Optional[ONLINE_PLAYS] = \
         glob.current_profile['plays'][key]
 
         if not _player_scores:
             return lb
-        
+
         if bmap.file_md5 not in _player_scores:
             return lb
 
         player_scores = _player_scores[bmap.file_md5]
-        
+
         if glob.mode:
             player_scores = [
                 x for x in player_scores if x['mods'] & glob.mode
@@ -309,7 +218,7 @@ class ModifiedLeaderboard:
 
         if params['rank_type'] == MODS:
             player_scores = [
-                x for x in player_scores if 
+                x for x in player_scores if
                 x['mods'] == params['mods']
             ]
             if not player_scores:

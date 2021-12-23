@@ -23,11 +23,11 @@ async def needs_updating() -> bool:
         if not resp:
             log_error('no version file found on github')
             return False
-        
+
         if resp.status != 200:
             log_error('no version file found on github')
             return False
-        
+
         exec(await resp.text())
         github_version: str = locals()['version']
 
@@ -46,7 +46,7 @@ async def update() -> None:
     if not FILE_STRUCTURE:
         log_error("couldn't update")
         return
-    
+
     for path_str in FILE_STRUCTURE:
         async with glob.http.get(
             f'{BASE_URL}/{path_str}'
@@ -55,8 +55,8 @@ async def update() -> None:
                 log_error(f"couldn't get content for {path_str}")
                 continue
 
-            file_content = await resp.text()
-            
+            file_content = await resp.content.read()
+
         split_path = path_str.split('/')
         path = Path.cwd() / split_path[0]
         for p in split_path[1:]:
@@ -65,12 +65,12 @@ async def update() -> None:
                 not path.exists()
             ):
                 path.mkdir(exist_ok=True)
-            
+
             path = path / p
 
-        path.write_text(file_content)
+        path.write_bytes(file_content)
         log_success(f"successfully updated file {path_str}")
-            
+
     log_success((
         'successfully updated the server!\n',
         'restart the server to run again!'

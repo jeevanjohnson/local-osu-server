@@ -187,7 +187,7 @@ def write(packetid: int, *args) -> bytes:
             p += write_list32(ctx)
         else:
             p += struct.pack(f'<{_type}', ctx)
-    
+
     p[3:3] = struct.pack('<I', len(p) - 3)
     return bytes(p)
 
@@ -228,7 +228,7 @@ def userPresence(p: 'Player') -> bytes:
 
 def userStats(p: 'Player') -> bytes:
     return write(
-        PacketIDS.CHO_USER_STATS, 
+        PacketIDS.CHO_USER_STATS,
         (p.userid, 'int'), (p.action, 'byte'),
         (p.info_text, 'str'), (p.map_md5, 'str'),
         (p.mods, 'int'), (p.mode, 'unbyte'),
@@ -261,12 +261,12 @@ def channelJoin(channel_name: str) -> bytes:
     )
 
 def channelInfo(
-    channel_name: str, 
+    channel_name: str,
     channel_description: str,
     channel_player_count: int
 ) -> bytes:
     return write(
-        PacketIDS.CHO_CHANNEL_INFO, 
+        PacketIDS.CHO_CHANNEL_INFO,
         (channel_name, 'str'), (channel_description, 'str'), (channel_player_count, 'short')
     )
 
@@ -292,14 +292,14 @@ def logout(uid: int) -> bytes:
 @functools.cache
 def sendMsg(client: str, msg: str, target: str, userid: int):
     return write(
-        PacketIDS.CHO_SEND_MESSAGE, 
+        PacketIDS.CHO_SEND_MESSAGE,
         (client, 'str'), (msg, 'str'),
-        (target, 'str'), (userid, 'int') 
+        (target, 'str'), (userid, 'int')
     )
 
 @functools.cache
 def userSilenced(userid: int) -> bytes:
     return write(
-        PacketIDS.CHO_USER_SILENCED, 
+        PacketIDS.CHO_USER_SILENCED,
         (userid, 'int')
     )

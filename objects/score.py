@@ -18,7 +18,7 @@ BEATMAP = Union[Beatmap, ModifiedBeatmap]
 
 class BanchoScore:
     def __init__(
-        self, bancho_score: dict[str, str], 
+        self, bancho_score: dict[str, str],
         bmap: Optional[Beatmap] = None
     ) -> None:
         self.score_id = bancho_score['score_id']
@@ -45,34 +45,32 @@ class BanchoScore:
     @property
     def as_leaderboard_score(self) -> dict:
         _dict = self.__dict__.copy()
-        
-        try: del _dict['bmap']
-        except: pass
 
         _dict['score'] = (
-            f"{_dict['pp']:.0f}" 
-            if config.pp_leaderboard and _dict['pp'] else 
+            f"{_dict['pp']:.0f}"
+            if config.pp_leaderboard and _dict['pp'] else
             _dict['score']
         )
 
-        try: del _dict['pp']
-        except: pass
-        
+        _dict = utils.delete_keys(
+            _dict, 'pp', 'bmap'
+        )
+
         return _dict
 
 class Score:
     def __init__(
-        self, mode: str, 
+        self, mode: str,
         md5: str, name: str,
         n300: int,  n100: int,
         n50: int, ngeki: int,
         nkatu: int, nmiss: int,
         score: int, max_combo: int,
         perfect: bool, mods: int, time: int,
-        replay: Optional[Replay] = None, 
+        replay: Optional[Replay] = None,
         additional_mods: Optional[int] = None,
         bmap: Optional[BEATMAP] = None,
-        acc: Optional[float] = None, pp: Optional[float] = None, 
+        acc: Optional[float] = None, pp: Optional[float] = None,
         replay_md5: Optional[str] = None, scoreid: Optional[int] = None,
         replay_frames: Optional[bytes] = None, mods_str: Optional[str] = None
     ) -> None:
@@ -99,20 +97,20 @@ class Score:
         self.scoreid = scoreid
         self.replay_frames = replay_frames
         self.mods_str = mods_str
-    
+
     def as_dict(self) -> dict[str, Any]:
-        score = self.__dict__.copy()
-        del score['replay']
-        del score['bmap']
+        score = utils.delete_keys(
+            self.__dict__.copy(), 'replay', 'bmap'
+        )
 
         if (
-            self.replay_frames and 
+            self.replay_frames and
             isinstance(self.replay_frames, bytes)
         ):
             score['replay_frames'] = utils.bytes_to_string(
                 score['replay_frames']
             )
-        
+
         return score
 
     @property
@@ -124,7 +122,7 @@ class Score:
         for lifebar in self.replay.bar_graph: # type: ignore
             if lifebar.current_hp == 0.0:
                 return True
-        
+
         return False
 
     @classmethod
@@ -166,11 +164,11 @@ class Score:
             not glob.replay_folder
         ):
             return
-        
+
         files = glob.replay_folder.glob('*.osr')
         replay_path = glob.replay_folder / max(files , key=os.path.getctime)
         replay = Replay.from_file(str(replay_path))
-        
+
         s = cls(
             glob.player.mode, replay.beatmap_md5, replay.player_name, # type: ignore
             replay.n300, replay.n100, replay.n50, replay.geki, # type: ignore

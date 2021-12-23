@@ -1,6 +1,6 @@
 import lzma
 import struct
-from enum import unique 
+from enum import unique
 from enum import IntEnum
 from enum import IntFlag
 from typing import Optional
@@ -66,14 +66,14 @@ class LifeBar:
         hp = 1.0
         if ',' not in raw_bar:
             return cls(int(raw_bar), hp)
-        
+
         hp, vtime = raw_bar.split(',')
         return cls(int(vtime or 0), float(hp))
 
 class Frame:
     def __init__(
-        self, delta_time: float, 
-        x: float, y: float, 
+        self, delta_time: float,
+        x: float, y: float,
         key: Key
     ) -> None:
         self.delta_time = delta_time
@@ -85,7 +85,7 @@ class Frame:
     def from_raw_frame(cls, raw_frame: bytes) -> 'Frame':
         w, x, y, z, = raw_frame.decode().split('|')
         return cls(
-            float(w), float(x), 
+            float(w), float(x),
             float(y), Key(int(z))
         )
 
@@ -116,24 +116,24 @@ class Replay:
         self.additional_mods: Optional[int] = None
         self.frames: Optional[list[Frame]] = None
         self.raw_frames: Optional[bytes] = None
-    
+
     @property
     def data(self) -> bytes:
         return self._data[self.offset:]
-    
+
     @classmethod
     def from_file(cls, path: str) -> 'Replay':
         with open(path, 'rb') as f:
             replay = cls(f.read())
             replay.parse()
             return replay
-    
+
     @classmethod
     def from_content(cls, content: bytes) -> 'Replay':
         replay = cls(content)
         replay.parse()
         return replay
-    
+
     def parse(self) -> None:
         self.mode = GameMode(self.read_byte())
         self.version = self.read_int()
@@ -152,16 +152,16 @@ class Replay:
         self.mods = Mods(self.read_int())
         self.bar_graph = [LifeBar.from_raw_bar(x) for x in self.read_string().split('|')]
         self.timestamp = self.read_long_long()
-        
+
         self.raw_frames = raw_frames = self.read_raw(self.read_int())
         decoded_frames: list[bytes] = lzma.decompress(raw_frames).split(b',')
         self.frames = [Frame.from_raw_frame(x) for x in decoded_frames if x]
 
         self.scoreid = self.read_long_long()
-        
+
         if self.mods & Mods.TARGET:
             self.additional_mods = self.read_double()
-    
+
     def read_byte(self) -> int:
         val, = struct.unpack('<b', self.data[:1])
         self.offset += 1

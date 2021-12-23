@@ -15,10 +15,10 @@ OSU_API_BASE = 'https://osu.ppy.sh/api'
 def real_type(value: str) -> Union[float, int, str]:
     if not isinstance(value, str):
         return value
-    
+
     if value.replace('-', '', 1).isdecimal():
         return int(value)
-    
+
     try: return float(value)
     except: pass
 
@@ -69,37 +69,35 @@ class Beatmap:
         self.diff_speed: float
         self.difficultyrating: float
         self.file_content: Optional[str]
-    
+
     def as_dict(self) -> dict:
-        bmap = self.__dict__.copy()
-        try: del bmap['map_file']
-        except: pass
-        
-        return bmap
+        return utils.delete_keys(
+            self.__dict__.copy(), 'map_file'
+        )
 
     @functools.cached_property
     def map_file(self) -> oppai.beatmap:
         return parser.map(
             osu_file = self.file_content.splitlines() # type: ignore
         )
-    
+
     async def get_file(self) -> Optional[str]:
         if 'file_content' in self.__dict__:
             return self.file_content
-        
+
         url = f'https://osu.ppy.sh/osu/{self.beatmap_id}'
         async with glob.http.get(url) as resp:
             if not resp or resp.status != 200:
                 return
-            
+
             content = (
                 await resp.content.read()
             ).decode(errors='ignore')
-            
+
             if not content:
                 return
-            
-            self.file_content = content 
+
+            self.file_content = content
             return content
 
     @property
@@ -110,7 +108,7 @@ class Beatmap:
         glob.beatmaps[self.file_md5] = self.as_dict()
         glob.beatmaps[str(self.beatmap_id)] = self.as_dict()
         utils.update_files()
-    
+
     @classmethod
     def from_dict(cls, _dict: dict[str, Any]) -> 'Beatmap':
         bmap = cls()
@@ -123,23 +121,23 @@ class Beatmap:
             bmap_dict: Optional[BMAP_DICT] = glob.beatmaps[str(value)]
         else:
             bmap_dict: Optional[BMAP_DICT] = glob.beatmaps[value]
-        
+
         if not bmap_dict:
             return
-        
+
         bmap_dict = bmap_dict.copy()
-        
+
         bmap = cls()
         for k, v in bmap_dict.items():
             bmap.__dict__[k] = v
 
         return bmap
-    
+
     @classmethod
     async def from_id(cls, bmap_id: int) -> Optional['Beatmap']:
         if bmap_id in glob.beatmaps:
             return cls.from_db(bmap_id)
-        
+
         if not config.osu_api_key:
             return None
 
@@ -153,23 +151,23 @@ class Beatmap:
         ) as resp:
             if not resp or resp.status != 200:
                 return
-            
+
             if not (json := await resp.json()):
                 return
-            
+
             bmap_json: dict = json[0]
-        
+
         bmap = cls()
         for k, v in bmap_json.items():
             bmap.__dict__[k] = real_type(v)
-        
+
         return bmap
 
     @classmethod
     async def from_md5(cls, md5: str) -> Optional['Beatmap']:
         if md5 in glob.beatmaps:
             return cls.from_db(md5)
-        
+
         if not config.osu_api_key:
             return None
 
@@ -183,14 +181,14 @@ class Beatmap:
         ) as resp:
             if not resp or resp.status != 200:
                 return
-            
+
             if not (json := await resp.json()):
                 return
-            
+
             bmap_json: dict = json[0]
-        
+
         bmap = cls()
         for k, v in bmap_json.items():
             bmap.__dict__[k] = real_type(v)
-        
+
         return bmap

@@ -3,10 +3,9 @@ import orjson
 import packets
 import asyncio
 from ext import glob
-from utils import log
-from utils import Color
 from server import Server
 from server import Request
+from utils import log_error
 from server import Response
 
 import utils
@@ -95,7 +94,7 @@ async def while_server_running() -> None:
             try:
                 await glob.handlers['score_sub']() 
             except Exception as e:
-                log(str(e), color = Color.RED)
+                log_error(str(e))
 
 server = Server()
 DEFAULT_RESPONSE = Response(200, b'')
@@ -120,7 +119,7 @@ async def osu(request: Request) -> Response:
         
         continue
         
-    log(path, "isn't handled", color = Color.RED)
+    log_error(path, "isn't handled")
     return DEFAULT_RESPONSE
 
 @server.get(

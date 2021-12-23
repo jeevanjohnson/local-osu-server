@@ -65,7 +65,7 @@ async def profile(request: Request) -> Response:
         else:
             m = 'vn'
             filter_mod = None
-    
+
     await p.update(filter_mod)
 
     response_json = {
@@ -148,12 +148,12 @@ async def tops(request: Request) -> Response:
 
     if filter_mod:
         scores = [
-            x for x in scores if 
+            x for x in scores if
             x['mods'] & filter_mod
         ]
     else:
         scores = [
-            x for x in scores if 
+            x for x in scores if
             not x['mods'] & (Mods.RELAX | Mods.AUTOPILOT)
         ]
 
@@ -248,12 +248,12 @@ async def recent(request: Request) -> Response:
 
     if filter_mod:
         scores = [
-            x for x in scores if 
+            x for x in scores if
             x['mods'] & filter_mod
         ]
     else:
         scores = [
-            x for x in scores if 
+            x for x in scores if
             not x['mods'] & (Mods.RELAX | Mods.AUTOPILOT)
         ]
 
@@ -390,7 +390,7 @@ async def wipe_profile(request: Request) -> Response:
             }),
             headers = {'Content-type': 'application/json charset=utf-8'}
         )
-    
+
     if 'yes' not in params:
         return Response(
             code = 200,
@@ -407,7 +407,7 @@ async def wipe_profile(request: Request) -> Response:
             }),
             headers = {'Content-type': 'application/json charset=utf-8'}
         )
-    
+
     if params['yes'] != 'yes':
         return Response(
             code = 200,
