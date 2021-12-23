@@ -3,4 +3,5 @@ __pycache__/
 *.lnk
 config.py
 extra.txt
+test.py
 TODOS

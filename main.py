@@ -12,7 +12,7 @@ from server import Response
 import utils
 import config
 import pyimgur
-import colorama
+import updater
 from objects import File
 from pathlib import Path
 from aiohttp import ClientSession
@@ -21,7 +21,12 @@ from objects.jsonfile import JsonFile
 # TODO: simplify path init
 async def on_start_up() -> None:
     glob.http = ClientSession()
-    colorama.init(autoreset=True)
+
+    if (
+        config.auto_update and
+        await updater.needs_updating()
+    ):
+        await updater.update()
 
     if config.paths['osu! path'] is not None:
         osu_path = Path(config.paths['osu! path'])
@@ -174,9 +179,9 @@ async def website(request: Request) -> Response:
         f"/{request.args['path']}"
     ](request)
 
-import handlers # load all handlers
+def main() -> int:
+    import handlers # load all handlers
 
-if __name__ == '__main__':
     try:
         import uvloop # type: ignore
         uvloop.install()
@@ -189,3 +194,8 @@ if __name__ == '__main__':
         before_startup = on_start_up,
         background_tasks = [while_server_running]
     )
+
+    return 0
+
+if __name__ == '__main__':
+    SystemExit(main())

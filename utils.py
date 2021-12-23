@@ -2,6 +2,7 @@ import re
 import base64
 import asyncio
 import packets
+import colorama
 import pyttanko as oppai
 from typing import Union
 from pathlib import Path
@@ -23,6 +24,8 @@ try:
 except ImportError:
     pass
 
+colorama.init(autoreset=True)
+
 Color = Fore
 
 PP = float
@@ -40,21 +43,21 @@ def calculator(
     
     if 'BanchoScore' not in str(type(score)): # avoids merge conflicts
         if not stars:
-            stars = oppai.diff_calc().calc(file, score.mods)
+            stars = oppai.diff_calc().calc(file, score.mods) # type: ignore
         
         pp, *_, acc_percent = oppai.ppv2(
             aim_stars = stars.aim, 
             speed_stars = stars.speed, 
             bmap = file, 
-            mods = score.mods,
-            n300 = score.n300,
-            n100 = score.n100, 
-            n50 = score.n50,
-            nmiss = score.nmiss,
-            combo = score.max_combo
+            mods = score.mods, # type: ignore
+            n300 = score.n300, # type: ignore
+            n100 = score.n100, # type: ignore
+            n50 = score.n50, # type: ignore
+            nmiss = score.nmiss, # type: ignore
+            combo = score.max_combo # type: ignore
         )
     else:
-        mods = int(score.enabled_mods)
+        mods = int(score.enabled_mods) # type: ignore
         if not stars:
             stars = oppai.diff_calc().calc(file, mods)
         
@@ -63,11 +66,11 @@ def calculator(
             speed_stars = stars.speed, 
             bmap = file, 
             mods = mods,
-            n300 = int(score.count300),
-            n100 = int(score.count100), 
-            n50 = int(score.count50),
-            nmiss = int(score.countmiss),
-            combo = int(score.maxcombo)
+            n300 = int(score.count300), # type: ignore
+            n100 = int(score.count100), # type: ignore
+            n50 = int(score.count50), # type: ignore
+            nmiss = int(score.countmiss), # type: ignore
+            combo = int(score.maxcombo) # type: ignore
         )
 
         score.pp = pp
@@ -130,6 +133,9 @@ def filter_top_scores(_scores: list[dict]) -> list[dict]:
 def log(*message: str, color: str = Color.WHITE) -> None:
     print(f"{color}{' '.join(message)}")
     return
+
+log_error = lambda *m: log(*m, color = Color.RED)
+log_success = lambda *m: log(*m, color = Color.GREEN)
 
 def bytes_to_string(b: bytes) -> str:
     return base64.b64encode(b).decode('ascii')

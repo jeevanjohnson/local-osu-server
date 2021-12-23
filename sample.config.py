@@ -43,6 +43,10 @@ menu_icon: dict[str, Optional[str]] = {
 }
 
 """Server Config"""
+# will automatically update the sever
+# whenever there are new updates added
+auto_update: bool = False
+
 # needed for loading leaderboards
 # you can find your's here https://old.ppy.sh/p/api/
 # if `None` then leaderboards won't load nor score submission
