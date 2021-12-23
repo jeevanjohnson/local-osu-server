@@ -113,12 +113,14 @@ class ModifiedLeaderboard:
             else:
                 num_on_lb = self.scores.index(self.personal_score) + 1
 
+            score = self.personal_score.score
             self.personal_score.score = int(self.personal_score.pp or 0)
             buffer += SCORE_FORMAT.format(
                 **self.personal_score.as_leaderboard_score,
                 num_on_lb = num_on_lb
             ).encode()
             buffer += b'\n'
+            self.personal_score.score = score
         else:
             buffer += b'\n'
         
