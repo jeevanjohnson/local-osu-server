@@ -7,6 +7,7 @@ from server import Server
 from server import Request
 from utils import log_error
 from server import Response
+from utils import log_success
 
 import sys
 import utils
@@ -100,6 +101,10 @@ async def while_server_running() -> None:
 
 async def shutdown_method() -> None:
     await glob.http.close()
+    log_success((
+        'server successfully shutdown!\n'
+        'see you next time :)'
+    ))
 
 server = Server()
 DEFAULT_RESPONSE = Response(200, b'')

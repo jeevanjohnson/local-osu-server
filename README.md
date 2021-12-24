@@ -22,7 +22,7 @@ coming soon
 
 ---
 # Reminders
-This project gets frequently updated, so just to update (will make an updater soon), just download the new code and replace it with the files you current have in your server. You may have to edit the config file a bit if `sample.config.py` gets some changes. 
+You may have to edit your `config.py` file a bit if `sample.config.py` gets some changes with incoming updates. 
 
 Any unknown errors you see when setting up or just playing, please report them to me on discord `cover#0675` :)
 
