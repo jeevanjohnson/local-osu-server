@@ -1,12 +1,9 @@
-import sys
 from ext import glob
 from pathlib import Path
 from typing import Optional
 from utils import log_error
 from utils import log_success
 import version as local_version
-
-# TODO: handle deleted files
 
 VERSION_LINK = (
     'https://raw.githubusercontent.com/coverosu/local-osu-server/main/version.py'
@@ -52,7 +49,7 @@ async def update() -> None:
 
     for type, fstructure in FILE_STRUCTURE.items():
         for path_str in fstructure:
-            if type == 'files':
+            if type == 'files' and '.' in path_str:
                 async with glob.http.get(
                     f'{BASE_URL}/{path_str}'
                 ) as resp:
@@ -74,15 +71,17 @@ async def update() -> None:
 
                 path = path / p
 
-            if type == 'files':
+            if type == 'files' and '.' in path_str:
                 path.write_bytes(file_content) # type: ignore
-            else:
+                log_success(f"successfully updated file {path_str}")
+            elif type == 'deleted_files':
                 try: path.unlink()
                 except: pass
-            
-            log_success(f"successfully updated file {path_str}")
+                log_success(f"successfully deleted file {path_str}")
+            else:
+                log_success(f"successfully created path {path_str}")
 
     log_success((
-        'successfully updated the server!\n',
+        'successfully updated the server!\n'
         'restart the server to run again!'
     ))
