@@ -146,8 +146,9 @@ def string_to_bytes(s: str) -> bytes:
 def render_menu(
     channel_name: str,
     description: str,
-    buttons: list[BUTTON]
-) -> None:
+    buttons: list[BUTTON],
+    add_to_queue: bool = True
+) -> bytearray:
     body = bytearray()
 
     body += packets.userSilenced(-1)
@@ -176,7 +177,10 @@ def render_menu(
             userid = -1,
         )
 
-    add_to_player_queue(body)
+    if add_to_queue:
+        add_to_player_queue(body)
+
+    return body
 
 async def str_to_wslpath(path: str) -> Path:
     wslpath_proc = await asyncio.subprocess.create_subprocess_exec(

@@ -182,6 +182,7 @@ async def website(request: Request) -> Response:
 
 def main() -> int:
     import handlers # load all handlers
+    from website import website_handler
 
     try:
         import uvloop # type: ignore

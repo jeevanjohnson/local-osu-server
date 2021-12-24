@@ -1,7 +1,7 @@
 # don't touch this file just leave it here 
 # for updater lol
 
-version = '1.1.5'
+version = '1.1.8'
 
 file_structure = ['.gitignore',
  'constants.py',
@@ -11,7 +11,6 @@ file_structure = ['.gitignore',
  'handlers/cho.py',
  'handlers/submit_score.py',
  'handlers/web.py',
- 'handlers/website.py',
  'handlers/__init__.py',
  'main.py',
  'objects/beatmap.py',
@@ -37,3 +36,7 @@ file_structure = ['.gitignore',
  'updater.py',
  'utils.py',
  'version.py']
+
+deleted_files = [
+    'handlers/website.py'
+]

@@ -144,7 +144,11 @@ class ModifiedFinder:
             else:
                 funorange_filename_from_txt = file_path.parts[-1]
 
-            if self.filename == funorange_filename_from_txt:
+            funorange_filename_from_txt_unquote = urlparse.unquote_plus(
+                funorange_filename_from_txt
+            )
+
+            if self.filename == funorange_filename_from_txt_unquote:
                 self.funorange_map_path = file_path
 
                 if glob.using_wsl:

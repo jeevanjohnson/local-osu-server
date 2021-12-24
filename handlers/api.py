@@ -174,16 +174,17 @@ async def tops(request: Request) -> Response:
             play['mods_str'] = repr(Mods(play['mods']))
 
         if bmap:
-            bmap_dict = bmap.as_dict()
-            try: del bmap_dict['file_content']
-            except: pass
+            bmap_dict = utils.delete_keys(
+                bmap.as_dict(), 'file_content'
+            )
 
             play['bmap'] = bmap_dict
         else:
             play['bmap'] = None
 
-        try: del play['replay_frames']
-        except: pass
+        play = utils.delete_keys(
+            play, 'replay_frames'
+        )
 
         response_json['plays'].append(play)
 
@@ -276,16 +277,17 @@ async def recent(request: Request) -> Response:
             play['mods_str'] = repr(Mods(play['mods']))
 
         if bmap:
-            bmap_dict = bmap.as_dict()
-            try: del bmap_dict['file_content']
-            except: pass
+            bmap_dict = utils.delete_keys(
+                bmap.as_dict(), 'file_content'
+            )
 
             play['bmap'] = bmap_dict
         else:
             play['bmap'] = None
 
-        try: del play['replay_frames']
-        except: pass
+        play = utils.delete_keys(
+            play, 'replay_frames'
+        )
 
         response_json['plays'].append(play)
 

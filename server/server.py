@@ -4,6 +4,7 @@ import socket
 import asyncio
 from typing import Any
 from typing import Union
+from pathlib import Path
 from typing import Callable
 from typing import Optional
 from typing import TypedDict
@@ -68,14 +69,17 @@ class Route(TypedDict):
 
 class Response:
     def __init__(
-        self, code: int, body: Union[bytes, bytearray], 
+        self, code: int, body: Union[str, bytes, bytearray], 
         headers: dict[str, Any] = {}
     ) -> None:
         self.code = code
         self.body = body
         self.headers = headers
 
-    def to_bytes(self) -> bytes:        
+    def to_bytes(self) -> bytes:
+        if isinstance(self.body, str):
+            self.body = self.body.encode()
+              
         resp = bytearray((
             f'HTTP/1.1 {self.code} {HTTP_STATUS_CODES[self.code]}\r\n'
             f'Content-Length: {len(self.body)}\r\n'
@@ -88,6 +92,40 @@ class Response:
         
         return bytes(resp + self.body)
     
+class HTMLResponse(Response):
+    def __init__(self, path: Union[str, Path], **kwargs) -> None:
+        if isinstance(path, Path):
+            content = path.read_text()
+        else:
+            content = Path(path).read_text()
+        
+        try:
+            super().__init__(
+                code = 200, 
+                body = content.format(**kwargs),
+                headers = {'Content-type': 'text/html'}
+            )
+        except:
+            super().__init__(
+                code = 200, 
+                body = content,
+                headers = {'Content-type': 'text/html'}
+            )
+
+class ImageResponse(Response):
+    def __init__(
+        self, image_bytes: Union[bytes, bytearray],
+        image_extenton: str = 'jpeg'
+    ) -> None:
+        image_extenton = image_extenton.replace('.', '', 1)
+        super().__init__(
+            code = 200,
+            body = image_bytes,
+            headers = {'Content-type': f'image/{image_extenton}'}
+        )
+
+ALL_RESPONSES = (Response, HTMLResponse, ImageResponse)    
+
 class Server:
     def __init__(self) -> None:
         self.routes: list[Route] = []
@@ -205,7 +243,7 @@ class Server:
 
             resp = await route['func'](request)
 
-            if isinstance(resp, Response):
+            if isinstance(resp, ALL_RESPONSES):
                 await loop.sock_sendall(client, resp.to_bytes())
             elif isinstance(resp, bytearray):
                 await loop.sock_sendall(client, bytes(resp))

@@ -86,10 +86,11 @@ async def login() -> tuple[BODY, CHO_TOKEN]:
     body += packets.userPresence(p)
     profile_name = None
 
-    utils.render_menu(
+    body += utils.render_menu(
         channel_name = '#osu',
         description = WELCOME_MSG.format(name=glob.player.name),
-        buttons = BUTTONS
+        buttons = BUTTONS,
+        add_to_queue = False
     )
 
     log(glob.player.name, 'successfully logged in!', color = Color.GREEN)
