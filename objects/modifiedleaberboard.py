@@ -2,6 +2,7 @@ import config
 from ext import glob
 from typing import Union
 from typing import Optional
+from utils import log_error
 from objects.mods import Mods
 from objects.score import Score
 from constants import ParsedParams
@@ -162,6 +163,22 @@ class ModifiedLeaderboard:
             if not bmap:
                 return lb
 
+            similarity = await finder.origin_edited_similarity(bmap)
+            
+            # TODO: find a better percentages
+            # checks if they aren't similar or
+            # they are the same map
+            if (
+                similarity < 94.5 or
+                similarity > 99.975
+            ):
+                log_error((
+                    f'when comparing, similarity was under 94.5% or above 99.975% ({similarity}%)\n'
+                    'if you believe this was a mistake or an error, please report it to\n'
+                    'cover on discord!'
+                ))
+                return lb
+            
             lb.bmap = bmap = ModifiedBeatmap.add_to_db(
                 bmap, params, funorange_map,
                 return_modified = True

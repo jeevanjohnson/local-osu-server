@@ -7,6 +7,19 @@ from pathlib import Path
 from typing import Union
 from typing import Optional
 import urllib.parse as urlparse
+from difflib import SequenceMatcher
+from objects.beatmap import Beatmap
+
+# TODO: for right now the finder
+# is pretty good for how it is
+# however if I wanted it to be really good
+# would probably need to check each individual circle
+# in the map and see if they are out of place to determine
+# if it is actually a speed up or only attribute edits
+# although speed now becomes more of an issue
+# so I may or may not write that check (probably wll)
+# but if I want it good I should write this in like c++, c, cython
+# or any other fast language so speed won't be a problem
 
 MD5 = str
 BMAPID = int
@@ -27,8 +40,47 @@ class ModifiedFinder:
         self.filename = filename
         self.name_data = name_data
 
+        self.original_bmap: Optional[Beatmap] = None
+        self.original_map_path: Optional[Path] = None
         self.funorange_map_path: Optional[FUNORANGE_MAP] = None
         self.original_md5_or_bmapid: Optional[MD5_OR_BMAPID] = None
+
+    async def origin_edited_similarity(
+        self, original_bmap: Optional[Beatmap] = None
+    ) -> float:
+        # returns a percentage of how similar the 
+        # funorange and original map is 0-100%
+        origin = ''
+        edited = ''
+
+        if not self.funorange_map_path:
+            return 0.0
+        else:
+            edited = self.funorange_map_path.read_text(errors='ignore')
+        
+        if self.original_map_path:
+            origin = self.original_map_path.read_text(errors='ignore')
+        elif original_bmap:
+            origin = await original_bmap.get_file()
+        elif self.original_md5_or_bmapid:
+            if isinstance(self.original_md5_or_bmapid, int):
+                bmap_id = self.original_md5_or_bmapid
+                origin_bmap = await Beatmap.from_id(bmap_id)
+            else:
+                md5 = self.original_md5_or_bmapid
+                origin_bmap = await Beatmap.from_md5(md5)
+            
+            if not origin_bmap:
+                return 0.0
+
+            self.original_bmap = origin_bmap
+            origin = await origin_bmap.get_file()
+        
+        if not origin:
+            return 0.0
+        
+        match = SequenceMatcher(None, origin, edited)
+        return match.real_quick_ratio() * 100
 
     def get_original_md5(self) -> Optional[MD5]:
         md5 = None
@@ -76,7 +128,7 @@ class ModifiedFinder:
                     lower_map_file_unquote[:-5] in lower_filename and
                     lower_filename != lower_map_file_unquote
                 ):
-                    orignal_bmap_file = map_set_folder / map_file
+                    self.original_map_path = orignal_bmap_file = map_set_folder / map_file
                     self.original_md5_or_bmapid = md5 = (
                         hashlib.md5(orignal_bmap_file.read_bytes()).hexdigest()
                     )
@@ -96,7 +148,7 @@ class ModifiedFinder:
             not self.original_md5_or_bmapid or
             not path_exists
         ):
-            return
+            return md5
 
         return md5
 

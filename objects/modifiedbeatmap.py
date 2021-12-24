@@ -5,18 +5,10 @@ from typing import Any
 from pathlib import Path
 import pyttanko as oppai
 from typing import Optional
-from typing import TypedDict
+from constants import ParsedParams
 from objects.beatmap import Beatmap
 
 parser = oppai.parser()
-
-class Params(TypedDict):
-    filename: str
-    mods: int
-    mode: int
-    rank_type: int
-    set_id: int
-    md5: str
 
 class ModifiedBeatmap:
     def __init__(self, **kwargs) -> None:
@@ -109,20 +101,16 @@ class ModifiedBeatmap:
 
     @staticmethod
     def add_to_db(
-        bmap: Beatmap, params: Params,
+        bmap: Beatmap, params: ParsedParams,
         path_to_modified: Path, return_modified: bool = False
     ) -> Optional['ModifiedBeatmap']:
         if (md5 := params['md5']) in glob.modified_beatmaps:
             return
 
-        # TODO: fix version name
-        lower_filename = params['filename'].lower()
-        url_parsed =  ''.join([
-            x.lower() for x in bmap.version
-            if x.isalpha() or x == ' '
-        ])
-        split = lower_filename.split(url_parsed)
-        version = f"[{bmap.version}{split[-1][:-4]}"
+        if (name_data := params['name_data']):
+            version = name_data['diff_name']
+        else:
+            version = f'{str(bmap.version)} (osutrainer)'
 
         file_content = path_to_modified.read_bytes().decode(errors='ignore')
         glob.modified_beatmaps[md5] = _dict = {
