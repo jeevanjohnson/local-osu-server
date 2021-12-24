@@ -98,6 +98,9 @@ async def while_server_running() -> None:
             except Exception as e:
                 log_error(str(e))
 
+async def shutdown_method() -> None:
+    await glob.http.close()
+
 server = Server()
 DEFAULT_RESPONSE = Response(200, b'')
 @server.get(
@@ -190,15 +193,13 @@ def main() -> int:
     except:
         pass
 
-    try:
-        server.run(
-            bind = ('127.0.0.1', 5000),
-            listening = 16,
-            before_startup = on_start_up,
-            background_tasks = [while_server_running]
-        )
-    except SystemExit:
-        pass
+    server.run(
+        bind = ('127.0.0.1', 5000),
+        listening = 16,
+        before_startup = on_start_up,
+        shutdown_method = shutdown_method,
+        background_tasks = [while_server_running]
+    )
 
     return 0
 

@@ -261,6 +261,7 @@ class Server:
         self, bind: tuple[str, int], 
         listening: int, 
         before_startup: Optional[Callable],
+        shutdown_method: Optional[Callable],
         background_tasks: Optional[list[Callable]]
     ) -> None:
         
@@ -285,18 +286,23 @@ class Server:
                 while True:
                     client, addr = await loop.sock_accept(sock)
                     loop.create_task(self.handle_con(client, loop))
-            except KeyboardInterrupt:
+            except (KeyboardInterrupt, SystemExit):
+                if shutdown_method:
+                    await shutdown_method()
+                
                 return
 
     def run(
         self, bind: tuple[str, int], 
         listening: int = 5, 
         before_startup: Optional[Callable] = None,
+        shutdown_method: Optional[Callable] = None,
         background_tasks: Optional[list[Callable]] = None
     ) -> None:
         asyncio.run(self._run(
             bind = bind,
             listening = listening,
             before_startup = before_startup,
+            shutdown_method = shutdown_method,
             background_tasks = background_tasks
         ))
