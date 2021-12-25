@@ -191,7 +191,7 @@ class ModifiedFinder:
         else:
             folders = []
 
-        lower_filename = self.filename.lower()
+        lower_filename = urlparse.unquote_plus(self.filename.lower())
 
         for map_set_folder in folders:
             for map_file in os.listdir(str(map_set_folder)):
