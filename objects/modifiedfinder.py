@@ -6,6 +6,7 @@ from ext import glob
 from pathlib import Path
 from typing import Union
 from typing import Optional
+from utils import log_error
 import urllib.parse as urlparse
 from difflib import SequenceMatcher
 from objects.beatmap import Beatmap
@@ -40,15 +41,76 @@ class ModifiedFinder:
         self.filename = filename
         self.name_data = name_data
 
+        self.raw_original_map: Optional[str] = None
+        self.raw_funorange_map: Optional[str] = None
         self.original_bmap: Optional[Beatmap] = None
         self.original_map_path: Optional[Path] = None
         self.funorange_map_path: Optional[FUNORANGE_MAP] = None
         self.original_md5_or_bmapid: Optional[MD5_OR_BMAPID] = None
 
+    def same_circles(
+        self,
+        raw_original_map: Optional[str] = None,
+        raw_funorange_map: Optional[str] = None
+    ) -> bool:
+        # checks if all the circles in
+        # both maps are placed in the same way
+
+        if not raw_original_map and self.raw_original_map:
+            raw_original_map = self.raw_original_map
+        elif not self.raw_original_map and raw_original_map:
+            self.raw_original_map = raw_original_map
+        elif self.original_map_path:
+            self.raw_original_map = raw_original_map = self.original_map_path.read_text(
+                errors = 'ignore'
+            )
+
+        if not raw_funorange_map and self.raw_funorange_map:
+            raw_funorange_map = self.raw_funorange_map
+        elif not self.raw_funorange_map and raw_funorange_map:
+            self.raw_funorange_map = raw_funorange_map
+        elif self.funorange_map_path:
+            self.raw_funorange_map = raw_funorange_map = self.funorange_map_path.read_text(
+                errors = 'ignore'
+            )
+
+        if (
+            not raw_funorange_map or
+            not raw_original_map
+        ):
+            log_error("couldn't find either funorange or original map!")
+            return False
+
+        split_origin = raw_original_map.splitlines()
+        split_funorange = raw_funorange_map.splitlines()
+
+        origin_hitobjects = split_origin[split_origin.index('[HitObjects]') + 1:]
+        funorange_hitobjects = split_funorange[split_funorange.index('[HitObjects]') + 1:]
+
+        if len(origin_hitobjects) != len(funorange_hitobjects):
+            log_error('not the same amount of hitobjects!')
+            return False
+
+        for origin_obj, fun_obj in zip(origin_hitobjects, funorange_hitobjects):
+            if origin_obj == fun_obj:
+                continue
+
+            # TODO: check if combo different?
+            fun_x, fun_y, *_ = fun_obj.split(',')
+            origin_x, origin_y, *_ = origin_obj.split(',')
+
+            if (
+                fun_x != origin_x or
+                fun_y != origin_y
+            ):
+                return False
+
+        return True
+
     async def origin_edited_similarity(
         self, original_bmap: Optional[Beatmap] = None
     ) -> float:
-        # returns a percentage of how similar the 
+        # returns a percentage of how similar the
         # funorange and original map is 0-100%
         origin = ''
         edited = ''
@@ -56,12 +118,15 @@ class ModifiedFinder:
         if not self.funorange_map_path:
             return 0.0
         else:
-            edited = self.funorange_map_path.read_text(errors='ignore')
-        
+            self.raw_funorange_map = edited = \
+                self.funorange_map_path.read_text(errors='ignore')
+
         if self.original_map_path:
-            origin = self.original_map_path.read_text(errors='ignore')
+            self.raw_original_map = origin = \
+                self.original_map_path.read_text(errors='ignore')
         elif original_bmap:
-            origin = await original_bmap.get_file()
+            self.raw_original_map = origin = \
+                await original_bmap.get_file()
         elif self.original_md5_or_bmapid:
             if isinstance(self.original_md5_or_bmapid, int):
                 bmap_id = self.original_md5_or_bmapid
@@ -69,18 +134,40 @@ class ModifiedFinder:
             else:
                 md5 = self.original_md5_or_bmapid
                 origin_bmap = await Beatmap.from_md5(md5)
-            
+
             if not origin_bmap:
                 return 0.0
 
             self.original_bmap = origin_bmap
-            origin = await origin_bmap.get_file()
-        
+            self.raw_original_map = origin = \
+                await origin_bmap.get_file()
+
         if not origin:
             return 0.0
-        
+
         match = SequenceMatcher(None, origin, edited)
-        return match.real_quick_ratio() * 100
+        ratio = match.real_quick_ratio() * 100
+    
+        tags = []
+        split_edited = edited.lower().splitlines()
+        start_index = split_edited.index('[metadata]') + 1
+        end_index = split_edited.index('', start_index)
+        for line in split_edited[start_index:end_index]:
+            if not line.startswith('tags'):
+                continue
+            
+            tags = line.lstrip().removeprefix('tags:').split()
+
+        if 'osutrainer' in tags:
+            # TODO: why is this here
+            if ratio > 99.75:
+                while ratio > 99.75:
+                    ratio -= 0.01
+            elif ratio < 94.5:
+                while ratio < 94.5:
+                    ratio += 0.01
+        
+        return ratio
 
     def get_original_md5(self) -> Optional[MD5]:
         md5 = None
@@ -159,7 +246,7 @@ class ModifiedFinder:
         ):
             return
 
-        file_content = self.funorange_map_path.read_bytes().decode(
+        file_content = self.funorange_map_path.read_text(
             errors='ignore'
         ).lower().splitlines()
 

@@ -112,7 +112,7 @@ class ModifiedBeatmap:
         else:
             version = f'{str(bmap.version)} (osutrainer)'
 
-        file_content = path_to_modified.read_bytes().decode(errors='ignore')
+        file_content = path_to_modified.read_text(errors='ignore')
         glob.modified_beatmaps[md5] = _dict = {
             'md5': md5,
             'rank_status': bmap.approved,

@@ -9,8 +9,6 @@ VERSION_LINK = (
     'https://raw.githubusercontent.com/coverosu/local-osu-server/main/version.py'
 )
 
-VERSION_FILE = Path.cwd() / 'version.py'
-
 file_structure_typing = Optional[dict[str, list[str]]]
 FILE_STRUCTURE: file_structure_typing = None
 

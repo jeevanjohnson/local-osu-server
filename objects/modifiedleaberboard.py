@@ -179,6 +179,10 @@ class ModifiedLeaderboard:
                 ))
                 return lb
             
+            if not finder.same_circles():
+                log_error('circles in the maps are different!')
+                return lb
+            
             lb.bmap = bmap = ModifiedBeatmap.add_to_db(
                 bmap, params, funorange_map,
                 return_modified = True
