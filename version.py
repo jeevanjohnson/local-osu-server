@@ -1,7 +1,7 @@
 # don't touch this file just leave it here 
 # for updater lol
 
-version = '1.2.6'
+version = '1.2.7'
 
 file_structure = ['.gitignore',
  'constants.py',
@@ -13,10 +13,13 @@ file_structure = ['.gitignore',
  'handlers/web.py',
  'handlers/__init__.py',
  'main.py',
+ 'menus/main_menu.py',
+ 'menus/__init__.py',
  'objects/beatmap.py',
  'objects/file.py',
  'objects/jsonfile.py',
  'objects/leaderboard.py',
+ 'objects/menu.py',
  'objects/modifiedbeatmap.py',
  'objects/modifiedfinder.py',
  'objects/modifiedleaberboard.py',

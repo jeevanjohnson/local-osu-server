@@ -1,7 +1,6 @@
 import re
 import base64
 import asyncio
-import packets
 import colorama
 import pyttanko as oppai
 from typing import Union
@@ -10,7 +9,6 @@ from colorama import Fore
 from typing import Literal
 from typing import Optional
 from typing import Callable
-from constants import BUTTON
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -142,45 +140,6 @@ def bytes_to_string(b: bytes) -> str:
 
 def string_to_bytes(s: str) -> bytes:
     return base64.b64decode(s.encode('ascii'))
-
-def render_menu(
-    channel_name: str,
-    description: str,
-    buttons: list[BUTTON],
-    add_to_queue: bool = True
-) -> bytearray:
-    body = bytearray()
-
-    body += packets.userSilenced(-1)
-    body += packets.sendMsg(
-        client = 'local',
-        msg = description,
-        target = '#osu',
-        userid = -1,
-    )
-
-    for url, name in buttons:
-        if r'{mode}' in url:
-            if glob.mode:
-                m = repr(glob.mode).lower()
-            else:
-                m = 'vn'
-
-            url = url.format(
-                mode = m
-            )
-
-        body += packets.sendMsg(
-            client = 'local',
-            msg = f'[{url} {name}]',
-            target = channel_name,
-            userid = -1,
-        )
-
-    if add_to_queue:
-        add_to_player_queue(body)
-
-    return body
 
 async def str_to_wslpath(path: str) -> Path:
     wslpath_proc = await asyncio.subprocess.create_subprocess_exec(

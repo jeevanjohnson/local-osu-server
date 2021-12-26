@@ -95,7 +95,6 @@ class ModifiedFinder:
             if origin_obj == fun_obj:
                 continue
 
-            # TODO: check if combo different?
             fun_x, fun_y, *_ = fun_obj.split(',')
             origin_x, origin_y, *_ = origin_obj.split(',')
 

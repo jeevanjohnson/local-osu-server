@@ -9,14 +9,13 @@ from utils import handler
 from server import Request
 from objects import Player
 from typing import Optional
+from menus import main_menu
 from server import Response
 import urllib.parse as urlparse
 
 from constants import BODY
-from constants import BUTTONS
 from constants import CHANNELS
 from constants import CHO_TOKEN
-from constants import WELCOME_MSG
 
 profile_name: Optional[str] = None
 
@@ -86,12 +85,8 @@ async def login() -> tuple[BODY, CHO_TOKEN]:
     body += packets.userPresence(p)
     profile_name = None
 
-    body += utils.render_menu(
-        channel_name = '#osu',
-        description = WELCOME_MSG.format(name=glob.player.name),
-        buttons = BUTTONS,
-        add_to_queue = False
-    )
+    main_menu.name = 'Main Menu (current mode: vanilla)'
+    body += main_menu.as_binary(newline_per_category=True)
 
     log(glob.player.name, 'successfully logged in!', color = Color.GREEN)
     return body, 'success'

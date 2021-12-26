@@ -99,6 +99,9 @@ async def while_server_running() -> None:
             except Exception as e:
                 log_error(str(e))
 
+        if glob.pfps.is_changed():
+            glob.pfps.read_file()
+
 async def shutdown_method() -> None:
     await glob.http.close()
     log_success((

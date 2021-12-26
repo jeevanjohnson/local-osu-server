@@ -13,7 +13,7 @@ from objects import Mods
 from utils import handler
 from server import Request
 from server import Response
-from constants import BUTTONS
+from menus import main_menu
 import urllib.parse as urlparse
 from objects import Leaderboard
 from constants import ParsedParams
@@ -42,7 +42,7 @@ async def web_screenshot(request: Request) -> Response:
         return Response(200, b"Can't upload to imgur!")
     else:
         return Response(
-            code = 301, 
+            code = 301,
             body = b'',
             headers = {'Location': request.args['link']}
         )
@@ -50,16 +50,16 @@ async def web_screenshot(request: Request) -> Response:
 @handler('/web/osu-screenshot.php')
 async def osu_screenshots(request: Request) -> Response:
     if (
-        not glob.screenshot_folder or 
+        not glob.screenshot_folder or
         not glob.imgur
     ):
         return Response(200, b'img_err')
     else:
         screenshots = glob.screenshot_folder.glob('*')
         latest_screenshot = glob.screenshot_folder / max(screenshots , key=os.path.getctime)
-        
+
         uploaded_image = glob.imgur.upload_image(
-            path = str(latest_screenshot), 
+            path = str(latest_screenshot),
             title = 'from local server'
         )
 
@@ -69,7 +69,7 @@ async def osu_screenshots(request: Request) -> Response:
 @handler(regex.bmap_web_path)
 async def bmap_web(request: Request) -> Response:
     return Response(
-        code = 301, 
+        code = 301,
         body = b'',
         headers = {'Location': f'https://osu.ppy.sh/{request.path[5:]}'}
     )
@@ -84,11 +84,11 @@ DEFAULT_CHARTS = '\n'.join([
 async def score_sub(request: Request) -> Response:
     global REMINDER
     if (
-        not glob.player or 
+        not glob.player or
         not glob.current_profile
     ):
         return Response(200, b"error: no")
-    
+
     if REMINDER is None:
         glob.player.queue += packets.notification((
             'To submit a play be sure to save the replay of the play!'
@@ -100,23 +100,23 @@ async def score_sub(request: Request) -> Response:
             'To submit a play be sure to save the replay of the play!'
         ))
         REMINDER = 0
-    
+
     REMINDER += 1
-    
+
     if 'playcount' in glob.current_profile:
         glob.current_profile['playcount'] += 1
     else:
         glob.current_profile['playcount'] = 1
-    
+
     utils.update_files()
 
     glob.player.queue += packets.userStats(glob.player)
 
     log(
-        f"{glob.player.name}'s playcount increased!", 
+        f"{glob.player.name}'s playcount increased!",
         color = Color.GREEN
     )
-    
+
     return Response(200, DEFAULT_CHARTS)
 
 @handler('/web/osu-getseasonal.php')
@@ -125,7 +125,7 @@ async def get_bgs(request: Request) -> Response:
         bgs = b'[""]'
     else:
         bgs = orjson.dumps(config.seasonal_bgs)
-    
+
     return Response(200, bgs)
 
 @handler('/web/osu-getreplay.php')
@@ -144,9 +144,9 @@ async def get_replay(request: Request) -> Response:
         ) as resp:
             if not resp or resp.status != 200:
                 return Response(200, b'error: no')
-            
+
             json = await resp.json()
-        
+
         replay_frames = utils.string_to_bytes(json["content"])
         log('bancho replay handled', color = Color.LIGHTGREEN_EX)
         return Response(200, replay_frames)
@@ -166,7 +166,7 @@ async def get_replay(request: Request) -> Response:
             return Response(200, b'error: no')
         else:
             log(
-                f"{glob.player.name}'s replay was handled", 
+                f"{glob.player.name}'s replay was handled",
                 color = Color.LIGHTGREEN_EX
             )
 
@@ -176,7 +176,7 @@ async def get_replay(request: Request) -> Response:
                 replay = utils.string_to_bytes(play['replay_frames'])
 
             return Response(
-                code = 200, 
+                code = 200,
                 body = replay
             )
     else:
@@ -203,85 +203,91 @@ async def leaderboard(request: Request) -> Response:
 
     if mods & Mods.RELAX:
         if (
-            not glob.mode or 
+            not glob.mode or
             not glob.mode & Mods.RELAX
         ):
             glob.mode = Mods.RELAX
             glob.invalid_mods = (
-                Mods.AUTOPILOT | Mods.AUTOPLAY | 
+                Mods.AUTOPILOT | Mods.AUTOPLAY |
                 Mods.CINEMA | Mods.TARGET
             )._value_
             glob.player.queue += packets.notification(
                 'Mode was switched to rx!'
             )
             asyncio.create_task(glob.player.update(glob.mode))
-            utils.render_menu('#osu', 'Mode was switched to rx!', BUTTONS)
+            main_menu.name = 'Main Menu (current mode: relax)'
+            glob.player.queue += main_menu.as_binary(newline_per_category=True)
+
     elif mods & Mods.AUTOPILOT:
         if (
-            not glob.mode or 
+            not glob.mode or
             not glob.mode & Mods.AUTOPILOT
         ):
             glob.mode = Mods.AUTOPILOT
             glob.invalid_mods = (
-                Mods.RELAX | Mods.AUTOPLAY | 
+                Mods.RELAX | Mods.AUTOPLAY |
                 Mods.CINEMA | Mods.TARGET
             )._value_
             glob.player.queue += packets.notification(
                 'Mode was switched to ap!'
             )
             asyncio.create_task(glob.player.update(glob.mode))
-            utils.render_menu('#osu', 'Mode was switched to ap!', BUTTONS)
+            main_menu.name = 'Main Menu (current mode: autopilot)'
+            glob.player.queue += main_menu.as_binary(newline_per_category=True)
+
     elif not mods & (Mods.RELAX | Mods.AUTOPILOT):
         if glob.mode:
             glob.mode = None
             glob.invalid_mods = (
-                Mods.AUTOPILOT | Mods.RELAX | 
-                Mods.AUTOPLAY | Mods.CINEMA | 
+                Mods.AUTOPILOT | Mods.RELAX |
+                Mods.AUTOPLAY | Mods.CINEMA |
                 Mods.TARGET
             )._value_
             glob.player.queue += packets.notification(
                 'Mode was switched to vanilla!'
             )
             asyncio.create_task(glob.player.update(glob.mode))
-            utils.render_menu('#osu', 'Mode was switched to vanilla!', BUTTONS)
+            main_menu.name = 'Main Menu (current mode: vanilla)'
+            glob.player.queue += main_menu.as_binary(newline_per_category=True)
 
     if config.osu_api_key:
         lb = await Leaderboard.from_bancho(parsed_params)
     else:
         lb = await Leaderboard.from_offline(parsed_params)
 
-    if not lb.bmap or lb.bmap.approved not in (1, 2, 3, 4):
+    valid_bmap = lb.bmap and lb.bmap.approved in (1, 2, 3, 4)
+    if not valid_bmap:
         regex_results = [
-            r.search(filename) 
+            r.search(filename)
             for r in regex.modified_regexes
         ]
 
         name_data = regex.filename_parser.search(filename)
         if name_data and (diff_name := name_data['diff_name']):
             regex_results.extend([
-                r.search(diff_name) 
+                r.search(diff_name)
                 for r in regex.attribute_edits
             ])
 
             parsed_params['name_data'] = name_data
-        
+
         if any(regex_results):
             lb = await ModifiedLeaderboard.from_client(parsed_params) # type: ignore
             log(
-                f'handled funorange map of {parsed_params["filename"]}', 
+                f'handled funorange map of {parsed_params["filename"]}',
                 color = Color.GREEN
             )
         else:
             log(
-                f'handled bancho(?) map of {parsed_params["filename"]}', 
+                f'handled bancho(?) map of {parsed_params["filename"]}',
                 color = Color.GREEN
             )
     else:
         log(
-            f'handled map of setid: {parsed_params["set_id"]}', 
+            f'handled map of setid: {parsed_params["set_id"]}',
             color = Color.GREEN
         )
-    
+
     return Response(200, lb.as_binary)
 
 BASE_URL = 'https://beatconnect.io'
@@ -297,13 +303,13 @@ async def download(request: Request) -> Response:
             not (osz_binary := await resp.content.read())
         ):
             log(
-                f"can't downloaded map set, id: {setid}", 
+                f"can't downloaded map set, id: {setid}",
                 color = Color.RED
-            )   
+            )
             return Response(200, b'')
 
     log(
-        f'succesfully downloaded map set, id: {setid}', 
+        f'succesfully downloaded map set, id: {setid}',
         color = Color.GREEN
     )
     return Response(
@@ -346,28 +352,28 @@ async def direct(request: Request) -> Response:
             packets.notification("No api key given for direct!")
         )
         return Response(200, b'0')
-    
+
     beatconnect_params = {
         'token': config.beatconnect_api_key,
     }
     client_params = request.params
     client_params['q'] = query = urlparse.unquote_plus(client_params['q'])
 
-    if client_params['q'] not in ("Newest", "Top Rated", "Most Played"):
-        beatconnect_params['q'] = urlparse.unquote_plus(client_params['q'])
-    
+    if query not in ("Newest", "Top Rated", "Most Played"):
+        beatconnect_params['q'] = query
+
     if client_params['m'] != -1:
         beatconnect_params['m'] = DIRECT_TO_MIRROR_MODE[client_params['m']]
-    
+
     beatconnect_params['s'] = DIRECT_TO_API_STATUS[client_params['r']]
-    
+
     async with glob.http.get(
-        url = f'{DIRECT_BASE_API}/search', 
+        url = f'{DIRECT_BASE_API}/search',
         params = beatconnect_params
     ) as resp:
         if (
-            not resp or 
-            resp.status != 200 or 
+            not resp or
+            resp.status != 200 or
             not (resp_dict := await resp.json())
         ):
             log('no maps found', color = Color.RED)
@@ -376,14 +382,14 @@ async def direct(request: Request) -> Response:
     maps = resp_dict['beatmaps']
     len_maps = len(maps)
     bmaps = [f"{'101' if len_maps == 100 else len_maps}"]
-    
+
     for bmap in maps:
         diffs = []
         for row in sorted(bmap['beatmaps'], key = lambda x: x['difficulty']):
             diffs.append(DIRECT_DIFF_FORMAT.format(**row))
 
         diffs = ','.join(diffs)
-        bmaps.append(DIRECT_SET_FORMAT.format(**bmap, diffs=diffs)) 
+        bmaps.append(DIRECT_SET_FORMAT.format(**bmap, diffs=diffs))
 
     log(f'maps loaded for query: `{query}` !', color = Color.GREEN)
     return Response(200, '\n'.join(bmaps).encode())

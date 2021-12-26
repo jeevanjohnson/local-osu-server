@@ -1,6 +1,7 @@
 import re
 import http
 import socket
+import orjson
 import asyncio
 from typing import Any
 from typing import Union
@@ -16,7 +17,6 @@ HTTP_STATUS_CODES = {
 	for status in http.HTTPStatus
 }
 
-# TODO: define more types?
 class Request:
     def __init__(self) -> None:
         self.content_length: int
@@ -124,7 +124,23 @@ class ImageResponse(Response):
             headers = {'Content-type': f'image/{image_extenton}'}
         )
 
-ALL_RESPONSES = (Response, HTMLResponse, ImageResponse)    
+class JsonResponse(Response):
+    def __init__(self, code: int, json: dict) -> None:
+        super().__init__(
+            code = code,
+            body = orjson.dumps(json),
+            headers = {'Content-type': 'application/json charset=utf-8'}
+        )
+
+class SuccessJsonResponse(JsonResponse):
+    def __init__(self, json: dict) -> None:
+        super().__init__(200, json)
+
+ALL_RESPONSES = (
+    Response, HTMLResponse, 
+    ImageResponse, JsonResponse,
+    SuccessJsonResponse
+)    
 
 class Server:
     def __init__(self) -> None:
@@ -247,6 +263,10 @@ class Server:
                 await loop.sock_sendall(client, resp.to_bytes())
             elif isinstance(resp, bytearray):
                 await loop.sock_sendall(client, bytes(resp))
+            elif isinstance(resp, str):
+                await loop.sock_sendall(
+                    client, Response(200, resp.encode()).to_bytes()
+                )
             elif isinstance(resp, bytes):
                 await loop.sock_sendall(client, resp)
             else:
@@ -281,7 +301,6 @@ class Server:
             print(
                 f'Server is up and running on port {bind[1]}!'
             )
-
             try:
                 while True:
                     client, addr = await loop.sock_accept(sock)

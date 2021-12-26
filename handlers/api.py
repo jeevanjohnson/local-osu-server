@@ -10,47 +10,26 @@ from utils import handler
 from objects import Score
 from server import Request
 from objects import Player
-from server import Response
 from objects import Beatmap
 from typing import Optional
 from objects import ModifiedBeatmap
+from server import SuccessJsonResponse
 
 JSON = orjson.dumps
 
-@handler(
-    ('/api/v1/client/tops', '/api/v1/client/recalc', # type: ignore
-    '/api/v1/client/recent', '/api/v1/client/profile', # type: ignore
-    '/api/v1/client/wipe') # type: ignore
-)
-async def client_handlers(request: Request) -> Response:
-    path = request.path.replace('/client', '')
-
-    if glob.player:
-        request.params['u'] = glob.player.name
-        log(
-            f'handling {path.split("/")[-1]} button for client',
-            color = Color.GREEN
-        )
-
-    return await glob.handlers[path](request)
-
 @handler('/api/v1/profile')
-async def profile(request: Request) -> Response:
+async def profile(request: Request) -> SuccessJsonResponse:
     if (
         not (params := request.params) or
         'u' not in params
     ):
-        return Response(
-            code = 200,
-            body = JSON({
-                'status': 'failed',
-                'message': (
-                    'please provide a profile name in parameters\n'
-                    'example: http://127.0.0.1:5000/api/v1/client/profile?u=profile name'
-                )
-            }),
-            headers = {'Content-type': 'application/json charset=utf-8'}
-        )
+        return SuccessJsonResponse({
+            'status': 'failed',
+            'message': (
+                'please provide a profile name in parameters\n'
+                'example: http://127.0.0.1:5000/api/v1/client/profile?u=profile name'
+            )
+        })
 
     p = Player(params['u'])
 
@@ -77,32 +56,24 @@ async def profile(request: Request) -> Response:
         'mode': m
     }
 
-    return Response(
-        code = 200,
-        body = JSON(response_json),
-        headers = {'Content-type': 'application/json charset=utf-8'}
-    )
+    return SuccessJsonResponse(response_json)
 
 SCORES = list[dict]
 RANKED_PLAYS = dict[str, list[dict]]
 APPROVED_PLAYS = RANKED_PLAYS
 @handler('/api/v1/tops')
-async def tops(request: Request) -> Response:
+async def tops(request: Request) -> SuccessJsonResponse:
     if (
         not (params := request.params) or
         'u' not in params
     ):
-        return Response(
-            code = 200,
-            body = JSON({
-                'status': 'failed',
-                'message': (
-                    'please provide a profile name in parameters\n'
-                    'example: http://127.0.0.1:5000/api/v1/client/tops?u=profile name'
-                )
-            }),
-            headers = {'Content-type': 'application/json charset=utf-8'}
-        )
+        return SuccessJsonResponse({
+            'status': 'failed',
+            'message': (
+                'please provide a profile name in parameters\n'
+                'example: http://127.0.0.1:5000/api/v1/client/tops?u=profile name'
+            )
+        })
 
     if 'limit' not in params:
         limit = 100
@@ -116,20 +87,16 @@ async def tops(request: Request) -> Response:
 
     name: str = params['u']
     if name not in glob.profiles:
-        Response(
-            code = 200,
-            body = JSON({
-                'status': 'failed',
-                'message': "profile can't be found!"
-            }),
-            headers = {'Content-type': 'application/json charset=utf-8'}
-        )
+        return SuccessJsonResponse({
+            'status': 'failed',
+            'message': "profile can't be found!"
+        })
 
     profile = glob.profiles[name]
     response_json = {
         'status': 'success!',
         'name': name,
-        'mode': 'unknown' if 'm' not in params else params['m'],
+        'mode': 'vn' if 'm' not in params else params['m'],
         'plays': []
     }
 
@@ -188,40 +155,28 @@ async def tops(request: Request) -> Response:
 
         response_json['plays'].append(play)
 
-    return Response(
-        code = 200,
-        body = JSON(response_json),
-        headers = {'Content-type': 'application/json charset=utf-8'}
-    )
+    return SuccessJsonResponse(response_json)
 
 @handler('/api/v1/recent')
-async def recent(request: Request) -> Response:
+async def recent(request: Request) -> SuccessJsonResponse:
     if (
         not (params := request.params) or
         'u' not in params
     ):
-        return Response(
-            code = 200,
-            body = JSON({
-                'status': 'failed',
-                'message': (
-                    'please provide a profile name in parameters\n'
-                    'example: http://127.0.0.1:5000/api/v1/client/recent?u=profile name'
-                )
-            }),
-            headers = {'Content-type': 'application/json charset=utf-8'}
-        )
+        return SuccessJsonResponse({
+            'status': 'failed',
+            'message': (
+                'please provide a profile name in parameters\n'
+                'example: http://127.0.0.1:5000/api/v1/client/recent?u=profile name'
+            )
+        })
 
     name: str = params['u']
     if name not in glob.profiles:
-        Response(
-            code = 200,
-            body = JSON({
-                'status': 'failed',
-                'message': "profile can't be found!"
-            }),
-            headers = {'Content-type': 'application/json charset=utf-8'}
-        )
+        return SuccessJsonResponse({
+            'status': 'failed',
+            'message': "profile can't be found!"
+        })
 
     if 'limit' not in params:
         limit = 100
@@ -237,7 +192,7 @@ async def recent(request: Request) -> Response:
     response_json = {
         'status': 'success!',
         'name': name,
-        'mode': 'unknown' if 'm' not in params else params['m'],
+        'mode': 'vn' if 'm' not in params else params['m'],
         'plays': []
     }
 
@@ -291,11 +246,7 @@ async def recent(request: Request) -> Response:
 
         response_json['plays'].append(play)
 
-    return Response(
-        code = 200,
-        body = JSON(response_json),
-        headers = {'Content-type': 'application/json charset=utf-8'}
-    )
+    return SuccessJsonResponse(response_json)
 
 async def _recalc(md5: str, score: Score) -> dict:
     bmap = (
@@ -318,7 +269,7 @@ async def _recalc(md5: str, score: Score) -> dict:
 
 ACCEPTED_PLAYS = ('ranked_plays', 'approved_plays')
 @handler('/api/v1/recalc')
-async def recalc(request: Request) -> Response:
+async def recalc(request: Request) -> SuccessJsonResponse:
     # TODO: make use of the params
 
     async def background_recalc() -> None:
@@ -365,71 +316,50 @@ async def recalc(request: Request) -> Response:
 
     asyncio.create_task(background_recalc())
 
-    response_msg = {
+    return SuccessJsonResponse({
         'status': 'success!',
         'message': 'All profiles are being calculated!'
-    }
-    return Response(
-        code = 200,
-        body = JSON(response_msg),
-        headers = {'Content-type': 'application/json charset=utf-8'}
-    )
+    })
 
 @handler('/api/v1/wipe')
-async def wipe_profile(request: Request) -> Response:
+async def wipe_profile(request: Request) -> SuccessJsonResponse:
     if (
         not (params := request.params) or
         'u' not in params
     ):
-        return Response(
-            code = 200,
-            body = JSON({
-                'status': 'failed',
-                'message': (
-                    'please provide a profile name in parameters\n'
-                    'example: http://127.0.0.1:5000/api/v1/wipe?u=profile name'
-                )
-            }),
-            headers = {'Content-type': 'application/json charset=utf-8'}
-        )
+        return SuccessJsonResponse({
+            'status': 'failed',
+            'message': (
+                'please provide a profile name in parameters\n'
+                'example: http://127.0.0.1:5000/api/v1/wipe?u=profile name'
+            )
+        })
 
     if 'yes' not in params:
-        return Response(
-            code = 200,
-            body = JSON({
-                'status': '1/2 done',
-                'message': (
-                    'CURRENTLY IT WILL WIPE ALL YOUR STATS INCLUDING RX, AP, VN ON\n'
-                    'YOUR CURRENT PROFILE YOU ARE TRYING TO WIPE\n'
-                    'TODO: check and wipe for different modes\n'
-                    'if you are sure you want to wipe\n'
-                    'type the following at the end of the url and click enter\n'
-                    '&yes=yes'
-                )
-            }),
-            headers = {'Content-type': 'application/json charset=utf-8'}
-        )
+        return SuccessJsonResponse({
+            'status': '1/2 done',
+            'message': (
+                'CURRENTLY IT WILL WIPE ALL YOUR STATS INCLUDING RX, AP, VN ON\n'
+                'YOUR CURRENT PROFILE YOU ARE TRYING TO WIPE\n'
+                'TODO: check and wipe for different modes\n'
+                'if you are sure you want to wipe\n'
+                'type the following at the end of the url and click enter\n'
+                '&yes=yes'
+            )
+        })
 
     if params['yes'] != 'yes':
-        return Response(
-            code = 200,
-            body = JSON({
-                'status': 'fail',
-                'message': "yes didn't equal yes!"
-            }),
-            headers = {'Content-type': 'application/json charset=utf-8'}
-        )
+        return SuccessJsonResponse({
+            'status': 'fail',
+            'message': "yes didn't equal yes!"
+        })
 
     name: str = params['u']
     if name not in glob.profiles:
-        Response(
-            code = 200,
-            body = JSON({
-                'status': 'failed',
-                'message': "profile can't be found!"
-            }),
-            headers = {'Content-type': 'application/json charset=utf-8'}
-        )
+        return SuccessJsonResponse({
+            'status': 'failed',
+            'message': "profile can't be found!"
+        })
 
     glob.profiles.update(
         queries.init_profile(name)
@@ -443,12 +373,7 @@ async def wipe_profile(request: Request) -> Response:
     ):
         await glob.player.update(glob.mode)
 
-    response_msg = {
+    return SuccessJsonResponse({
         'status': 'success!',
         'message': f'{name} was wiped!'
-    }
-    return Response(
-        code = 200,
-        body = JSON(response_msg),
-        headers = {'Content-type': 'application/json charset=utf-8'}
-    )
+    })
