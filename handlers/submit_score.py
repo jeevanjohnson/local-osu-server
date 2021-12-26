@@ -91,10 +91,14 @@ async def submit_score() -> None:
         )
         return
 
-    bmap = (
-        await ModifiedBeatmap.from_md5(score.md5) or
-        await Beatmap.from_md5(score.md5)
-    )
+    if config.disable_funorange_maps:
+        bmap = await Beatmap.from_md5(score.md5)
+    else:
+        bmap = (
+            await ModifiedBeatmap.from_md5(score.md5) or
+            await Beatmap.from_md5(score.md5)
+        )
+    
     if not bmap:
         glob.player.queue += packets.notification("Map has to exist on bancho!")
         return

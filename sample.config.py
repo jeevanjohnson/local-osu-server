@@ -48,6 +48,10 @@ menu_icon: dict[str, Optional[str]] = {
 # updater is not 100% tested, but should work safely
 auto_update: bool = False
 
+# will not include funorange maps in rankings or plays 
+# and won't submit funorange map scores
+disable_funorange_maps: bool = False
+
 # needed for loading leaderboards
 # you can find your's here https://old.ppy.sh/p/api/
 # if `None` then leaderboards won't load nor score submission

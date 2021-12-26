@@ -256,7 +256,7 @@ async def leaderboard(request: Request) -> Response:
         lb = await Leaderboard.from_offline(parsed_params)
 
     valid_bmap = lb.bmap and lb.bmap.approved in (1, 2, 3, 4)
-    if not valid_bmap:
+    if not valid_bmap and not config.disable_funorange_maps:
         regex_results = [
             r.search(filename)
             for r in regex.modified_regexes

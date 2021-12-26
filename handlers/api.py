@@ -1,4 +1,5 @@
 import utils
+import config
 import orjson
 import queries
 import asyncio
@@ -123,6 +124,12 @@ async def tops(request: Request) -> SuccessJsonResponse:
             x for x in scores if
             not x['mods'] & (Mods.RELAX | Mods.AUTOPILOT)
         ]
+    
+    if config.disable_funorange_maps:
+        scores = [
+            x for x in scores if 
+            x['md5'] not in glob.modified_beatmaps
+        ]
 
     scores.sort(key = lambda s: s['pp'], reverse = True)
     top_scores = utils.filter_top_scores(scores[:limit])
@@ -211,6 +218,12 @@ async def recent(request: Request) -> SuccessJsonResponse:
         scores = [
             x for x in scores if
             not x['mods'] & (Mods.RELAX | Mods.AUTOPILOT)
+        ]
+
+    if config.disable_funorange_maps:
+        scores = [
+            x for x in scores if 
+            x['md5'] not in glob.modified_beatmaps
         ]
 
     scores.sort(

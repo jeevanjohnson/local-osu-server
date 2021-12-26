@@ -134,6 +134,12 @@ class Player:
                 not x['mods'] & (Mods.RELAX | Mods.AUTOPILOT)
             ]
 
+        if config.disable_funorange_maps:
+            scores = [
+                x for x in scores if 
+                x['md5'] not in glob.modified_beatmaps
+            ]
+
         scores.sort(key = lambda s: s['pp'], reverse = True)
         top_scores = utils.filter_top_scores(scores[:100])
         top_scores.sort(key = lambda s: s['pp'], reverse = True)
