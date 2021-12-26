@@ -30,7 +30,7 @@ async def on_start_up() -> None:
         await updater.update()
         sys.exit(0)
 
-    if config.paths['osu! path'] is not None:
+    if config.paths['osu! path']:
         osu_path = Path(config.paths['osu! path'])
         glob.songs_folder = Path(
             config.paths['songs'] or str(osu_path / 'Songs')
@@ -83,6 +83,9 @@ async def on_start_up() -> None:
             return
         
         glob.default_avatar = await resp.content.read()
+    
+    import version as local_version
+    log_success(f'running on version {local_version.version}')
 
 async def while_server_running() -> None:
     if glob.replay_folder is None:
