@@ -5,6 +5,7 @@ from server import Request
 from typing import Optional
 from typing import Callable
 from server import Response
+from server import JsonResponse
 
 def local_message(
     message: str, 
@@ -17,9 +18,13 @@ def local_message(
         userid = -1,
     )
 
+RESPONSE = Union[Response, JsonResponse, str]
 def button_func(func: Callable) -> Callable:
 
-    async def editied_func(request: Request) -> Response:
+    async def editied_func(request: Request) -> RESPONSE:
+        if not glob.player:
+            return Response(404, b'please login to use these paths')
+
         return await func(**request.params)
 
     return editied_func

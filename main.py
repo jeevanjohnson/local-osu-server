@@ -3,6 +3,7 @@ import orjson
 import packets
 import asyncio
 from ext import glob
+from typing import Union
 from server import Server
 from server import Request
 from utils import log_error
@@ -189,10 +190,12 @@ async def apiv1(request: Request) -> Response:
 @server.get(
     path = regex.website_handler
 )
-async def website(request: Request) -> Response:
-    return await glob.handlers[
-        f"/{request.args['path']}"
-    ](request)
+async def website(request: Request) -> Union[Response, str]:
+    path = f"/{request.args['path']}"
+    if path not in glob.handlers:
+        return 'path not found'
+    
+    return await glob.handlers[path](request)
 
 def main() -> int:
     import handlers # load all handlers

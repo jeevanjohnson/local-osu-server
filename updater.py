@@ -1,3 +1,5 @@
+import sys
+import asyncio
 from ext import glob
 from pathlib import Path
 from typing import Optional
@@ -78,6 +80,33 @@ async def update() -> None:
                 log_success(f"successfully deleted file {path_str}")
             else:
                 log_success(f"successfully created path {path_str}")
+            
+            if 'requirements.txt' in path_str:
+                if sys.version == 'linux':
+                    version_info = sys.version_info
+                    major = version_info.major
+                    minor = version_info.minor
+                    await asyncio.create_subprocess_shell(
+                        f'python{major}.{minor} -m pip install -r requirements.txt',
+                        stdin = asyncio.subprocess.DEVNULL,
+                        stderr = asyncio.subprocess.DEVNULL,
+                        stdout = asyncio.subprocess.DEVNULL
+                    )
+                else:
+                    await asyncio.create_subprocess_shell(
+                        'python -m pip install -r requirements.txt',
+                        stdin = asyncio.subprocess.DEVNULL,
+                        stderr = asyncio.subprocess.DEVNULL,
+                        stdout = asyncio.subprocess.DEVNULL
+                    )
+                    await asyncio.create_subprocess_shell(
+                        'python3 -m pip install -r requirements.txt',
+                        stdin = asyncio.subprocess.DEVNULL,
+                        stderr = asyncio.subprocess.DEVNULL,
+                        stdout = asyncio.subprocess.DEVNULL
+                    )
+                
+                log_success('updated packages!')
 
     log_success((
         'successfully updated the server!\n'

@@ -30,8 +30,11 @@ def main_menu_button(
         return func
     return inner
 
+import sys
+import utils
 from ext import glob
 from server import Request
+from threading import Thread
 from server import JsonResponse
 from server import SuccessJsonResponse
 
@@ -132,7 +135,53 @@ async def wipe() -> RESPONSE:
     docs = "change current profile's avatar from a path"
 )
 async def avatar_from_path() -> RESPONSE:
-    return 'TODO: support at some point....'
+    if glob.using_wsl or sys.platform != 'win32':
+        return 'TODO: support at some point....'
+
+    def handle_avatar() -> None:
+        import webbrowser
+        msg_fmt = 'http://127.0.0.1:5000/api/v1/show_msg?m={}'
+
+        import ctypes
+        ctypes.windll.ole32.CoInitialize(None)
+
+        import clr 
+        clr.AddReference('System.Windows.Forms')
+        from System.Windows.Forms import OpenFileDialog # type: ignore
+
+        file_dialog = OpenFileDialog()
+        result = file_dialog.ShowDialog()
+
+        if result != 1:
+            webbrowser.open_new_tab(
+                msg_fmt.format("no image found")
+            )
+            return
+
+        img_path = file_dialog.FileName
+        if not img_path:
+            webbrowser.open_new_tab(
+                msg_fmt.format("no image found")
+            )
+            return
+        
+        glob.pfps[glob.player.name] = img_path # type: ignore
+        utils.update_files()
+        
+        webbrowser.open_new_tab(
+            msg_fmt.format("avatar was changed!")
+        )
+        return
+    
+    Thread(target=handle_avatar).start()
+
+    return SuccessJsonResponse({
+        'status': 'success!',
+        'message': (
+            'Handling your request in a different thread!\n'
+            '(prevents server from crashing)'
+        )
+    })
 
 @main_menu_button(
     category = 'Avatar',

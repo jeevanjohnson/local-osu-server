@@ -7,16 +7,28 @@ from ext import glob
 from utils import log
 from utils import Color
 from objects import Mods
+from typing import Union
 from utils import handler
 from objects import Score
 from server import Request
 from objects import Player
 from objects import Beatmap
 from typing import Optional
+import urllib.parse as urlparse
 from objects import ModifiedBeatmap
 from server import SuccessJsonResponse
 
 JSON = orjson.dumps
+
+@handler('/api/v1/show_msg')
+async def show_message(request: Request) -> Union[SuccessJsonResponse, str]:
+    if 'm' not in request.params:
+        return SuccessJsonResponse({
+            'status': 'failed',
+            'message': 'no message found?'
+        })
+    
+    return urlparse.unquote(request.params['m'])
 
 @handler('/api/v1/profile')
 async def profile(request: Request) -> SuccessJsonResponse:

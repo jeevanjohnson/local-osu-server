@@ -38,33 +38,30 @@ OSU_API_BASE = 'https://osu.ppy.sh/api'
 
 @handler(regex.screenshot_web_path)
 async def web_screenshot(request: Request) -> Response:
-    if request.args['link'] == 'img_err':
-        return Response(200, b"Can't upload to imgur!")
-    else:
-        return Response(
-            code = 301,
-            body = b'',
-            headers = {'Location': request.args['link']}
-        )
+    return Response(
+        code = 301,
+        body = b'',
+        headers = {'Location': request.args['link']}
+    )
 
 @handler('/web/osu-screenshot.php')
 async def osu_screenshots(request: Request) -> Response:
-    if (
-        not glob.screenshot_folder or
-        not glob.imgur
-    ):
-        return Response(200, b'img_err')
-    else:
-        screenshots = glob.screenshot_folder.glob('*')
-        latest_screenshot = glob.screenshot_folder / max(screenshots , key=os.path.getctime)
+    if not glob.screenshot_folder:
+        return Response(200, b'error: no')
 
-        uploaded_image = glob.imgur.upload_image(
-            path = str(latest_screenshot),
-            title = 'from local server'
-        )
+    screenshots = glob.screenshot_folder.glob('*')
+    latest_screenshot = glob.screenshot_folder / max(screenshots , key=os.path.getctime)
 
-        pyperclip.copy(uploaded_image.link)
-        return Response(200, uploaded_image.link.encode())
+    if not glob.imgur:
+        return Response(200, str(latest_screenshot))
+
+    uploaded_image = glob.imgur.upload_image(
+        path = str(latest_screenshot),
+        title = 'from local server'
+    )
+
+    pyperclip.copy(uploaded_image.link)
+    return Response(200, uploaded_image.link.encode())
 
 @handler(regex.bmap_web_path)
 async def bmap_web(request: Request) -> Response:
