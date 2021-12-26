@@ -3,6 +3,7 @@ import utils
 import regex
 import orjson
 import config
+import aiohttp
 import packets
 import asyncio
 import pyperclip
@@ -14,6 +15,8 @@ from utils import handler
 from server import Request
 from server import Response
 from menus import main_menu
+from utils import log_error
+from utils import log_success
 import urllib.parse as urlparse
 from objects import Leaderboard
 from constants import ParsedParams
@@ -29,8 +32,8 @@ for hand in [
     '/web/osu-error.php',
     '/difficulty-rating',
     '/web/osu-session.php',
-    '/web/osu-getfriends.php',
     '/web/osu-markasread.php',
+    '/web/osu-getfriends.php',
 ]:
     handler(hand)(DEFAULT_RESPONSE_FUNC)
 
@@ -50,7 +53,7 @@ async def osu_screenshots(request: Request) -> Response:
         return Response(200, b'error: no')
 
     screenshots = glob.screenshot_folder.glob('*')
-    latest_screenshot = glob.screenshot_folder / max(screenshots , key=os.path.getctime)
+    latest_screenshot = glob.screenshot_folder / max(screenshots, key=os.path.getctime)
 
     if not glob.imgur:
         return Response(200, str(latest_screenshot))
@@ -109,11 +112,7 @@ async def score_sub(request: Request) -> Response:
 
     glob.player.queue += packets.userStats(glob.player)
 
-    log(
-        f"{glob.player.name}'s playcount increased!",
-        color = Color.GREEN
-    )
-
+    log_success(f"{glob.player.name}'s playcount increased!")
     return Response(200, DEFAULT_CHARTS)
 
 @handler('/web/osu-getseasonal.php')
@@ -156,10 +155,7 @@ async def get_replay(request: Request) -> Response:
             'replay_frames' not in play or
             play['replay_frames'] is None
         ):
-            log(
-                f'no replay frames were found for scoreid: {real_id}',
-                color = Color.RED
-            )
+            log_error(f'no replay frames were found for scoreid: {real_id}')
             return Response(200, b'error: no')
         else:
             log(
@@ -177,7 +173,7 @@ async def get_replay(request: Request) -> Response:
                 body = replay
             )
     else:
-        log('error handling replay', color = Color.RED)
+        log_error('error handling replay')
         return Response(200, b'error: no')
 
 @handler('/web/osu-osz2-getscores.php')
@@ -270,20 +266,11 @@ async def leaderboard(request: Request) -> Response:
 
         if any(regex_results):
             lb = await ModifiedLeaderboard.from_client(parsed_params) # type: ignore
-            log(
-                f'handled funorange map of {parsed_params["filename"]}',
-                color = Color.GREEN
-            )
+            log_success(f'handled funorange map of {parsed_params["filename"]}')
         else:
-            log(
-                f'handled bancho(?) map of {parsed_params["filename"]}',
-                color = Color.GREEN
-            )
+            log_success(f'handled bancho(?) map of {parsed_params["filename"]}')
     else:
-        log(
-            f'handled map of setid: {parsed_params["set_id"]}',
-            color = Color.GREEN
-        )
+        log_success(f'handled map of setid: {parsed_params["set_id"]}')
 
     return Response(200, lb.as_binary)
 
@@ -299,16 +286,10 @@ async def download(request: Request) -> Response:
             resp.status != 200 or
             not (osz_binary := await resp.content.read())
         ):
-            log(
-                f"can't downloaded map set, id: {setid}",
-                color = Color.RED
-            )
+            log_success(f"can't downloaded map set, id: {setid}")
             return Response(200, b'')
 
-    log(
-        f'succesfully downloaded map set, id: {setid}',
-        color = Color.GREEN
-    )
+    log_success(f'succesfully downloaded map set, id: {setid}')
     return Response(
         code = 200,
         body = osz_binary,
@@ -364,17 +345,21 @@ async def direct(request: Request) -> Response:
 
     beatconnect_params['s'] = DIRECT_TO_API_STATUS[client_params['r']]
 
-    async with glob.http.get(
-        url = f'{DIRECT_BASE_API}/search',
-        params = beatconnect_params
-    ) as resp:
-        if (
-            not resp or
-            resp.status != 200 or
-            not (resp_dict := await resp.json())
-        ):
-            log('no maps found', color = Color.RED)
-            return Response(200, b'0') # no maps found
+    try:
+        async with glob.http.get(
+            url = f'{DIRECT_BASE_API}/search',
+            params = beatconnect_params
+        ) as resp:
+            if (
+                not resp or
+                resp.status != 200 or
+                not (resp_dict := await resp.json())
+            ):
+                log_error('no maps found')
+                return Response(200, b'0') # no maps found
+    except aiohttp.ClientConnectorError:
+        log_error('mirror currently down')
+        return Response(200, b'0')
 
     maps = resp_dict['beatmaps']
     len_maps = len(maps)
@@ -388,5 +373,5 @@ async def direct(request: Request) -> Response:
         diffs = ','.join(diffs)
         bmaps.append(DIRECT_SET_FORMAT.format(**bmap, diffs=diffs))
 
-    log(f'maps loaded for query: `{query}` !', color = Color.GREEN)
+    log_success(f'maps loaded for query: `{query}` !')
     return Response(200, '\n'.join(bmaps).encode())

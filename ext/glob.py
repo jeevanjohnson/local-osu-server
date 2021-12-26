@@ -27,6 +27,7 @@ lock = asyncio.Lock()
 modified_beatmaps: 'JsonFile'
 imgur: Optional[Imgur] = None
 player: Optional['Player'] = None
+commands: dict[str, Callable] = {}
 osu_exe_path: Optional[Path] = None
 songs_folder: Optional[Path] = None
 replay_folder: Optional['File'] = None

@@ -152,13 +152,7 @@ async def tops(request: Request) -> SuccessJsonResponse:
             await ModifiedBeatmap.from_md5(play['md5']) or
             await Beatmap.from_md5(play['md5'])
         )
-
-        if (
-            'mods_str' not in play or
-            play['mods_str'] is None
-        ):
-            play['mods_str'] = repr(Mods(play['mods']))
-
+        
         if bmap:
             bmap_dict = utils.delete_keys(
                 bmap.as_dict(), 'file_content'
@@ -166,7 +160,13 @@ async def tops(request: Request) -> SuccessJsonResponse:
 
             play['bmap'] = bmap_dict
         else:
-            play['bmap'] = None
+            continue
+        
+        if (
+            'mods_str' not in play or
+            play['mods_str'] is None
+        ):
+            play['mods_str'] = repr(Mods(play['mods']))
 
         play = utils.delete_keys(
             play, 'replay_frames'
