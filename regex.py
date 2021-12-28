@@ -1,4 +1,7 @@
-import re
+try:
+    import re2 as re # type: ignore
+except ImportError:
+    import re
 
 screenshot_web_path = re.compile(r'\/ss\/(?P<link>.*)')
 bmap_web_path = re.compile(r'\/(beatmaps|beatmapsets)\/(?P<path>.*)')

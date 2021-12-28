@@ -15,10 +15,10 @@ Why do I even care for this server? Well when I got restricted on osu! back in 2
 5. Type and enter the following
 ```
 cd "replace_this_text_with_the_folder_directory_of_the_server_you_just_installed"
-pip install -r requirements.txt
+python -m pip install -r requirements.txt
 ```
-6. You'll have to edit the config file provided, read through it to fully setup the server
-7. just run `main.py` with the following command `py main.py` and you should be good to go!
+6. You'll have to edit the config file provided, read through it to fully setup the server (most important information you will want to fill in is `osu_api_key` and `osu_daily_api_key`)
+7. just run `main.py` with the following command `./main.py` and you should be good to go!
 
 
 # Linux Setup

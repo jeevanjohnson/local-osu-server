@@ -122,6 +122,7 @@ class ModifiedLeaderboard:
                 else:
                     enabled = False
             
+            s.name = f'({idx}) {s.name}'
             buffer += SCORE_FORMAT.format(
                 **s.as_leaderboard_score,
                 num_on_lb = idx

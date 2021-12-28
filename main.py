@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 import regex
 import orjson
 import packets
