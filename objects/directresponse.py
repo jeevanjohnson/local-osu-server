@@ -1,3 +1,4 @@
+import time
 import utils
 from typing import Union
 from typing import Optional
@@ -163,13 +164,18 @@ class DirectResponse:
                 f"@{play['mode']}"
             )
 
+            utc_play_time_str = time.strftime(
+                '%Y-%m-%dT%H:%M:%SZ', 
+                time.localtime(play['time'])
+            )
+
             fake_set = BeatmapSet(
                 id = -setid,
                 artist = f"{idx+1}. {bmap['artist']}",
                 title = title,
                 creator = bmap['creator'],
                 ranked = bmap['approved'],
-                last_updated = play['time'],
+                last_updated = utc_play_time_str,
                 beatmaps = [diff_version]
             )
 
