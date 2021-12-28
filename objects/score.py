@@ -187,10 +187,16 @@ class Score:
         else:
             sid = 0
 
+        pp_checks = (
+            config.pp_leaderboard or 
+            glob.mode or 
+            config.show_pp_for_personal_best
+        )
+
         return {
             'score_id': sid,
             'username': self.name,
-            'score': int(self.pp) if config.pp_leaderboard or glob.mode else self.score, # type: ignore
+            'score': int(self.pp or 0) if pp_checks else self.score,
             'maxcombo': self.max_combo,
             'count50': self.n50,
             'count100': self.n100,

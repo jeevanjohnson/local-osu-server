@@ -1,9 +1,10 @@
 # don't touch this file just leave it here 
 # for updater lol
 
-version = '1.3.1'
+version = '1.4.0'
 
 file_structure = ['.gitignore',
+ 'commands.py',
  'constants.py',
  'ext/glob.py',
  'handlers/api.py',
@@ -13,13 +14,12 @@ file_structure = ['.gitignore',
  'handlers/web.py',
  'handlers/__init__.py',
  'main.py',
- 'menus/main_menu.py',
- 'menus/__init__.py',
  'objects/beatmap.py',
+ 'objects/command.py',
+ 'objects/directresponse.py',
  'objects/file.py',
  'objects/jsonfile.py',
  'objects/leaderboard.py',
- 'objects/menu.py',
  'objects/modifiedbeatmap.py',
  'objects/modifiedfinder.py',
  'objects/modifiedleaberboard.py',
@@ -45,5 +45,8 @@ file_structure = ['.gitignore',
  'website/__init__.py']
 
 deleted_files = [
-    'handlers/website.py'
+    'handlers/website.py',
+    'menus/main_menu.py',
+    'menus/__init__.py',
+    'objects/menu.py',
 ]

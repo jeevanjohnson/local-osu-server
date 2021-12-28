@@ -18,6 +18,11 @@ if TYPE_CHECKING:
     from objects import ModifiedBeatmap
 
 try:
+    import packets
+except ImportError:
+    pass
+
+try:
     from ext import glob
 except ImportError:
     pass
@@ -90,7 +95,9 @@ def handler(target: PATH) -> Callable:
                 glob.handlers[i] = func
         else:
             glob.handlers[target] = func
+        
         return func
+    
     return inner
 
 def is_path(p: str) -> Union[Path, Literal[False]]:
@@ -159,3 +166,52 @@ def delete_keys(_dict: dict, *keys: str) -> dict:
         except: pass
 
     return _dict_copy
+
+def local_message(
+    message: str, 
+    channel: str = '#osu'
+) -> bytes:
+    return packets.sendMsg(
+        client = 'local',
+        msg = message,
+        target = channel,
+        userid = -1,
+    )
+
+def get_grade(
+    score: Optional['Score'] = None, 
+    n300: Optional[int] = None,
+    n100: Optional[int] = None,
+    n50: Optional[int] = None,
+    nmiss: Optional[int] = None,
+    mods: Optional[int] = None
+    ) -> str:
+    if score:
+        total = score.n300 + score.n100 + score.n50 + score.nmiss
+        n300_percent = score.n300 / total
+        using_hdfl = score.mods & 1032
+        nomiss = score.nmiss == 0
+        n50 = score.n50
+    else:
+        total = n300 + n100 + n50 + nmiss # type: ignore
+        n300_percent = n300 / total
+        using_hdfl = mods & 1032 # type: ignore
+        nomiss = nmiss == 0
+        n50 = n50
+
+    if n300_percent > 0.9:
+        if nomiss and (n50 / total) < 0.1: # type: ignore
+            return 'SH' if using_hdfl else 'S'
+        else:
+            return 'A'
+
+    if n300_percent > 0.8:
+        return 'A' if nomiss else 'B'
+
+    if n300_percent > 0.7:
+        return 'B' if nomiss else 'C'
+
+    if n300_percent > 0.6:
+        return 'C'
+
+    return 'D'

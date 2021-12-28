@@ -2,7 +2,7 @@ import re
 
 screenshot_web_path = re.compile(r'\/ss\/(?P<link>.*)')
 bmap_web_path = re.compile(r'\/(beatmaps|beatmapsets)\/(?P<path>.*)')
-download_web_path = re.compile(r'/d/(?P<setid>[0-9]*)')
+download_web_path = re.compile(r'/d/(?P<setid>[-0-9]*)')
 
 filename_parser = re.compile(
     r"(?P<artist>.*) - (?P<song_name>.*) ((?P<mapper>.*) \[)(?P<diff_name>.*)\]\.osu"

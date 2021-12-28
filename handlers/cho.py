@@ -9,7 +9,6 @@ from utils import handler
 from server import Request
 from objects import Player
 from typing import Optional
-from menus import main_menu
 from server import Response
 import urllib.parse as urlparse
 
@@ -85,8 +84,11 @@ async def login() -> tuple[BODY, CHO_TOKEN]:
     body += packets.userPresence(p)
     profile_name = None
 
-    main_menu.name = 'Main Menu (current mode: vanilla)'
-    body += main_menu.as_binary(newline_per_category=True)
+    body += utils.local_message(
+        'Menus are gone! (finally lol)\n'
+        'please ues the built in commands in direct from now on\n'
+        'to see all the commands, type !help in the direct search bar.'
+    )
 
     log(glob.player.name, 'successfully logged in!', color = Color.GREEN)
     return body, 'success'

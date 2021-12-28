@@ -42,6 +42,19 @@ menu_icon: dict[str, Optional[str]] = {
     'click_link': '',
 }
 
+# you can run commands through the direct search bar
+# this prefix can change to whatever you want it to be
+# just know that when you change it that is the character
+# you need to use before typing out commands and such
+command_prefix: str = '!'
+
+# shows pp amount instead of actual score for
+# personal best on leaderboards
+show_pp_for_personal_best: bool = True
+
+# amount of scores to show on leaderboard max is 100
+amount_of_scores_on_lb: int = 100
+
 """Server Config"""
 # will automatically update the sever
 # whenever there are new updates added

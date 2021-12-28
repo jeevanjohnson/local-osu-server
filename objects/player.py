@@ -4,6 +4,7 @@ import config
 import orjson
 import queries
 import packets
+import asyncio
 from ext import glob
 from typing import Union
 from typing import Optional
@@ -71,7 +72,7 @@ class Player:
         utils.update_files()
         glob.current_profile = glob.profiles[self.name]
 
-    async def get_rank(self) -> int:
+    async def get_rank(self) -> Optional[int]:
         if not config.osu_daily_api_key:
             return 1
 
@@ -91,15 +92,13 @@ class Player:
             if not json:
                 return 1
 
+        if (
+            'error' in json and
+            json['error'] == 'Only 1 request per second is authorized'
+        ):
+            raise Exception
+
         if 'rank' not in json:
-            input((
-                'Hey!\n'
-                'If you have a valid osu!daily api key and end up\n'
-                'Seeing this error please send this to cover on discord!\n'
-                f'With the following info: {json}\n'
-                '(At this point, set `config.osu_daily_api_key` to `None`)\n'
-                'click enter to continue however :)'
-            ))
             return 1
 
         return json['rank']
@@ -156,7 +155,17 @@ class Player:
         if 'playcount' in glob.current_profile:
             self.playcount = glob.current_profile['playcount']
 
-        self.rank = await self.get_rank()
+        rank = None
+        updated_rank = False
+        while not updated_rank:
+            try: 
+                rank = await self.get_rank()
+                updated_rank = True
+            except: 
+                await asyncio.sleep(1)
+        
+        if rank:
+            self.rank = rank
 
         if self.from_login:
             self.queue += packets.userStats(self)

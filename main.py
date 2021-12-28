@@ -201,6 +201,9 @@ def main() -> int:
     import handlers # load all handlers
     from website import website_handler
 
+    # load all commands
+    import commands
+
     try:
         import uvloop # type: ignore
         uvloop.install()

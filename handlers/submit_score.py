@@ -13,29 +13,6 @@ from objects import ModifiedBeatmap
 
 RANKED_PLAYS = dict[str, list[dict]]
 
-def get_grade(score: Score) -> str:
-    total = score.n300 + score.n100 + score.n50 + score.nmiss
-    n300_percent = score.n300 / total
-    using_hdfl = score.mods & 1032
-    nomiss = score.nmiss == 0
-
-    if n300_percent > 0.9:
-        if nomiss and (score.n50 / total) < 0.1:
-            return 'SH' if using_hdfl else 'S'
-        else:
-            return 'A'
-
-    if n300_percent > 0.8:
-        return 'A' if nomiss else 'B'
-
-    if n300_percent > 0.7:
-        return 'B' if nomiss else 'C'
-
-    if n300_percent > 0.6:
-        return 'C'
-
-    return 'D'
-
 SCORE = list[dict]
 
 leaderboard_worthy = (1, 2, 3, 4)
@@ -162,7 +139,7 @@ async def submit_score() -> None:
     score_str = (
         f'{bmap.artist} - {bmap.title} [{bmap.version}]\n'
         f'+{score.mods_str} {score.acc:.2f}%\n'
-        f'{get_grade(score)} {score.pp:.0f}PP {score.nmiss}x\n'
+        f'{utils.get_grade(score)} {score.pp:.0f}PP {score.nmiss}x\n'
         f'was successfully submitted!'
     )
 
@@ -171,17 +148,11 @@ async def submit_score() -> None:
     """Sends score to recent channel"""
     msg = (
         f'{bmap.artist} - {bmap.title} [{bmap.version}]\n'
-        f'+{score.mods_str} {score.acc:.2f}% {get_grade(score)} {score.pp:.0f}PP '
+        f'+{score.mods_str} {score.acc:.2f}% {utils.get_grade(score)} {score.pp:.0f}PP '
         f'{score.max_combo}x/{bmap.max_combo}x {score.nmiss}X'
     )
     if config.ping_user_when_recent_score:
         msg += f'\nachieved by {glob.player.name}'
 
-    glob.player.queue += packets.sendMsg(
-        client = 'local',
-        msg = msg,
-        target = '#recent',
-        userid = -1,
-    )
-
+    glob.player.queue += utils.local_message(msg, channel='#recent')
     log(glob.player.name, 'has successfully submitted a score!', color = Color.GREEN)

@@ -15,34 +15,46 @@ from aiohttp import ClientSession
 if TYPE_CHECKING:
     from objects.file import File
     from objects.player import Player
+    from objects.command import Command
     from objects.jsonfile import JsonFile
 
+# db
 pfps: 'JsonFile'
-modified_txt: Path
-http: ClientSession
 beatmaps: 'JsonFile'
 profiles: 'JsonFile'
-default_avatar: bytes
-lock = asyncio.Lock()
 modified_beatmaps: 'JsonFile'
-imgur: Optional[Imgur] = None
-player: Optional['Player'] = None
-commands: dict[str, Callable] = {}
+
+# paths
+modified_txt: Path
 osu_exe_path: Optional[Path] = None
 songs_folder: Optional[Path] = None
 replay_folder: Optional['File'] = None
 screenshot_folder: Optional[Path] = None
-current_profile: Optional[dict[str, Any]] = None
-handlers: dict[Union[str, re.Pattern], Callable] = {}
 
-using_wsl = (
-    sys.platform == 'linux' and
-    'microsoft-standard-WSL' in os.uname().release # type: ignore
-)
-
+# session
 mode: Optional[Mods] = None
+player: Optional['Player'] = None
+current_profile: Optional[dict[str, Any]] = None
 invalid_mods: int = (
     Mods.AUTOPILOT | Mods.RELAX |
     Mods.AUTOPLAY | Mods.CINEMA |
     Mods.TARGET
 )._value_
+
+current_cmd: Optional['Command'] = None
+
+# services
+http: ClientSession
+imgur: Optional[Imgur] = None
+
+# constants
+default_avatar: bytes
+lock = asyncio.Lock()
+commands: dict[str, 'Command'] = {}
+handlers: dict[Union[str, re.Pattern], Callable] = {}
+
+# checks
+using_wsl = (
+    sys.platform == 'linux' and
+    'microsoft-standard-WSL' in os.uname().release # type: ignore
+)

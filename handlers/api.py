@@ -95,8 +95,13 @@ async def tops(request: Request) -> SuccessJsonResponse:
 
     if 'm' not in params:
         filter_mod = None
+    elif (m := params['m']):
+        if m == 'vn':
+            filter_mod = Mods.NOMOD
+        else:
+            filter_mod = Mods.from_str(m)
     else:
-        filter_mod = Mods.from_str(params['m'])
+        filter_mod = None
 
     name: str = params['u']
     if name not in glob.profiles:
@@ -164,7 +169,7 @@ async def tops(request: Request) -> SuccessJsonResponse:
         
         if (
             'mods_str' not in play or
-            play['mods_str'] is None
+            not play['mods_str']
         ):
             play['mods_str'] = repr(Mods(play['mods']))
 
@@ -204,8 +209,13 @@ async def recent(request: Request) -> SuccessJsonResponse:
 
     if 'm' not in params:
         filter_mod = None
+    elif (m := params['m']):
+        if m == 'vn':
+            filter_mod = Mods.NOMOD
+        else:
+            filter_mod = Mods.from_str(m)
     else:
-        filter_mod = Mods.from_str(params['m'])
+        filter_mod = None
 
     profile = glob.profiles[name]
     response_json = {
@@ -252,7 +262,7 @@ async def recent(request: Request) -> SuccessJsonResponse:
 
         if (
             'mods_str' not in play or
-            play['mods_str'] is None
+            not play['mods_str']
         ):
             play['mods_str'] = repr(Mods(play['mods']))
 

@@ -14,12 +14,12 @@ from objects import Mods
 from utils import handler
 from server import Request
 from server import Response
-from menus import main_menu
 from utils import log_error
 from utils import log_success
 import urllib.parse as urlparse
 from objects import Leaderboard
 from constants import ParsedParams
+from objects import DirectResponse
 from objects import ModifiedLeaderboard
 
 async def DEFAULT_RESPONSE_FUNC(request: Request) -> Response:
@@ -34,6 +34,7 @@ for hand in [
     '/web/osu-session.php',
     '/web/osu-markasread.php',
     '/web/osu-getfriends.php',
+    '/web/osu-getbeatmapinfo.php'
 ]:
     handler(hand)(DEFAULT_RESPONSE_FUNC)
 
@@ -208,9 +209,6 @@ async def leaderboard(request: Request) -> Response:
                 'Mode was switched to rx!'
             )
             asyncio.create_task(glob.player.update(glob.mode))
-            main_menu.name = 'Main Menu (current mode: relax)'
-            glob.player.queue += main_menu.as_binary(newline_per_category=True)
-
     elif mods & Mods.AUTOPILOT:
         if (
             not glob.mode or
@@ -225,9 +223,6 @@ async def leaderboard(request: Request) -> Response:
                 'Mode was switched to ap!'
             )
             asyncio.create_task(glob.player.update(glob.mode))
-            main_menu.name = 'Main Menu (current mode: autopilot)'
-            glob.player.queue += main_menu.as_binary(newline_per_category=True)
-
     elif not mods & (Mods.RELAX | Mods.AUTOPILOT):
         if glob.mode:
             glob.mode = None
@@ -240,8 +235,6 @@ async def leaderboard(request: Request) -> Response:
                 'Mode was switched to vanilla!'
             )
             asyncio.create_task(glob.player.update(glob.mode))
-            main_menu.name = 'Main Menu (current mode: vanilla)'
-            glob.player.queue += main_menu.as_binary(newline_per_category=True)
 
     if config.osu_api_key:
         lb = await Leaderboard.from_bancho(parsed_params)
@@ -278,8 +271,18 @@ BASE_URL = 'https://beatconnect.io'
 @handler(regex.download_web_path)
 async def download(request: Request) -> Response:
     setid = request.args['setid']
-    url = f'{BASE_URL}/b/{setid}'
+    
+    if setid == '-1' and glob.current_cmd:
+        cmd = glob.current_cmd
+        await cmd.func(*cmd.args)
+        cmd.args = []
+        glob.current_cmd = None
+        return Response(200, b'')
+    
+    if setid == '-1':
+        return Response(200, b'')
 
+    url = f'{BASE_URL}/b/{setid}'
     async with glob.http.get(url) as resp:
         if (
             not resp or
@@ -294,16 +297,6 @@ async def download(request: Request) -> Response:
         code = 200,
         body = osz_binary,
     )
-
-DIRECT_DIFF_FORMAT = (
-    '[{difficulty:.2f}⭐] {version} {{CS{cs} OD{accuracy} AR{ar} HP{drain}}}@{mode_int}'
-)
-
-DIRECT_SET_FORMAT = (
-    '{id}.osz|{artist}|{title}|{creator}|'
-    '{ranked}|10.0|{last_updated}|{id}|'
-    '0|0|0|0|0|{diffs}' # 0s are threadid, has_vid, has_story, filesize, filesize_novid
-)
 
 DIRECT_TO_API_STATUS = {
     0: 'ranked',
@@ -323,8 +316,46 @@ DIRECT_TO_MIRROR_MODE = {
 }
 
 DIRECT_BASE_API = 'https://beatconnect.io/api'
+
+COMMAND_NOT_FOUND = DirectResponse.from_str(
+    'command not found!'
+).as_binary
+
 @handler('/web/osu-search.php')
 async def direct(request: Request) -> Response:
+    query = urlparse.unquote_plus(request.params['q'])
+    if query.startswith(config.command_prefix):
+        cmd, *args = query.split()
+        cmd = cmd.removeprefix(config.command_prefix)
+        
+        if cmd not in glob.commands:
+            return Response(200, COMMAND_NOT_FOUND)
+        
+        command = glob.commands[cmd]
+        
+        if command.confirm_with_user:
+            command.args = args
+            glob.current_cmd = command
+
+            msg = (
+                'click me to execute!\n'
+                f'loaded command: {command.name}\n'
+                f'following args: {args}'
+            )
+
+            execute_button = DirectResponse.from_str(
+                msg, start_id = -1
+            ).as_binary
+
+            return Response(200, execute_button)
+        else:
+            resp = await command.func(*args)
+
+            if resp:
+                return Response(200, bytes(resp))
+            else:
+                return Response(200, b'0')
+
     if not config.beatconnect_api_key:
         utils.add_to_player_queue(
             packets.notification("No api key given for direct!")
@@ -335,7 +366,6 @@ async def direct(request: Request) -> Response:
         'token': config.beatconnect_api_key,
     }
     client_params = request.params
-    client_params['q'] = query = urlparse.unquote_plus(client_params['q'])
 
     if query not in ("Newest", "Top Rated", "Most Played"):
         beatconnect_params['q'] = query
@@ -350,28 +380,23 @@ async def direct(request: Request) -> Response:
             url = f'{DIRECT_BASE_API}/search',
             params = beatconnect_params
         ) as resp:
+        
             if (
                 not resp or
                 resp.status != 200 or
                 not (resp_dict := await resp.json())
             ):
                 log_error('no maps found')
-                return Response(200, b'0') # no maps found
+                return Response(200, b'0')
+        
     except aiohttp.ClientConnectorError:
         log_error('mirror currently down')
         return Response(200, b'0')
-
-    maps = resp_dict['beatmaps']
-    len_maps = len(maps)
-    bmaps = [f"{'101' if len_maps == 100 else len_maps}"]
-
-    for bmap in maps:
-        diffs = []
-        for row in sorted(bmap['beatmaps'], key = lambda x: x['difficulty']):
-            diffs.append(DIRECT_DIFF_FORMAT.format(**row))
-
-        diffs = ','.join(diffs)
-        bmaps.append(DIRECT_SET_FORMAT.format(**bmap, diffs=diffs))
-
+    
     log_success(f'maps loaded for query: `{query}` !')
-    return Response(200, '\n'.join(bmaps).encode())
+    return Response(
+        code = 200, 
+        body = DirectResponse(
+            bmaps = resp_dict['beatmaps']
+        ).as_binary
+    )

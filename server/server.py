@@ -270,7 +270,10 @@ class Server:
             elif isinstance(resp, bytes):
                 await loop.sock_sendall(client, resp)
             else:
-                raise Exception(f'unknown type for resp, type: {type(resp)}')
+                try:
+                    await loop.sock_sendall(client, Response(200, bytes(resp)).to_bytes())
+                except:
+                    raise Exception(f'unknown type for resp, type: {type(resp)}')
             
             client.close()
             return
