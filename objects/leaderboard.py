@@ -1,3 +1,4 @@
+import time
 import utils
 import config
 from ext import glob
@@ -57,6 +58,20 @@ SCORE_FORMAT = (
     "{num_on_lb}|{time}|{replay_available}"
 )
 VALID_LB_STATUESES = (LOVED, QUALIFIED, RANKED, APPROVED)
+
+LB_NOT_SUPPORTED_PLACEHOLDER =  Score(
+    0, '', "Not supported atm!", 
+    0, 0, 0, 0, 0, 0, 0, 0, False, 0, int(time.time())
+)
+BLANK_BMAP = Beatmap(
+    approved = 3,
+    title_unicode = '',
+    title = '',
+    artist_unicode = '',
+    artist = '',
+    beatmap_id = 0,
+    beatmapset_id = 0
+)
 
 SCORE = Union[Score, BanchoScore]
 class Leaderboard:
@@ -141,13 +156,7 @@ class Leaderboard:
         mods = client_params['mods']
         rank_type = client_params['rank_type']
 
-        bmap = Beatmap()
-        bmap.approved = 3
-        bmap.title_unicode = bmap.title = ''
-        bmap.artist_unicode = bmap.artist = ''
-        bmap.beatmap_id = bmap.beatmapset_id = 0
-
-        lb.bmap = bmap
+        lb.bmap = BLANK_BMAP
         scores: list[Union[Score, BanchoScore]] = []
 
         lb.scores = scores
@@ -331,3 +340,9 @@ class Leaderboard:
         lb.personal_score = player_score
         lb.scores = lb.scores[:config.amount_of_scores_on_lb]
         return lb
+
+class NotSupported(Leaderboard):
+    def __init__(self) -> None:
+        super().__init__()
+        self.bmap = BLANK_BMAP
+        self.scores.append(LB_NOT_SUPPORTED_PLACEHOLDER)

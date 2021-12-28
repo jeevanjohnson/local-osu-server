@@ -25,7 +25,10 @@ def real_type(value: str) -> Union[float, int, str]:
     return value
 
 class Beatmap:
-    def __init__(self) -> None:
+    def __init__(self, **kwargs) -> None:
+        if kwargs:
+            self.__dict__.update(**kwargs)
+
         self.beatmapset_id: int
         self.beatmap_id: int
         self.approved: int

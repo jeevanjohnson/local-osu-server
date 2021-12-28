@@ -18,6 +18,7 @@ from utils import log_error
 from utils import log_success
 import urllib.parse as urlparse
 from objects import Leaderboard
+from objects import NotSupported
 from constants import ParsedParams
 from objects import DirectResponse
 from objects import ModifiedLeaderboard
@@ -177,10 +178,23 @@ async def get_replay(request: Request) -> Response:
         log_error('error handling replay')
         return Response(200, b'error: no')
 
+NOT_SUPPORTED = NotSupported().as_binary
+
 @handler('/web/osu-osz2-getscores.php')
 async def leaderboard(request: Request) -> Response:
     if not glob.player:
         return Response(404, b'')
+
+    mode = request.params['m']
+    rank_type = request.params['v']
+
+    supported = (
+        mode == 0 and
+        rank_type in (0, 1, 2)
+    )
+
+    if not supported:
+        return Response(200, NOT_SUPPORTED)
 
     parsed_params = ParsedParams(
         filename = urlparse.unquote_plus(request.params['f']),

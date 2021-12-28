@@ -60,7 +60,7 @@ class BanchoScore:
 
 class Score:
     def __init__(
-        self, mode: str,
+        self, mode: int,
         md5: str, name: str,
         n300: int,  n100: int,
         n50: int, ngeki: int,
