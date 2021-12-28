@@ -199,8 +199,8 @@ async def leaderboard(request: Request) -> Response:
     parsed_params = ParsedParams(
         filename = urlparse.unquote_plus(request.params['f']),
         mods = request.params['mods'],
-        mode = request.params['m'],
-        rank_type = request.params['v'],
+        mode = mode,
+        rank_type = rank_type,
         set_id = request.params['i'],
         md5 = request.params['c'],
         name_data =  None
