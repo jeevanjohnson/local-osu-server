@@ -1,4 +1,3 @@
-import re
 import base64
 import asyncio
 import colorama
@@ -8,7 +7,6 @@ from pathlib import Path
 from colorama import Fore
 from typing import Literal
 from typing import Optional
-from typing import Callable
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -79,26 +77,6 @@ def calculator(
         score.pp = pp
 
     return (pp, acc_percent)
-
-# TODO: rethink of this
-# starting to see flaws
-iterators = (list, tuple)
-PATH = Union[
-    str, re.Pattern,
-    list[Union[str, re.Pattern]],
-    tuple[Union[str, re.Pattern]]
-]
-def handler(target: PATH) -> Callable:
-    def inner(func: Callable) -> Callable:
-        if isinstance(target, iterators):
-            for i in target:
-                glob.handlers[i] = func
-        else:
-            glob.handlers[target] = func
-        
-        return func
-    
-    return inner
 
 def is_path(p: str) -> Union[Path, Literal[False]]:
     path = Path(p)

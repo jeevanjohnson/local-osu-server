@@ -103,11 +103,10 @@ class DirectResponse:
         split = message.splitlines()
 
         for line in split:
-            fake_id = start_id if not self.bmaps else -len(self.bmaps)
-            
             self.bmaps.append(
-                self.load_fake_bmap(fake_id, message=line)
+                self.load_fake_bmap(start_id, message=line)
             )
+            start_id += -1
 
     @classmethod
     def from_str(cls, s: str, start_id: int = -2) -> 'DirectResponse':

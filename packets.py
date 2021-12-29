@@ -1,7 +1,10 @@
 import enum
 import struct
 import functools
-from objects import Player
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from objects import Player
 
 @enum.unique
 class PacketIDS(enum.IntEnum):

@@ -1,53 +1,9 @@
 import lzma
 import struct
-from enum import unique
-from enum import IntEnum
 from enum import IntFlag
+from pathlib import Path
 from typing import Optional
-
-@unique
-class GameMode(IntEnum):
-    Standard = 0
-    Taiko = 1
-    CatchTheBeat = 2
-    Osumania = 3
-
-@unique
-class Mods(IntFlag):
-    NOMOD       = 0
-    NOFAIL      = 1 << 0
-    EASY        = 1 << 1
-    TOUCHSCREEN = 1 << 2 # old: 'NOVIDEO'
-    HIDDEN      = 1 << 3
-    HARDROCK    = 1 << 4
-    SUDDENDEATH = 1 << 5
-    DOUBLETIME  = 1 << 6
-    RELAX       = 1 << 7
-    HALFTIME    = 1 << 8
-    NIGHTCORE   = 1 << 9
-    FLASHLIGHT  = 1 << 10
-    AUTOPLAY    = 1 << 11
-    SPUNOUT     = 1 << 12
-    AUTOPILOT   = 1 << 13
-    PERFECT     = 1 << 14
-    KEY4        = 1 << 15
-    KEY5        = 1 << 16
-    KEY6        = 1 << 17
-    KEY7        = 1 << 18
-    KEY8        = 1 << 19
-    FADEIN      = 1 << 20
-    RANDOM      = 1 << 21
-    CINEMA      = 1 << 22
-    TARGET      = 1 << 23
-    KEY9        = 1 << 24
-    KEYCOOP     = 1 << 25
-    KEY1        = 1 << 26
-    KEY3        = 1 << 27
-    KEY2        = 1 << 28
-    SCOREV2     = 1 << 29
-    MIRROR      = 1 << 30
-
-    SPEED_CHANGING = DOUBLETIME | NIGHTCORE | HALFTIME
+from objects.mods import Mods
 
 class Key(IntFlag):
     M1    = 1 << 0
@@ -95,38 +51,37 @@ class Replay:
         self._data = raw_replay
         self.offset = 0
 
-        self.mode: Optional[GameMode] = None
-        self.version: Optional[int] = None
-        self.beatmap_md5: Optional[str] = None
-        self.replay_md5: Optional[str] = None
-        self.player_name: Optional[str] = None
-        self.n300: Optional[int] = None
-        self.n100: Optional[int] = None
-        self.n50: Optional[int] = None
-        self.geki: Optional[int] = None
-        self.katu: Optional[int] = None
-        self.miss: Optional[int] = None
-        self.total_score: Optional[int] = None
-        self.combo: Optional[int] = None
-        self.perfect: Optional[int] = None
-        self.mods: Optional[Mods] = None
-        self.bar_graph: Optional[list[LifeBar]] = None
-        self.timestamp: Optional[int] = None
-        self.score_id: Optional[int] = None
+        self.mode: int
+        self.version: int
+        self.beatmap_md5: str
+        self.replay_md5: str
+        self.player_name: str
+        self.n300: int
+        self.n100: int
+        self.n50: int
+        self.ngeki: int
+        self.nkatu: int
+        self.nmiss: int
+        self.total_score: int
+        self.combo: int
+        self.perfect: bool
+        self.mods: Mods
+        self.bar_graph: list[LifeBar]
+        self.timestamp: int
+        self.score_id: int
         self.additional_mods: Optional[int] = None
-        self.frames: Optional[list[Frame]] = None
-        self.raw_frames: Optional[bytes] = None
+        self.frames: list[Frame]
+        self.raw_frames: bytes
 
     @property
     def data(self) -> bytes:
         return self._data[self.offset:]
 
     @classmethod
-    def from_file(cls, path: str) -> 'Replay':
-        with open(path, 'rb') as f:
-            replay = cls(f.read())
-            replay.parse()
-            return replay
+    def from_file(cls, path: Path) -> 'Replay':
+        replay = cls(path.read_bytes())
+        replay.parse()
+        return replay
 
     @classmethod
     def from_content(cls, content: bytes) -> 'Replay':
@@ -135,7 +90,7 @@ class Replay:
         return replay
 
     def parse(self) -> None:
-        self.mode = GameMode(self.read_byte())
+        self.mode = self.read_byte()
         self.version = self.read_int()
         self.beatmap_md5 = self.read_string()
         self.player_name = self.read_string()
@@ -143,18 +98,18 @@ class Replay:
         self.n300 = self.read_short()
         self.n100 = self.read_short()
         self.n50 = self.read_short()
-        self.geki = self.read_short()
-        self.katu = self.read_short()
-        self.miss = self.read_short()
+        self.ngeki = self.read_short()
+        self.nkatu = self.read_short()
+        self.nmiss = self.read_short()
         self.total_score = self.read_int()
         self.combo = self.read_short()
-        self.perfect = self.read_byte()
+        self.perfect = bool(self.read_byte())
         self.mods = Mods(self.read_int())
         self.bar_graph = [LifeBar.from_raw_bar(x) for x in self.read_string().split('|')]
         self.timestamp = self.read_long_long()
 
-        self.raw_frames = raw_frames = self.read_raw(self.read_int())
-        decoded_frames: list[bytes] = lzma.decompress(raw_frames).split(b',')
+        self.raw_frames = self.read_raw(self.read_int())
+        decoded_frames = lzma.decompress(self.raw_frames).split(b',')
         self.frames = [Frame.from_raw_frame(x) for x in decoded_frames if x]
 
         self.scoreid = self.read_long_long()

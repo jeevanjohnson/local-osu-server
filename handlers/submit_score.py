@@ -5,7 +5,6 @@ from ext import glob
 from utils import log
 from utils import Color
 from objects import Mods
-from utils import handler
 from objects import Score
 from objects import Beatmap
 from typing import Optional
@@ -22,16 +21,9 @@ status_to_db = {
     3: 'qualified',
     4: 'loved'
 }
-@handler('score_sub')
-async def submit_score() -> None:
+
+async def score_submit(score: Score) -> None:
     if not glob.player:
-        return
-
-    if not glob.current_profile:
-        return
-
-    score = Score.from_score_sub()
-    if not score:
         return
 
     if score.name != glob.player.name:

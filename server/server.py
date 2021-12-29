@@ -1,21 +1,15 @@
-import re
-import http
 import socket
-import orjson
+import inspect
 import asyncio
 from typing import Any
-from typing import Union
-from pathlib import Path
 from typing import Callable
 from typing import Optional
-from typing import TypedDict
-
-# https://datatracker.ietf.org/doc/html/rfc7231#section-6s
-HTTP_STATUS_CODES = {
-	# {418: "I'm a Teapot"}
-	status.value: status.phrase
-	for status in http.HTTPStatus
-}
+from typing import Coroutine
+from server.router import Router
+from asyncio import AbstractEventLoop
+from server.responses import Response
+from server.responses import JsonResponse
+from server.responses import ALL_RESPONSES
 
 class Request:
     def __init__(self) -> None:
@@ -61,100 +55,89 @@ class Request:
             return f'{url}?{params_str}'
         else:
             return url
-        
-class Route(TypedDict):
-    path: Union[str, re.Pattern]
-    methods: list[str]
-    func: Callable
 
-class Response:
+from server import params
+
+def Alias(
+    *alias: str
+) -> Any:
+    return params.Alias(
+        *alias
+    )
+
+def Query(
+    func: Callable,
+    alias: Optional[params.Alias] = None
+) -> Any: 
+    return params.Query(
+        func, alias
+    )
+
+PARAMS = (params.Query, params.Alias)
+
+class HTTPServer:
     def __init__(
-        self, code: int, body: Union[str, bytes, bytearray], 
-        headers: dict[str, Any] = {}
+        self, 
+        loop: AbstractEventLoop = asyncio.get_event_loop()
     ) -> None:
-        self.code = code
-        self.body = body
-        self.headers = headers
+        self.loop = loop
+        self.routers: list[Router] = []
+        self.start_method: Optional[Coroutine] = None
+        self.shutdown_method: Optional[Coroutine] = None
 
-    def to_bytes(self) -> bytes:
-        if isinstance(self.body, str):
-            self.body = self.body.encode()
-              
-        resp = bytearray((
-            f'HTTP/1.1 {self.code} {HTTP_STATUS_CODES[self.code]}\r\n'
-            f'Content-Length: {len(self.body)}\r\n'
-        ).encode())
+    def add_router(self, router: Router) -> None:
+        self.routers.append(router)
 
-        for key, value in self.headers.items():
-            resp += f'{key}: {value}\r\n'.encode()
-
-        resp += b'\r\n'
+    def parse_args(
+        self, 
+        args: dict[str, Any],
+        func: Callable, 
+        request: Optional[Request] = None
+    ) -> dict[str, Any]:
         
-        return bytes(resp + self.body)
-    
-class HTMLResponse(Response):
-    def __init__(self, path: Union[str, Path], **kwargs) -> None:
-        if isinstance(path, Path):
-            content = path.read_text()
-        else:
-            content = Path(path).read_text()
+        signature = inspect.signature(func)
+
+        parsed_args = {}
+        if not signature.parameters or not args:
+            return parsed_args
+
+        parameter_keys = args.keys()
+        for arg_name, func_arg in signature.parameters.items():
+            arg_names = [arg_name]
+            default_value = func_arg.default
+
+            if isinstance(default_value, Request) and request:
+                parsed_args[arg_name] = request
+                continue
+
+            is_param = isinstance(default_value, PARAMS)
+            if is_param:
+                arg_names.extend(default_value.alias)
+
+            parameter_key_check = [key for key in parameter_keys if key in arg_names]
+            if not parameter_key_check:
+                continue
+            
+            arg_key, = parameter_key_check
+            parameter_value = args[arg_key]
+
+            if is_param:
+                parameter_value = default_value(parameter_value)
+            
+            if not isinstance(parameter_value, func_arg.annotation):
+                parameter_value = func_arg.annotation(parameter_value)
+            
+            parsed_args[arg_name] = parameter_value
         
-        try:
-            super().__init__(
-                code = 200, 
-                body = content.format(**kwargs),
-                headers = {'Content-type': 'text/html'}
-            )
-        except:
-            super().__init__(
-                code = 200, 
-                body = content,
-                headers = {'Content-type': 'text/html'}
-            )
+        return parsed_args
 
-class ImageResponse(Response):
-    def __init__(
-        self, image_bytes: Union[bytes, bytearray],
-        image_extenton: str = 'jpeg'
-    ) -> None:
-        image_extenton = image_extenton.replace('.', '', 1)
-        super().__init__(
-            code = 200,
-            body = image_bytes,
-            headers = {'Content-type': f'image/{image_extenton}'}
-        )
-
-class JsonResponse(Response):
-    def __init__(self, code: int, json: dict) -> None:
-        super().__init__(
-            code = code,
-            body = orjson.dumps(json),
-            headers = {'Content-type': 'application/json charset=utf-8'}
-        )
-
-class SuccessJsonResponse(JsonResponse):
-    def __init__(self, json: dict) -> None:
-        super().__init__(200, json)
-
-ALL_RESPONSES = (
-    Response, HTMLResponse, 
-    ImageResponse, JsonResponse,
-    SuccessJsonResponse
-)    
-
-class Server:
-    def __init__(self) -> None:
-        self.routes: list[Route] = []
+    def starting(self, func: Callable) -> Callable:
+        self.start_method = func()
+        return func
     
-    def get(self, path: Union[str, re.Pattern]) -> Callable:
-        def inner(func: Callable) -> Callable:
-            self.routes.append({
-                'path': path,
-                'methods': ['GET'],
-                'func': func
-            })
-            return func
-        return inner
+    def shutdown(self, func: Callable) -> Callable:
+        self.shutdown_method = func()
+        return func
 
     def real_type(self, value: str) -> Any:
         if value.replace('-', '', 1).isdecimal():
@@ -202,6 +185,7 @@ class Server:
         ):
             request.boundary = '--' + request.content_type.split('; boundary=', 1)[1]
             request.multipart = None
+            print('you see if u somehow get here, what is wrong with you')
             breakpoint() # TODO: multipart
         else:
             request.raw_body = body
@@ -226,12 +210,11 @@ class Server:
         return request
 
     async def handle_con(
-        self, client: socket.socket,
-        loop: asyncio.AbstractEventLoop
+        self, client: socket.socket
     ) -> None:
-        data = await loop.sock_recv(client, 1024)
+        data = await self.loop.sock_recv(client, 1024)
         if not data:
-            await loop.sock_sendall(client, b'')
+            await self.loop.sock_sendall(client, b'')
             client.close()
             return
         
@@ -239,92 +222,123 @@ class Server:
         if 'content_length' in request:
             length = request.content_length
             if length > 1024:
-                data += await loop.sock_recv(client, length)
+                data += await self.loop.sock_recv(client, length)
                 request = self.parse(data)
         
-        for route in self.routes:
-            if request.method not in route['methods']:
+        for router in self.routers:
+            if not (match := router.match(request.path)):
                 continue
-
-            path = route['path']
-            if isinstance(path, str):
-                if request.path != path:
-                    continue
+            
+            if isinstance(match, str):
+                path = request.path.removeprefix(match)
             else:
-                result = path.match(request.path)
-                if not result:
+                path = request.path.removeprefix(router.main_destination) # type: ignore
+            
+            for route in router:
+                if request.method not in route.methods:
+                    continue
+
+                match = route.match(path)
+                if match is False:
                     continue
                 
-                request.args = result.groupdict()
+                if isinstance(match, dict):
+                    request.args = match
+                else:
+                    request.args = {}
 
-            resp = await route['func'](request)
+                all_possible_parameters = request.__dict__
+                all_possible_parameters |= request.params
+                all_possible_parameters |= request.args
 
-            if isinstance(resp, ALL_RESPONSES):
-                await loop.sock_sendall(client, resp.to_bytes())
-            elif isinstance(resp, bytearray):
-                await loop.sock_sendall(client, bytes(resp))
-            elif isinstance(resp, str):
-                await loop.sock_sendall(
-                    client, Response(200, resp.encode()).to_bytes()
-                )
-            elif isinstance(resp, bytes):
-                await loop.sock_sendall(client, resp)
-            else:
-                try:
-                    await loop.sock_sendall(client, Response(200, bytes(resp)).to_bytes())
-                except:
-                    raise Exception(f'unknown type for resp, type: {type(resp)}')
-            
-            client.close()
-            return
+                route_handler = route.handler
+                resp = await route_handler(**self.parse_args(
+                    all_possible_parameters, route_handler, request
+                ))
+
+                if isinstance(resp, ALL_RESPONSES):
+                    await self.loop.sock_sendall(
+                        client, resp.to_bytes()
+                    )
+                elif isinstance(resp, bytearray):
+                    await self.loop.sock_sendall(
+                        client, Response(200, bytes(resp)).to_bytes()
+                    )
+                elif isinstance(resp, str):
+                    await self.loop.sock_sendall(
+                        client, Response(200, resp.encode()).to_bytes()
+                    )
+                elif isinstance(resp, bytes):
+                    await self.loop.sock_sendall(
+                        client, resp
+                    )
+                else:
+                    try:
+                        await self.loop.sock_sendall(
+                            client, Response(200, bytes(resp)).to_bytes()
+                        )
+                    except:
+                        raise Exception(f'unknown type for resp, type: {type(resp)}')
+                
+                client.close()
+                return
 
         print(request.path, request.params, request.method)
+        await self.loop.sock_sendall(
+            client, JsonResponse(404, {'error': 'not found'}).to_bytes()
+        )
+        client.close()
+        return
 
     async def _run(
-        self, bind: tuple[str, int], 
-        listening: int, 
-        before_startup: Optional[Callable],
-        shutdown_method: Optional[Callable],
-        background_tasks: Optional[list[Callable]]
+        self, 
+        bind: tuple[str, int] = ('127.0.0.1', 5000), 
+        listening: int = 16,
+        background_tasks: Optional[list[Callable]] = None
     ) -> None:
         
         with socket.socket(socket.AF_INET) as sock:
-            loop = asyncio.get_running_loop()
-
-            if before_startup:
-                await before_startup()
+            if self.start_method:
+                await self.start_method
             
             if background_tasks:
                 [asyncio.create_task(func()) for func in background_tasks]
+
+            # used to avoid 'Address already in use'
+            #sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
             sock.bind(bind)
             sock.listen(listening)
             sock.setblocking(False)
 
             print(
-                f'Server is up and running on port {bind[1]}!'
+                'Server is up and running on {}:{}!'.format(*bind)
             )
-            try:
-                while True:
-                    client, addr = await loop.sock_accept(sock)
-                    loop.create_task(self.handle_con(client, loop))
-            except (KeyboardInterrupt, SystemExit):
-                if shutdown_method:
-                    await shutdown_method()
-                
-                return
 
+            while True:
+                client, addr = await self.loop.sock_accept(sock)
+                self.loop.create_task(self.handle_con(client))
+    
     def run(
-        self, bind: tuple[str, int], 
-        listening: int = 5, 
-        before_startup: Optional[Callable] = None,
-        shutdown_method: Optional[Callable] = None,
+        self,
+        bind: tuple[str, int] = ('127.0.0.1', 5000), 
+        listening: int = 16,
         background_tasks: Optional[list[Callable]] = None
     ) -> None:
-        asyncio.run(self._run(
-            bind = bind,
-            listening = listening,
-            before_startup = before_startup,
-            shutdown_method = shutdown_method,
-            background_tasks = background_tasks
-        ))
+        try:
+            self.loop.run_until_complete(self._run(
+                bind, listening, background_tasks
+            ))
+        except (KeyboardInterrupt, SystemExit):
+            [task.cancel() for task in asyncio.all_tasks()]
+            if self.shutdown_method:
+                self.loop.run_until_complete(
+                    self.shutdown_method
+                )
+        
+        try:
+            self.loop.close()
+        except:
+            pass
+
+        return

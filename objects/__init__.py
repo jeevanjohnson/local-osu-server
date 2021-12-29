@@ -12,4 +12,5 @@ from .leaderboard import Leaderboard
 from .leaderboard import NotSupported
 from .directresponse import DirectResponse
 from .modifiedbeatmap import ModifiedBeatmap
+from .leaderboardtypes import LeaderboardTypes
 from .modifiedleaberboard import ModifiedLeaderboard

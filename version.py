@@ -1,7 +1,7 @@
 # don't touch this file just leave it here 
 # for updater lol
 
-version = '1.4.3'
+version = '1.5.0'
 
 file_structure = ['.gitignore',
  'commands.py',
@@ -20,6 +20,7 @@ file_structure = ['.gitignore',
  'objects/file.py',
  'objects/jsonfile.py',
  'objects/leaderboard.py',
+ 'objects/leaderboardtypes.py',
  'objects/modifiedbeatmap.py',
  'objects/modifiedfinder.py',
  'objects/modifiedleaberboard.py',
@@ -34,6 +35,9 @@ file_structure = ['.gitignore',
  'regex.py',
  'requirements.txt',
  'sample.config.py',
+ 'server/params.py',
+ 'server/responses.py',
+ 'server/router.py',
  'server/server.py',
  'server/__init__.py',
  'updater.py',

@@ -7,10 +7,10 @@ from ext import glob
 from utils import log
 from utils import Color
 from objects import Mods
-from typing import Union
-from utils import handler
+from server import Alias
+from server import Query
 from objects import Score
-from server import Request
+from server import Router
 from objects import Player
 from objects import Beatmap
 from typing import Optional
@@ -18,45 +18,27 @@ import urllib.parse as urlparse
 from objects import ModifiedBeatmap
 from server import SuccessJsonResponse
 
+api = Router('/api/v1')
+
+lower = lambda x: x.lower()
 JSON = orjson.dumps
 
-@handler('/api/v1/show_msg')
-async def show_message(request: Request) -> Union[SuccessJsonResponse, str]:
-    if 'm' not in request.params:
-        return SuccessJsonResponse({
-            'status': 'failed',
-            'message': 'no message found?'
-        })
-    
-    return urlparse.unquote(request.params['m'])
-
-@handler('/api/v1/profile')
-async def profile(request: Request) -> SuccessJsonResponse:
-    if (
-        not (params := request.params) or
-        'u' not in params
-    ):
-        return SuccessJsonResponse({
-            'status': 'failed',
-            'message': (
-                'please provide a profile name in parameters\n'
-                'example: http://127.0.0.1:5000/api/v1/client/profile?u=profile name'
-            )
-        })
-
-    p = Player(params['u'])
+@api.get('/profile')
+async def profile(
+    name: str = Query(urlparse.unquote_plus, Alias('u')),
+    mode: str = Query(lower, Alias('m'))
+) -> SuccessJsonResponse:
+    p = Player(name)
 
     filter_mod = None
-    m = 'vn'
-    if 'm' in params:
-        m = params['m'].lower().strip()
-        if m == 'rx':
-            filter_mod = Mods.RELAX
-        elif m == 'ap':
-            filter_mod = Mods.AUTOPILOT
-        else:
-            m = 'vn'
-            filter_mod = None
+    
+    if mode == 'rx':
+        filter_mod = Mods.RELAX
+    elif mode == 'ap':
+        filter_mod = Mods.AUTOPILOT
+    else:
+        mode = 'vn'
+        filter_mod = None
 
     await p.update(filter_mod)
 
@@ -66,7 +48,8 @@ async def profile(request: Request) -> SuccessJsonResponse:
         'rank': p.rank,
         'playcount': p.playcount,
         'pp': p.pp,
-        'mode': m
+        'acc': p.acc,
+        'mode': mode,
     }
 
     return SuccessJsonResponse(response_json)
@@ -74,36 +57,19 @@ async def profile(request: Request) -> SuccessJsonResponse:
 SCORES = list[dict]
 RANKED_PLAYS = dict[str, list[dict]]
 APPROVED_PLAYS = RANKED_PLAYS
-@handler('/api/v1/tops')
-async def tops(request: Request) -> SuccessJsonResponse:
-    if (
-        not (params := request.params) or
-        'u' not in params
-    ):
-        return SuccessJsonResponse({
-            'status': 'failed',
-            'message': (
-                'please provide a profile name in parameters\n'
-                'example: http://127.0.0.1:5000/api/v1/client/tops?u=profile name'
-            )
-        })
 
-    if 'limit' not in params:
-        limit = 100
-    else:
-        limit = params['limit']
+@api.get('/tops')
+async def tops(
+    name: str = Query(urlparse.unquote_plus, Alias('u')),
+    limit: int = 100,
+    mode: str = Query(lower, Alias('m')),
+) -> SuccessJsonResponse:
 
-    if 'm' not in params:
-        filter_mod = None
-    elif (m := params['m']):
-        if m == 'vn':
-            filter_mod = Mods.NOMOD
-        else:
-            filter_mod = Mods.from_str(m)
+    if mode != 'vn':
+        filter_mod = Mods.from_str(mode)
     else:
         filter_mod = None
 
-    name: str = params['u']
     if name not in glob.profiles:
         return SuccessJsonResponse({
             'status': 'failed',
@@ -114,7 +80,7 @@ async def tops(request: Request) -> SuccessJsonResponse:
     response_json = {
         'status': 'success!',
         'name': name,
-        'mode': 'vn' if 'm' not in params else params['m'],
+        'mode': 'vn' if not filter_mod else mode,
         'plays': []
     }
 
@@ -181,39 +147,21 @@ async def tops(request: Request) -> SuccessJsonResponse:
 
     return SuccessJsonResponse(response_json)
 
-@handler('/api/v1/recent')
-async def recent(request: Request) -> SuccessJsonResponse:
-    if (
-        not (params := request.params) or
-        'u' not in params
-    ):
-        return SuccessJsonResponse({
-            'status': 'failed',
-            'message': (
-                'please provide a profile name in parameters\n'
-                'example: http://127.0.0.1:5000/api/v1/client/recent?u=profile name'
-            )
-        })
+@api.get('/recent')
+async def recent(
+    name: str = Query(urlparse.unquote_plus, Alias('u')),
+    limit: int = 100,
+    mode: str = Query(lower, Alias('m')),
+) -> SuccessJsonResponse:
 
-    name: str = params['u']
     if name not in glob.profiles:
         return SuccessJsonResponse({
             'status': 'failed',
             'message': "profile can't be found!"
         })
 
-    if 'limit' not in params:
-        limit = 100
-    else:
-        limit = params['limit']
-
-    if 'm' not in params:
-        filter_mod = None
-    elif (m := params['m']):
-        if m == 'vn':
-            filter_mod = Mods.NOMOD
-        else:
-            filter_mod = Mods.from_str(m)
+    if mode != 'vn':
+        filter_mod = Mods.from_str(mode)
     else:
         filter_mod = None
 
@@ -221,7 +169,7 @@ async def recent(request: Request) -> SuccessJsonResponse:
     response_json = {
         'status': 'success!',
         'name': name,
-        'mode': 'vn' if 'm' not in params else params['m'],
+        'mode': 'vn' if not filter_mod else mode,
         'plays': []
     }
 
@@ -303,8 +251,8 @@ async def _recalc(md5: str, score: Score) -> dict:
     return score.as_dict()
 
 ACCEPTED_PLAYS = ('ranked_plays', 'approved_plays')
-@handler('/api/v1/recalc')
-async def recalc(request: Request) -> SuccessJsonResponse:
+@api.get('/recalc')
+async def recalc() -> SuccessJsonResponse:
     # TODO: make use of the params
 
     async def background_recalc() -> None:
@@ -356,21 +304,13 @@ async def recalc(request: Request) -> SuccessJsonResponse:
         'message': 'All profiles are being calculated!'
     })
 
-@handler('/api/v1/wipe')
-async def wipe_profile(request: Request) -> SuccessJsonResponse:
-    if (
-        not (params := request.params) or
-        'u' not in params
-    ):
-        return SuccessJsonResponse({
-            'status': 'failed',
-            'message': (
-                'please provide a profile name in parameters\n'
-                'example: http://127.0.0.1:5000/api/v1/wipe?u=profile name'
-            )
-        })
+@api.get('/api/v1/wipe')
+async def wipe_profile(
+    name: str = Query(urlparse.unquote_plus, Alias('u')),
+    yes: str = ''
+) -> SuccessJsonResponse:
 
-    if 'yes' not in params:
+    if not yes:
         return SuccessJsonResponse({
             'status': '1/2 done',
             'message': (
@@ -383,13 +323,12 @@ async def wipe_profile(request: Request) -> SuccessJsonResponse:
             )
         })
 
-    if params['yes'] != 'yes':
+    if yes != 'yes':
         return SuccessJsonResponse({
             'status': 'fail',
             'message': "yes didn't equal yes!"
         })
 
-    name: str = params['u']
     if name not in glob.profiles:
         return SuccessJsonResponse({
             'status': 'failed',

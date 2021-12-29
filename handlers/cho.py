@@ -1,3 +1,4 @@
+import time
 import utils
 import config
 import packets
@@ -5,8 +6,9 @@ import asyncio
 from ext import glob
 from utils import log
 from utils import Color
-from utils import handler
-from server import Request
+from server import Alias
+from server import Query
+from server import Router
 from objects import Player
 from typing import Optional
 from server import Response
@@ -16,18 +18,47 @@ from constants import BODY
 from constants import CHANNELS
 from constants import CHO_TOKEN
 
+cho = Router((
+    '/c4', '/c5', '/c6', '/ce', '/c' # type: ignore
+))
+
 profile_name: Optional[str] = None
+parse_name = lambda n: urlparse.unquote(n).strip()
+
+@cho.get('/')
+async def cho_handler(
+    osu_token: str = ''
+) -> Response:
+    if not osu_token:
+        body: bytes
+        token: str
+        body, token = await login()
+        return Response(
+            code = 200, 
+            body = body, 
+            headers = {"cho-token": token}
+        )
+
+    if not glob.player:
+        return Response(200, packets.systemRestart())
+
+    if glob.player.queue:
+        return Response(200, glob.player.clear())
+
+    return Response(200, b'')
 
 # should be in web, but works with cho
 # to have login work "properly"
-@handler('/web/bancho_connect.php')
-async def bancho_connect(request: Request) -> Response:
+from handlers.web import web
+@web.get('/bancho_connect.php')
+async def bancho_connect(
+    username: str = Query(parse_name, Alias('u'))
+) -> Response:
     global profile_name
-    profile_name = urlparse.unquote(request.params['u']).strip()
-    log('Got a player name of', profile_name, color = Color.LIGHTBLUE_EX)
+    profile_name = username
+    log('Got a player name of', username, color = Color.LIGHTBLUE_EX)
     return Response(200, b'')
 
-@handler('login')
 async def login() -> tuple[BODY, CHO_TOKEN]:
     global profile_name
     body = bytearray()

@@ -1,4 +1,5 @@
 import os
+import re
 import utils
 import regex
 import orjson
@@ -11,51 +12,97 @@ from ext import glob
 from utils import log
 from utils import Color
 from objects import Mods
-from utils import handler
-from server import Request
-from server import Response
+from server import Query
+from server import Alias
+from typing import Union
+from server import Router
 from utils import log_error
+from server import Response
 from utils import log_success
 import urllib.parse as urlparse
 from objects import Leaderboard
 from objects import NotSupported
 from constants import ParsedParams
 from objects import DirectResponse
+from objects import LeaderboardTypes
 from objects import ModifiedLeaderboard
 
-async def DEFAULT_RESPONSE_FUNC(request: Request) -> Response:
+web = Router((
+    '/osu/web', '/osu' # type: ignore
+))
+
+async def DEFAULT_RESPONSE_FUNC() -> Response:
     return Response(200, b'')
 
 # unusable or unused handlers
 for hand in [
-    '/web/lastfm.php',
-    '/web/osu-rate.php',
-    '/web/osu-error.php',
+    '/lastfm.php',
+    '/osu-rate.php',
+    '/osu-error.php',
+    '/osu-session.php',
     '/difficulty-rating',
-    '/web/osu-session.php',
-    '/web/osu-markasread.php',
-    '/web/osu-getfriends.php',
-    '/web/osu-getbeatmapinfo.php'
+    '/osu-markasread.php',
+    '/osu-getfriends.php',
+    '/osu-getbeatmapinfo.php'
 ]:
-    handler(hand)(DEFAULT_RESPONSE_FUNC)
+    web.get(hand)(DEFAULT_RESPONSE_FUNC)
 
 OSU_API_BASE = 'https://osu.ppy.sh/api'
 
-@handler(regex.screenshot_web_path)
-async def web_screenshot(request: Request) -> Response:
+@web.get(re.compile(r'\/ss\/(?P<link>.*)'))
+async def get_ss(link: str) -> Response:
     return Response(
         code = 301,
         body = b'',
-        headers = {'Location': request.args['link']}
+        headers = {'Location': link}
     )
 
-@handler('/web/osu-screenshot.php')
-async def osu_screenshots(request: Request) -> Response:
+@web.get(re.compile(r'(?P<full_path>\/(beatmaps|beatmapsets)\/.*)'))
+async def bmap_web(full_path: str) -> Response:
+    return Response(
+        code = 301,
+        body = b'',
+        headers = {'Location': f'https://osu.ppy.sh/{full_path}'}
+    )
+
+BASE_URL = 'https://beatconnect.io'
+@web.get(re.compile(r'/d/(?P<setid>[-0-9]*)'))
+async def get_osz(setid: int) -> Response:
+    if setid == -1 and glob.current_cmd:
+        cmd = glob.current_cmd
+        await cmd.func(*cmd.args)
+        cmd.args = []
+        glob.current_cmd = None
+        return Response(200, b'')
+    
+    if setid == -1:
+        return Response(200, b'')
+
+    url = f'{BASE_URL}/b/{setid}'
+    async with glob.http.get(url) as resp:
+        if (
+            not resp or
+            resp.status != 200 or
+            not (osz_binary := await resp.content.read())
+        ):
+            log_success(f"can't downloaded map set, id: {setid}")
+            return Response(200, b'')
+
+    log_success(f'succesfully downloaded map set, id: {setid}')
+    return Response(
+        code = 200,
+        body = osz_binary,
+    )
+
+@web.get('/osu-screenshot.php')
+async def osu_screenshots() -> Response:
     if not glob.screenshot_folder:
         return Response(200, b'error: no')
 
-    screenshots = glob.screenshot_folder.glob('*')
-    latest_screenshot = glob.screenshot_folder / max(screenshots, key=os.path.getctime)
+    latest_screenshot = glob.screenshot_folder / max(
+        glob.screenshot_folder.glob('*'), 
+        key = os.path.getctime
+    )
 
     if not glob.imgur:
         return Response(200, str(latest_screenshot))
@@ -68,28 +115,18 @@ async def osu_screenshots(request: Request) -> Response:
     pyperclip.copy(uploaded_image.link)
     return Response(200, uploaded_image.link.encode())
 
-@handler(regex.bmap_web_path)
-async def bmap_web(request: Request) -> Response:
-    return Response(
-        code = 301,
-        body = b'',
-        headers = {'Location': f'https://osu.ppy.sh/{request.path[5:]}'}
-    )
-
 REMINDER = None
 DEFAULT_CHARTS = '\n'.join([
     "beatmapId:0|beatmapSetId:0|beatmapPlaycount:0|beatmapPasscount:0|approvedDate:0",
     "chartId:beatmap|chartUrl:https://osu.ppy.sh/b/0|chartName:Beatmap Ranking|rankBefore:|rankAfter:0|maxComboBefore:|maxComboAfter:0|accuracyBefore:|accuracyAfter:0|rankedScoreBefore:|rankedScoreAfter:0|ppBefore:|ppAfter:0|onlineScoreId:0",
     "chartId:overall|chartUrl:https://osu.ppy.sh/u/2|chartName:Overall Ranking|rankBefore:0|rankAfter:0|rankedScoreBefore:0|rankedScoreAfter:0|totalScoreBefore:0|totalScoreAfter:0|maxComboBefore:0|maxComboAfter:0|accuracyBefore:0|accuracyAfter:0|ppBefore:0|ppAfter:0|achievements-new:|onlineScoreId:0"
 ]).encode()
-@handler('/web/osu-submit-modular-selector.php')
-async def score_sub(request: Request) -> Response:
+
+@web.get('/osu-submit-modular-selector.php')
+async def score_sub() -> Response:
     global REMINDER
-    if (
-        not glob.player or
-        not glob.current_profile
-    ):
-        return Response(200, b"error: no")
+    if not glob.player:
+        return Response(404, b'')
 
     if REMINDER is None:
         glob.player.queue += packets.notification((
@@ -117,8 +154,8 @@ async def score_sub(request: Request) -> Response:
     log_success(f"{glob.player.name}'s playcount increased!")
     return Response(200, DEFAULT_CHARTS)
 
-@handler('/web/osu-getseasonal.php')
-async def get_bgs(request: Request) -> Response:
+@web.get('/osu-getseasonal.php')
+async def get_bgs() -> Response:
     if config.seasonal_bgs is None:
         bgs = b'[""]'
     else:
@@ -126,15 +163,16 @@ async def get_bgs(request: Request) -> Response:
 
     return Response(200, bgs)
 
-@handler('/web/osu-getreplay.php')
-async def get_replay(request: Request) -> Response:
-    scoreid = request.params['c']
-
+@web.get('/osu-getreplay.php')
+async def get_replay(
+    scoreid: int = Alias('c'),
+    mode: int = Alias('m')
+) -> Response:
     if scoreid > 0:
         params = {
             'k': config.osu_api_key,
-            's': request.params['c'],
-            'm': request.params['m']
+            's': scoreid,
+            'm': mode
         }
         async with glob.http.get(
             url = f'{OSU_API_BASE}/get_replay',
@@ -178,36 +216,43 @@ async def get_replay(request: Request) -> Response:
         log_error('error handling replay')
         return Response(200, b'error: no')
 
-NOT_SUPPORTED = NotSupported().as_binary
+NOT_SUPPORTED = bytes(NotSupported())
 
-@handler('/web/osu-osz2-getscores.php')
-async def leaderboard(request: Request) -> Response:
+@web.get('/osu-osz2-getscores.php')
+async def leaderboard(
+    mods: Mods,
+    mode: int = Alias('m'),
+    rank_type: LeaderboardTypes = Alias('v'),
+    filename: str = Query(urlparse.unquote_plus, Alias('f')),
+    setid: int = Alias('i'),
+    md5: str = Alias('c')
+) -> Response:
     if not glob.player:
         return Response(404, b'')
 
-    mode = request.params['m']
-    rank_type = request.params['v']
+    valid_rank_types = (
+        LeaderboardTypes.LOCAL, 
+        LeaderboardTypes.TOP, 
+        LeaderboardTypes.MODS
+    )
 
     supported = (
         mode == 0 and
-        rank_type in (0, 1, 2)
+        rank_type in valid_rank_types
     )
 
     if not supported:
         return Response(200, NOT_SUPPORTED)
 
     parsed_params = ParsedParams(
-        filename = urlparse.unquote_plus(request.params['f']),
-        mods = request.params['mods'],
+        filename = filename,
+        mods = mods,
         mode = mode,
         rank_type = rank_type,
-        set_id = request.params['i'],
-        md5 = request.params['c'],
+        set_id = setid,
+        md5 = md5,
         name_data =  None
     )
-
-    filename = parsed_params['filename']
-    mods = request.params['mods']
 
     if mods & Mods.RELAX:
         if (
@@ -218,7 +263,7 @@ async def leaderboard(request: Request) -> Response:
             glob.invalid_mods = (
                 Mods.AUTOPILOT | Mods.AUTOPLAY |
                 Mods.CINEMA | Mods.TARGET
-            )._value_
+            )
             glob.player.queue += packets.notification(
                 'Mode was switched to rx!'
             )
@@ -232,7 +277,7 @@ async def leaderboard(request: Request) -> Response:
             glob.invalid_mods = (
                 Mods.RELAX | Mods.AUTOPLAY |
                 Mods.CINEMA | Mods.TARGET
-            )._value_
+            )
             glob.player.queue += packets.notification(
                 'Mode was switched to ap!'
             )
@@ -244,7 +289,7 @@ async def leaderboard(request: Request) -> Response:
                 Mods.AUTOPILOT | Mods.RELAX |
                 Mods.AUTOPLAY | Mods.CINEMA |
                 Mods.TARGET
-            )._value_
+            )
             glob.player.queue += packets.notification(
                 'Mode was switched to vanilla!'
             )
@@ -272,45 +317,14 @@ async def leaderboard(request: Request) -> Response:
             parsed_params['name_data'] = name_data
 
         if any(regex_results):
-            lb = await ModifiedLeaderboard.from_client(parsed_params) # type: ignore
-            log_success(f'handled funorange map of {parsed_params["filename"]}')
+            lb = await ModifiedLeaderboard.from_client(parsed_params)
+            log_success(f'handled funorange map of {filename}')
         else:
-            log_success(f'handled bancho(?) map of {parsed_params["filename"]}')
+            log_success(f'handled bancho(?) map of {filename}')
     else:
-        log_success(f'handled map of setid: {parsed_params["set_id"]}')
+        log_success(f'handled map of setid: {setid}')
 
     return Response(200, lb.as_binary)
-
-BASE_URL = 'https://beatconnect.io'
-@handler(regex.download_web_path)
-async def download(request: Request) -> Response:
-    setid = request.args['setid']
-    
-    if setid == '-1' and glob.current_cmd:
-        cmd = glob.current_cmd
-        await cmd.func(*cmd.args)
-        cmd.args = []
-        glob.current_cmd = None
-        return Response(200, b'')
-    
-    if setid == '-1':
-        return Response(200, b'')
-
-    url = f'{BASE_URL}/b/{setid}'
-    async with glob.http.get(url) as resp:
-        if (
-            not resp or
-            resp.status != 200 or
-            not (osz_binary := await resp.content.read())
-        ):
-            log_success(f"can't downloaded map set, id: {setid}")
-            return Response(200, b'')
-
-    log_success(f'succesfully downloaded map set, id: {setid}')
-    return Response(
-        code = 200,
-        body = osz_binary,
-    )
 
 DIRECT_TO_API_STATUS = {
     0: 'ranked',
@@ -323,6 +337,7 @@ DIRECT_TO_API_STATUS = {
 }
 
 DIRECT_TO_MIRROR_MODE = {
+    -1: '',
     0: 'std',
     1: 'taiko',
     2: 'ctb',
@@ -335,16 +350,27 @@ COMMAND_NOT_FOUND = DirectResponse.from_str(
     'command not found!'
 ).as_binary
 
-@handler('/web/osu-search.php')
-async def direct(request: Request) -> Response:
-    query = urlparse.unquote_plus(request.params['q'])
+convert_param_mode_to_api = lambda x: DIRECT_TO_MIRROR_MODE[x]
+convert_param_rankstatus_to_api = lambda x: DIRECT_TO_API_STATUS[x]
+
+@web.get('/osu-search.php')
+async def direct(
+    query: str = Query(urlparse.unquote_plus, Alias('q')),
+    mode: str = Query(convert_param_mode_to_api, Alias('m')),
+    ranking_status: str = Query(convert_param_rankstatus_to_api, Alias('r'))
+) -> Response:
     if query.startswith(config.command_prefix):
-        cmd, *args = query.split()
-        cmd = cmd.removeprefix(config.command_prefix)
+        query_no_prefix = query.removeprefix(config.command_prefix)
+        split = query_no_prefix.split()
         
-        if cmd not in glob.commands:
+        if (
+            not split or
+            split[0] not in glob.commands
+        ):
             return Response(200, COMMAND_NOT_FOUND)
         
+        cmd, *args = split
+
         command = glob.commands[cmd]
         
         if command.confirm_with_user:
@@ -376,18 +402,17 @@ async def direct(request: Request) -> Response:
         )
         return Response(200, b'0')
 
-    beatconnect_params = {
-        'token': config.beatconnect_api_key,
+    beatconnect_params: dict[str, Union[int, str]] = {
+        'token': config.beatconnect_api_key
     }
-    client_params = request.params
 
     if query not in ("Newest", "Top Rated", "Most Played"):
         beatconnect_params['q'] = query
 
-    if client_params['m'] != -1:
-        beatconnect_params['m'] = DIRECT_TO_MIRROR_MODE[client_params['m']]
+    if mode != -1:
+        beatconnect_params['m'] = mode
 
-    beatconnect_params['s'] = DIRECT_TO_API_STATUS[client_params['r']]
+    beatconnect_params['s'] = ranking_status
 
     try:
         async with glob.http.get(

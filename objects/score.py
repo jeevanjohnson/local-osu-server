@@ -7,6 +7,7 @@ import binascii
 from ext import glob
 from typing import Any
 from typing import Union
+from pathlib import Path
 from typing import Optional
 from datetime import datetime
 from objects.mods import Mods
@@ -157,6 +158,31 @@ class Score:
         return Score(**dictionary)
 
     @classmethod
+    def from_replay(cls, replay: Path) -> 'Score':
+        parsed_replay = Replay.from_file(replay)
+
+        return Score(
+            mode = parsed_replay.mode,
+            md5 = parsed_replay.beatmap_md5,
+            name = parsed_replay.player_name,
+            n300 = parsed_replay.n300,
+            n100 = parsed_replay.n100,
+            n50 = parsed_replay.n50,
+            ngeki = parsed_replay.ngeki,
+            nkatu = parsed_replay.nkatu,
+            nmiss = parsed_replay.nmiss,
+            score = parsed_replay.total_score,
+            max_combo = parsed_replay.combo,
+            perfect = parsed_replay.perfect,
+            mods = parsed_replay.mods,
+            time = int(time.time()),
+            replay_md5 = parsed_replay.replay_md5,
+            replay_frames = parsed_replay.raw_frames,
+            mods_str = repr(parsed_replay.mods),
+            replay = parsed_replay
+        )
+
+    @classmethod
     def from_score_sub(cls) -> Optional['Score']:
         if (
             not glob.player or
@@ -166,7 +192,7 @@ class Score:
 
         files = glob.replay_folder.glob('*.osr')
         replay_path = glob.replay_folder / max(files , key=os.path.getctime)
-        replay = Replay.from_file(str(replay_path))
+        replay = Replay.from_file(replay_path)
 
         s = cls(
             glob.player.mode, replay.beatmap_md5, replay.player_name, # type: ignore

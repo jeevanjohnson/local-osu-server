@@ -16,7 +16,10 @@ APPROVED_PLAYS = RANKED_PLAYS
 OSU_DAILY_API = 'https://osudaily.net/api'
 
 class Player:
-    def __init__(self, name: str, from_login: bool = False) -> None:
+    def __init__(
+        self, name: str, 
+        from_login: bool = False
+    ) -> None:
         self.name = name
         self.from_login = from_login
         if (
@@ -26,7 +29,6 @@ class Player:
             self.init_db()
 
         self.queue = bytearray()
-        self.login_time = time.time()
 
         self.rank: int = 9999999
         self.acc: float = 0.0

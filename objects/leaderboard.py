@@ -80,6 +80,9 @@ class Leaderboard:
         self.bmap: Optional[Beatmap] = None
         self.personal_score: Optional[Score] = None
 
+    def __bytes__(self) -> bytes:
+        return self.as_binary
+
     @property
     def lb_base_fmt(self) -> Optional[bytes]:
         if not self.bmap:
