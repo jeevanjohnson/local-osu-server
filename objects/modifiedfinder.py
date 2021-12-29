@@ -165,7 +165,7 @@ class ModifiedFinder:
             elif ratio < 94.5:
                 while ratio < 94.5:
                     ratio += 0.01
-        
+
         return ratio
 
     def get_original_md5(self) -> Optional[MD5]:

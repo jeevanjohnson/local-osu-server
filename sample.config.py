@@ -70,9 +70,7 @@ disable_funorange_maps: bool = False
 # if `None` then leaderboards won't load nor score submission
 osu_api_key: Optional[str] = ''
 
-# TODO: probably gonna remove this and
-# find a way to just copy the image into your clip board
-# but if u want ur screenshots to be uploaded
+# if u want ur screenshots to be uploaded
 # get your client id here https://api.imgur.com/
 # if `None` it won't upload screenshots
 imgur_client_id: Optional[str] = ''

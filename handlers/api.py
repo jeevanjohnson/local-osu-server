@@ -252,11 +252,25 @@ async def _recalc(md5: str, score: Score) -> dict:
 
 ACCEPTED_PLAYS = ('ranked_plays', 'approved_plays')
 @api.get('/recalc')
-async def recalc() -> SuccessJsonResponse:
-    # TODO: make use of the params
+async def recalc(
+    name: str = Query(urlparse.unquote_plus, Alias('u'))
+) -> SuccessJsonResponse:
+    
+    if (
+        name != 'all' and 
+        name not in glob.profiles
+    ):
+        return SuccessJsonResponse({
+            'status': 'fail',
+            'message': 'invalid name'
+        })
 
     async def background_recalc() -> None:
-        profiles = glob.profiles
+        if name == 'all':
+            profiles = glob.profiles
+        else:
+            profiles = [glob.profiles[name]]
+        
         for index_of_profile, profile_name in enumerate(profiles):
             log(
                 f'{index_of_profile}/{len(profiles)}', 'profiles calculated.',

@@ -181,10 +181,10 @@ async def stats(
     
     msg = (
         f"name: {json['name']}\n"
-        f"rank: {json['rank']}\n"
+        f"rank: #{json['rank']}\n"
         f"playcount: {json['playcount']}\n"
         f"pp: {json['pp']}\n"
-        f"acc: {json['acc']:.2f}\n"
+        f"acc: {json['acc']:.2f}%\n"
         f"mode: {json['mode']}"
     )
     return DirectResponse.from_str(msg)
@@ -196,7 +196,9 @@ async def stats(
 )
 async def recalc() -> None:
 
-    await run_recalc()
+    await run_recalc(
+        name = glob.player.name # type: ignore
+    )
     glob.player.queue += packets.notification( # type: ignore
         "Stats will be updated once recalculation is finished!"
     )
