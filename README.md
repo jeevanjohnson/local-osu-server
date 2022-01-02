@@ -18,8 +18,6 @@ Why do I even care for this server? Well when I got restricted on osu! back in 2
 coming soon
 
 # Reminders
-You may have to edit your `config.py` file a bit if `sample.config.py` gets some changes with incoming updates. 
-
 Any unknown errors you see when setting up or just playing, please report them to me on discord `cover#0675` :)
 
 To make/play with different profiles, when logging in be sure to put the username of the profile you want to play/make and it will automaticly make/go onto the profile.
