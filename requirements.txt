@@ -1,11 +1,8 @@
-borgor
 orjson
 aiohttp
-pipreqs
 pyimgur
 colorama
 pyttanko
 pydantic
 colorama
 pyperclip
-pythonnet
