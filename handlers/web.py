@@ -3,7 +3,6 @@ import re
 import utils
 import regex
 import orjson
-import config
 import aiohttp
 import packets
 import asyncio
@@ -156,10 +155,10 @@ async def score_sub() -> Response:
 
 @web.get('/osu-getseasonal.php')
 async def get_bgs() -> Response:
-    if config.seasonal_bgs is None:
+    if not glob.config.seasonal_bgs:
         bgs = b'[""]'
     else:
-        bgs = orjson.dumps(config.seasonal_bgs)
+        bgs = orjson.dumps(glob.config.seasonal_bgs)
 
     return Response(200, bgs)
 
@@ -170,7 +169,7 @@ async def get_replay(
 ) -> Response:
     if scoreid > 0:
         params = {
-            'k': config.osu_api_key,
+            'k': glob.config.osu_api_key,
             's': scoreid,
             'm': mode
         }
@@ -295,13 +294,13 @@ async def leaderboard(
             )
             asyncio.create_task(glob.player.update(glob.mode))
 
-    if config.osu_api_key:
+    if glob.config.osu_api_key:
         lb = await Leaderboard.from_bancho(parsed_params)
     else:
         lb = await Leaderboard.from_offline(parsed_params)
 
     valid_bmap = lb.bmap and lb.bmap.approved in (1, 2, 3, 4)
-    if not valid_bmap and not config.disable_funorange_maps:
+    if not valid_bmap and not glob.config.disable_funorange_maps:
         regex_results = [
             r.search(filename)
             for r in regex.modified_regexes
@@ -359,8 +358,8 @@ async def direct(
     mode: str = Query(convert_param_mode_to_api, Alias('m')),
     ranking_status: str = Query(convert_param_rankstatus_to_api, Alias('r'))
 ) -> Response:
-    if query.startswith(config.command_prefix):
-        query_no_prefix = query.removeprefix(config.command_prefix)
+    if query.startswith(glob.config.command_prefix):
+        query_no_prefix = query.removeprefix(glob.config.command_prefix)
         split = query_no_prefix.split()
         
         if (
@@ -396,14 +395,14 @@ async def direct(
             else:
                 return Response(200, b'0')
 
-    if not config.beatconnect_api_key:
+    if not glob.config.beatconnect_api_key:
         utils.add_to_player_queue(
             packets.notification("No api key given for direct!")
         )
         return Response(200, b'0')
 
     beatconnect_params: dict[str, Union[int, str]] = {
-        'token': config.beatconnect_api_key
+        'token': glob.config.beatconnect_api_key
     }
 
     if query not in ("Newest", "Top Rated", "Most Played"):

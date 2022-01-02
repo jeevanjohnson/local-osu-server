@@ -290,7 +290,7 @@ class ModifiedFinder:
                 self.funorange_map_path = file_path
 
                 if glob.using_wsl:
-                    self.funorange_map_path = await utils.str_to_wslpath(
+                    self.funorange_map_path = await utils.async_str_to_wslpath(
                         path = str(file_path)
                     )
 

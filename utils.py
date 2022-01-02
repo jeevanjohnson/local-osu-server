@@ -1,6 +1,7 @@
 import base64
 import asyncio
 import colorama
+import subprocess
 import pyttanko as oppai
 from typing import Union
 from pathlib import Path
@@ -8,6 +9,7 @@ from colorama import Fore
 from typing import Literal
 from typing import Optional
 from typing import TYPE_CHECKING
+from objects.config import Config
 
 if TYPE_CHECKING:
     from objects import Score
@@ -126,7 +128,7 @@ def bytes_to_string(b: bytes) -> str:
 def string_to_bytes(s: str) -> bytes:
     return base64.b64decode(s.encode('ascii'))
 
-async def str_to_wslpath(path: str) -> Path:
+async def async_str_to_wslpath(path: str) -> Path:
     wslpath_proc = await asyncio.subprocess.create_subprocess_exec(
         'wslpath', path,
         stdin = asyncio.subprocess.DEVNULL,
@@ -136,6 +138,14 @@ async def str_to_wslpath(path: str) -> Path:
     stdin, _ = await wslpath_proc.communicate()
 
     return Path(stdin.decode().removesuffix('\n'))
+
+def str_to_wslpath(path: str) -> Path:
+    process = subprocess.run(
+        f'wslpath {path}',
+        stdout = subprocess.PIPE,
+        stderr = subprocess.DEVNULL,
+    )
+    return Path(process.stdout.decode().removesuffix('\n'))
 
 def delete_keys(_dict: dict, *keys: str) -> dict:
     _dict_copy = _dict.copy()
@@ -193,3 +203,145 @@ def get_grade(
         return 'C'
 
     return 'D'
+
+def altered_input(prompt: str, lower: bool = False) -> str:
+    if lower:
+        return input(prompt).strip().lower()
+    
+    return input(prompt).strip()
+
+def bool_input(prompt: str) -> bool:
+    return altered_input(prompt, lower = True).startswith('y')
+
+def setup_config() -> Config:
+    config = Config()
+
+    print('remember to continue click enter!')
+    for prompt, key in (
+        ('Please enter your osu! folder path\n>> ', 'osu_path'),
+        ('Please enter your songs folder path\nnote you can type `None` if your songs folder is in your osu! folder\n>> ', 'songs'),
+        ('Please enter your replay folder path\nnote you can type `None` if your replay folder is in your osu! folder\n>> ', 'replay'),
+        ('Please enter your screenshots folder path\nnote you can type `None` if your screenshots folder is in your osu! folder\n>> ', 'screenshots')
+    ):
+        while True:
+            raw_input = altered_input(prompt)
+
+            if raw_input == 'None':
+                config.paths[key] = None
+                break
+            
+            path_str = Path(raw_input)
+            
+            if glob.using_wsl:
+                path_str = str_to_wslpath(str(path_str))
+            
+            if not path_str.exists():
+                input('invalid path!\nclick enter to continue')
+                continue
+                
+            config.paths[key] = str(path_str)
+            break
+
+    config.pp_leaderboard = bool_input(
+        '(yes or no)\n'
+        'Show pp values for each score on leaderboard (PP leaderboards)\n'
+        'WARNING REALLY SLOW RIGHT NOW SO PLEASE ENTER N\n>> '
+    )
+    config.ping_user_when_recent_score = bool_input(
+        '(yes or no)\n'
+        'Highlight me when I submit any score\n>> '
+    )
+    
+    if bool_input('(yes or no)\nmenu icon?\n>> '):
+        config.menu_icon['image_link'] = altered_input(
+            'image link\n>> '
+        )
+        config.menu_icon['click_link'] = altered_input(
+            'click link\n>> '
+        )
+    
+    config.command_prefix = altered_input(
+        'command prefix\ndefault: !\n>> ',
+        lower = True
+    ) or '!'
+
+    config.show_pp_for_personal_best = bool_input(
+        '(yes or no)\n'
+        'Show pp for personal best (fast)\n>> '
+    )
+
+    while True: 
+        try:
+            config.amount_of_scores_on_lb = int(input(
+                'Number of scores shown on leaderboard\nmaximum: 100\n>> '
+            ))
+            break
+        except:
+            continue
+    
+    config.auto_update = bool_input(
+        '(yes or no)\n'
+        'Enable auto updater?\n>> '
+    )
+
+    config.disable_funorange_maps = bool_input(
+        '(yes or no)\n'
+        'Disable osu!trainer (funorange) maps?\n>> '
+    )
+
+    config.seasonal_bgs = altered_input(
+        'Seasonal Backgrounds! (Ingame backgrounds)\n'
+        'To apply just paste the link to a background\n'
+        'To have multiple seperate each link with a comma\n'
+        'To have non just click enter\n'
+        '>> '
+    ).split(',')
+
+    osu_api_doc = (
+        'osu! api key\n'
+        'Needed throughout the whole server really\n'
+        'You can find your api key here https://old.ppy.sh/p/api/\n'
+        "Type `None` if you can't get one (server won't really be able to function)"
+    )
+    imgur_doc = (
+        'Imgur client id\n'
+        'If u want your screenshots to be uploaded to imgur when "shift + screenshot_key"\n'
+        'You will have to provide a client id which you can find here https://api.imgur.com/\n'
+        "Type `None` if you don't want screenshots to be uploaded"
+    )
+    osu_daily_api_doc = (
+        'osu! daily api key\n'
+        'If you want your bancho rank to show up ingame\n'
+        'you will need this api key which you can find here https://github.com/Adrriii/osudaily-api/wiki\n'
+        'Type `None` if you want your rank to show as 1 the whole time'    
+    )
+    beatconnect_doc = (
+        'beatconnect api key\n'
+        'If you want direct working this is needed\n'
+        'Sign up for a key right here https://beatconnect.io/accounts/privatesignup/\n'
+        'Type `None` if you want direct/bmap downloading not to work'
+    )
+
+    for prompt, key in (
+        (osu_api_doc, 'osu_api_key'),
+        (imgur_doc, 'imgur_client_id'),
+        (osu_daily_api_doc, 'osu_daily_api_key'),
+        (beatconnect_doc, 'beatconnect_api_key')
+    ):
+        while True:
+            value = altered_input(f'{prompt}\n>> ')
+            if value == 'None':
+                config.__dict__[key] = None
+                break
+        
+            if (
+                key in ('osu_api_key', 'osu_daily_api_key', 'beatconnect_api_key') and 
+                len(value) < 32
+            ):
+                input('invalid api key\nclick enter to retry')
+                continue
+
+            config.__dict__[key] = value
+            break
+    
+    return config

@@ -8,17 +8,10 @@ Main purpose of this server is that it can replicate the bancho like experiences
 Why do I even care for this server? Well when I got restricted on osu! back in 2018, I wanted to feel the bancho experience like gaining ranks and such without breaking rules while being restricted, that same idea came back to me this year (2021) and now that I have the knowledge I can finally bring that to reality.
 
 # Windows Setup
-1. Install python, specifically [python3.9.5](https://www.python.org/downloads/release/python-395/)!
-2. You may need to uninstall python3.10 from your system, due to unstableness
+1. Install python, specifically [python3.9.5](https://www.python.org/downloads/release/python-395/)! [64-bit download](https://www.python.org/ftp/python/3.9.5/python-3.9.5-amd64.exe), [32-bit download](https://www.python.org/ftp/python/3.9.5/python-3.9.5.exe) 
+2. You will most likely need to uninstall python3.10 from your system, due to instability
 3. Download [the code](https://github.com/coverosu/local-osu-server/archive/refs/heads/main.zip) and extract to a folder
-4. Open up command prompt
-5. Type and enter the following
-```
-cd "replace_this_text_with_the_folder_directory_of_the_server_you_just_installed"
-python -m pip install -r requirements.txt
-```
-6. You'll have to edit the config file provided, read through it to fully setup the server (most important information you will want to fill in is `osu_api_key`, `osu_daily_api_key`, and your paths!)
-7. just run `main.py` with the following command `./main.py` and you should be good to go!
+4. Open the folder and double click the `main.py` file, from there the rest of the instructions are there for you to read and you should be good to go! (Note: most important information you will want to fill in is the paths, osu api key, and osu daily api key!)
 
 
 # Linux Setup

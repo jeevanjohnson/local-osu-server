@@ -1,5 +1,4 @@
 import orjson
-import config
 import packets
 from ext import glob
 from objects import Mods
@@ -61,7 +60,7 @@ async def help() -> DirectResponse:
             continue
         
         alias = ' / '.join([
-            f"{config.command_prefix}{n}" for n in cmd.names
+            f"{glob.config.command_prefix}{n}" for n in cmd.names
         ])
 
         if cmd.docs:
@@ -225,7 +224,7 @@ async def wipe() -> None:
 
 AVATAR_DOCS = (
     "change current profile's avatar! / "
-    f"example: {config.command_prefix}avatar (path or link to image here)"
+    f"example: {glob.config.command_prefix}avatar (path or link to image here)"
 )
 
 @command(
@@ -239,4 +238,6 @@ async def avatar(img: str) -> None:
         f'avatar was changed to: {img}\n'
         'restart your game for image to show!'
     )
-    return 
+    return
+
+# TODO: have the ability to update config through commands

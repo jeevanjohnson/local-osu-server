@@ -1,6 +1,5 @@
 import time
 import utils
-import config
 from ext import glob
 from typing import Union
 from typing import Optional
@@ -114,7 +113,7 @@ class Leaderboard:
 
         if self.personal_score:
             if self.personal_score not in self.scores:
-                num_on_lb = config.amount_of_scores_on_lb + 1
+                num_on_lb = glob.config.amount_of_scores_on_lb + 1
             else:
                 num_on_lb = self.scores.index(self.personal_score) + 1
             
@@ -132,9 +131,9 @@ class Leaderboard:
             idx += 1
             
             if idx == 1:
-                if config.show_pp_for_personal_best:
+                if glob.config.show_pp_for_personal_best:
                     enabled = True
-                    config.show_pp_for_personal_best = False
+                    glob.config.show_pp_for_personal_best = False
                 else:
                     enabled = False
             
@@ -146,7 +145,7 @@ class Leaderboard:
                 buffer += b'\n'
         
         if enabled:
-            config.show_pp_for_personal_best = True
+            glob.config.show_pp_for_personal_best = True
 
         return bytes(buffer)
 
@@ -167,7 +166,7 @@ class Leaderboard:
             not glob.player or
             not glob.current_profile
         ):
-            lb.scores = lb.scores[:config.amount_of_scores_on_lb]
+            lb.scores = lb.scores[:glob.config.amount_of_scores_on_lb]
             return lb
 
         key = 'qualified_plays'
@@ -176,11 +175,11 @@ class Leaderboard:
         glob.current_profile['plays'][key]
 
         if not _player_scores:
-            lb.scores = lb.scores[:config.amount_of_scores_on_lb]
+            lb.scores = lb.scores[:glob.config.amount_of_scores_on_lb]
             return lb
 
         if md5 not in _player_scores:
-            lb.scores = lb.scores[:config.amount_of_scores_on_lb]
+            lb.scores = lb.scores[:glob.config.amount_of_scores_on_lb]
             return lb
 
         player_scores = _player_scores[md5].copy()
@@ -193,7 +192,7 @@ class Leaderboard:
                 not x['mods'] & (Mods.RELAX | Mods.AUTOPILOT)
             ]
 
-        if config.pp_leaderboard or glob.mode:
+        if glob.config.pp_leaderboard or glob.mode:
             player_scores.sort(key = lambda s: s['pp'], reverse = True)
         else:
             player_scores.sort(key = lambda s: s['score'], reverse = True)
@@ -201,7 +200,7 @@ class Leaderboard:
         if rank_type == MODS:
             player_scores = [x for x in player_scores if x['mods'] & mods]
             if not player_scores:
-                lb.scores = lb.scores[:config.amount_of_scores_on_lb]
+                lb.scores = lb.scores[:glob.config.amount_of_scores_on_lb]
                 return lb
 
             player_score = Score.from_dict(player_scores[0])
@@ -210,7 +209,7 @@ class Leaderboard:
 
         lb.scores.append(player_score)
 
-        if config.pp_leaderboard:
+        if glob.config.pp_leaderboard:
             lb.scores.sort(
                 key = lambda s: int(s.pp), # type: ignore
                 reverse = True
@@ -225,7 +224,7 @@ class Leaderboard:
             lb.scores.remove(player_score)
 
         lb.personal_score = player_score
-        lb.scores = lb.scores[:config.amount_of_scores_on_lb]
+        lb.scores = lb.scores[:glob.config.amount_of_scores_on_lb]
         return lb
 
     @classmethod
@@ -239,17 +238,17 @@ class Leaderboard:
 
         lb.bmap = bmap = await Beatmap.from_md5(md5)
         if not bmap:
-            lb.scores = lb.scores[:config.amount_of_scores_on_lb]
+            lb.scores = lb.scores[:glob.config.amount_of_scores_on_lb]
             return lb
 
         ranked_status = FROM_API_TO_SERVER_STATUS[bmap.approved]
         if ranked_status not in VALID_LB_STATUESES:
-            lb.scores = lb.scores[:config.amount_of_scores_on_lb]
+            lb.scores = lb.scores[:glob.config.amount_of_scores_on_lb]
             return lb
 
-        if config.osu_api_key:
+        if glob.config.osu_api_key:
             params = {
-                'k': config.osu_api_key,
+                'k': glob.config.osu_api_key,
                 'b': bmap.beatmap_id,
                 'limit': 100
             }
@@ -266,7 +265,7 @@ class Leaderboard:
         else:
             scores: list[SCORE] = []
 
-        if config.pp_leaderboard:
+        if glob.config.pp_leaderboard:
             await bmap.get_file()
             scores.sort(
                 key = lambda s: utils.calculator(s, bmap)[0],
@@ -278,7 +277,7 @@ class Leaderboard:
             not glob.player or
             not glob.current_profile
         ):
-            lb.scores = lb.scores[:config.amount_of_scores_on_lb]
+            lb.scores = lb.scores[:glob.config.amount_of_scores_on_lb]
             return lb
 
         key = f'{status_to_db[bmap.approved]}_plays'
@@ -287,11 +286,11 @@ class Leaderboard:
         glob.current_profile['plays'][key]
 
         if not _player_scores:
-            lb.scores = lb.scores[:config.amount_of_scores_on_lb]
+            lb.scores = lb.scores[:glob.config.amount_of_scores_on_lb]
             return lb
 
         if md5 not in _player_scores:
-            lb.scores = lb.scores[:config.amount_of_scores_on_lb]
+            lb.scores = lb.scores[:glob.config.amount_of_scores_on_lb]
             return lb
 
         player_scores = _player_scores[md5]
@@ -306,10 +305,10 @@ class Leaderboard:
             ]
 
         if not player_scores:
-            lb.scores = lb.scores[:config.amount_of_scores_on_lb]
+            lb.scores = lb.scores[:glob.config.amount_of_scores_on_lb]
             return lb
 
-        if config.pp_leaderboard or glob.mode:
+        if glob.config.pp_leaderboard or glob.mode:
             player_scores.sort(key = lambda s: s['pp'], reverse = True)
         else:
             player_scores.sort(key = lambda s: s['score'], reverse = True)
@@ -317,7 +316,7 @@ class Leaderboard:
         if rank_type == MODS:
             player_scores = [x for x in player_scores if x['mods'] == mods]
             if not player_scores:
-                lb.scores = lb.scores[:config.amount_of_scores_on_lb]
+                lb.scores = lb.scores[:glob.config.amount_of_scores_on_lb]
                 return lb
 
             player_score = Score.from_dict(player_scores[0])
@@ -326,7 +325,7 @@ class Leaderboard:
 
         lb.scores.append(player_score)
 
-        if config.pp_leaderboard:
+        if glob.config.pp_leaderboard:
             lb.scores.sort(
                 key = lambda s: int(s.pp), # type: ignore
                 reverse = True
@@ -341,7 +340,7 @@ class Leaderboard:
             lb.scores.remove(player_score)
 
         lb.personal_score = player_score
-        lb.scores = lb.scores[:config.amount_of_scores_on_lb]
+        lb.scores = lb.scores[:glob.config.amount_of_scores_on_lb]
         return lb
 
 class NotSupported(Leaderboard):

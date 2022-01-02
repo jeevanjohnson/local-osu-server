@@ -1,7 +1,7 @@
 # don't touch this file just leave it here 
 # for updater lol
 
-version = '1.5.1'
+version = '1.5.5'
 
 file_structure = ['.gitignore',
  'commands.py',
@@ -29,6 +29,7 @@ file_structure = ['.gitignore',
  'objects/replay.py',
  'objects/score.py',
  'objects/__init__.py',
+ 'objects/config.py',
  'packets.py',
  'queries.py',
  'README.md',
@@ -53,4 +54,5 @@ deleted_files = [
     'menus/main_menu.py',
     'menus/__init__.py',
     'objects/menu.py',
+    'sample.config.py',
 ]

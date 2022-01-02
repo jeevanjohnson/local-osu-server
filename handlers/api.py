@@ -1,5 +1,4 @@
 import utils
-import config
 import orjson
 import queries
 import asyncio
@@ -108,7 +107,7 @@ async def tops(
             not x['mods'] & (Mods.RELAX | Mods.AUTOPILOT)
         ]
     
-    if config.disable_funorange_maps:
+    if glob.config.disable_funorange_maps:
         scores = [
             x for x in scores if 
             x['md5'] not in glob.modified_beatmaps
@@ -190,7 +189,7 @@ async def recent(
             not x['mods'] & (Mods.RELAX | Mods.AUTOPILOT)
         ]
 
-    if config.disable_funorange_maps:
+    if glob.config.disable_funorange_maps:
         scores = [
             x for x in scores if 
             x['md5'] not in glob.modified_beatmaps

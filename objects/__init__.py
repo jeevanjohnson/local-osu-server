@@ -4,6 +4,7 @@ from .beatmap import *
 from .mods import Mods
 from .file import File
 from .score import Score
+from .config import Config
 from .replay import Replay
 from .command import Command
 from .jsonfile import JsonFile

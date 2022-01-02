@@ -9,12 +9,15 @@ from objects.mods import Mods
 from server import HTTPServer
 from typing import TYPE_CHECKING
 from aiohttp import ClientSession
-
+from objects.config import Config
 
 if TYPE_CHECKING:
     from objects.player import Player
     from objects.command import Command
     from objects.jsonfile import JsonFile
+
+# config
+config = Config()
 
 # db
 pfps: 'JsonFile'

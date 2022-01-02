@@ -1,7 +1,6 @@
 import os
 import time
 import utils
-import config
 import calendar
 import binascii
 from ext import glob
@@ -49,7 +48,7 @@ class BanchoScore:
 
         _dict['score'] = (
             f"{_dict['pp']:.0f}"
-            if config.pp_leaderboard and _dict['pp'] else
+            if glob.config.pp_leaderboard and _dict['pp'] else
             _dict['score']
         )
 
@@ -214,9 +213,9 @@ class Score:
             sid = 0
 
         pp_checks = (
-            config.pp_leaderboard or 
+            glob.config.pp_leaderboard or 
             glob.mode or 
-            config.show_pp_for_personal_best
+            glob.config.show_pp_for_personal_best
         )
 
         return {

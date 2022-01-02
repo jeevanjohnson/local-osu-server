@@ -1,6 +1,4 @@
-import time
 import utils
-import config
 import orjson
 import queries
 import packets
@@ -75,12 +73,12 @@ class Player:
         glob.current_profile = glob.profiles[self.name]
 
     async def get_rank(self) -> Optional[int]:
-        if not config.osu_daily_api_key:
+        if not glob.config.osu_daily_api_key:
             return 1
 
         url = f'{OSU_DAILY_API}/pp.php'
         params = {
-            'k': config.osu_daily_api_key,
+            'k': glob.config.osu_daily_api_key,
             't': 'pp',
             'v': self.pp,
             'm': self.mode
@@ -135,7 +133,7 @@ class Player:
                 not x['mods'] & (Mods.RELAX | Mods.AUTOPILOT)
             ]
 
-        if config.disable_funorange_maps:
+        if glob.config.disable_funorange_maps:
             scores = [
                 x for x in scores if 
                 x['md5'] not in glob.modified_beatmaps
@@ -149,10 +147,13 @@ class Player:
         pp += 416.6667 * (1 - (0.9994 ** len(scores)))
         self.pp = round(pp)
 
+        # TODO: figure out how acc calc is wrong
+        # for now use old method
         if top_scores:
-            acc = sum([s['acc'] * 0.95 ** i for i, s in enumerate(top_scores)])
-            bonus_acc = 100.0 / (20 * (1 - 0.95 ** len(scores)))
-            self.acc = (acc * bonus_acc) / 100
+            self.acc = sum([s['acc'] for s in top_scores]) / len(top_scores)
+            # acc = sum([s['acc'] * 0.95 ** i for i, s in enumerate(top_scores)])
+            # bonus_acc = 100.0 / (20 * (1 - 0.95 ** len(scores)))
+            # self.acc = (acc * bonus_acc) / 100
 
         if 'playcount' in glob.current_profile:
             self.playcount = glob.current_profile['playcount']

@@ -1,5 +1,4 @@
 import utils
-import config
 import packets
 from ext import glob
 from utils import log
@@ -60,7 +59,7 @@ async def score_submit(score: Score) -> None:
         )
         return
 
-    if config.disable_funorange_maps:
+    if glob.config.disable_funorange_maps:
         bmap = await Beatmap.from_md5(score.md5)
     else:
         bmap = (
@@ -143,7 +142,7 @@ async def score_submit(score: Score) -> None:
         f'+{score.mods_str} {score.acc:.2f}% {utils.get_grade(score)} {score.pp:.0f}PP '
         f'{score.max_combo}x/{bmap.max_combo}x {score.nmiss}X'
     )
-    if config.ping_user_when_recent_score:
+    if glob.config.ping_user_when_recent_score:
         msg += f'\nachieved by {glob.player.name}'
 
     glob.player.queue += utils.local_message(msg, channel='#recent')

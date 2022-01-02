@@ -1,5 +1,4 @@
 import utils
-import config
 import functools
 from ext import glob
 from typing import Any
@@ -141,11 +140,11 @@ class Beatmap:
         if bmap_id in glob.beatmaps:
             return cls.from_db(bmap_id)
 
-        if not config.osu_api_key:
+        if not glob.config.osu_api_key:
             return None
 
         params = {
-            'k': config.osu_api_key,
+            'k': glob.config.osu_api_key,
             'b': bmap_id
         }
         async with glob.http.get(
@@ -171,11 +170,11 @@ class Beatmap:
         if md5 in glob.beatmaps:
             return cls.from_db(md5)
 
-        if not config.osu_api_key:
+        if not glob.config.osu_api_key:
             return None
 
         params = {
-            'k': config.osu_api_key,
+            'k': glob.config.osu_api_key,
             'h': md5
         }
         async with glob.http.get(

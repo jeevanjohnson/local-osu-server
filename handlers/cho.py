@@ -1,6 +1,4 @@
-import time
 import utils
-import config
 import packets
 import asyncio
 from ext import glob
@@ -94,12 +92,12 @@ async def login() -> tuple[BODY, CHO_TOKEN]:
     body += packets.friendsList(0)
 
     if (
-        config.menu_icon and
-        config.menu_icon['image_link'] and
-        config.menu_icon['click_link']
+        glob.config.menu_icon and
+        glob.config.menu_icon['image_link'] and
+        glob.config.menu_icon['click_link']
     ):
         body += packets.menuIcon(
-            tuple(config.menu_icon.values())
+            tuple(glob.config.menu_icon.values())
         )
 
     for channel in CHANNELS:

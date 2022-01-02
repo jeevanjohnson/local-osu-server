@@ -1,18 +1,51 @@
 #!/usr/bin/env python
 
+# since aiming user friendly, 
+# install all packages needed for them
+# before running anything
+
+import sys
+import subprocess
+
+print('ensuring all needed packages are installed!')
+
+if sys.version == 'linux':
+    version_info = sys.version_info
+    major = version_info.major
+    minor = version_info.minor
+    subprocess.run(
+        f'python{major}.{minor} -m pip install -r requirements.txt',
+        stdin = subprocess.DEVNULL,
+        stderr = subprocess.DEVNULL,
+        stdout = subprocess.DEVNULL
+    )
+else:
+    subprocess.run(
+        'python -m pip install -r requirements.txt',
+        stdin = subprocess.DEVNULL,
+        stderr = subprocess.DEVNULL,
+        stdout = subprocess.DEVNULL
+    )
+    subprocess.run(
+        'python3 -m pip install -r requirements.txt',
+        stdin = subprocess.DEVNULL,
+        stderr = subprocess.DEVNULL,
+        stdout = subprocess.DEVNULL
+    )
+
 import os
 import orjson
-import asyncio
-from ext import glob
-from server import HTTPServer
-from utils import log_success
-
-import config
 import updater
 import pyimgur
+import asyncio
+from ext import glob
 from pathlib import Path
+from objects import Config
+from objects import JsonFile
+from server import HTTPServer
+from utils import log_success
+from utils import setup_config
 from aiohttp import ClientSession
-from objects.jsonfile import JsonFile
 
 glob.http_server = http_server = HTTPServer()
 
@@ -20,23 +53,40 @@ glob.http_server = http_server = HTTPServer()
 async def on_start_up() -> None:
     glob.http = ClientSession(json_serialize=orjson.loads)
 
+    data_folder = Path.cwd() / '.data'
+    if not data_folder.exists():
+        data_folder.mkdir(exist_ok=True)
+
+    config_path = data_folder / 'config.json'
+    if config_path.exists():
+        print('config found!')
+        glob.config = Config.from_path(config_path)
+        if glob.config.__dict__.keys() != Config().__dict__.keys():
+            print('config was updated! please redo config')
+            glob.config = setup_config()
+    else:
+        glob.config = setup_config()
+        config_path.write_bytes(
+            orjson.dumps(glob.config.__dict__)
+        )
+
     if (
-        config.auto_update and
+        glob.config.auto_update and
         await updater.needs_updating()
     ):
         await updater.update()
         raise SystemExit
 
-    if config.paths['osu! path']:
-        osu_path = Path(config.paths['osu! path'])
+    if glob.config.paths['osu_path']:
+        osu_path = Path(glob.config.paths['osu_path'])
         glob.songs_folder = Path(
-            config.paths['songs'] or str(osu_path / 'Songs')
+            glob.config.paths['songs'] or str(osu_path / 'Songs')
         )
         glob.screenshot_folder = Path(
-            config.paths['screenshots'] or str(osu_path / 'Screenshots')
+            glob.config.paths['screenshots'] or str(osu_path / 'Screenshots')
         )
         glob.replay_folder = Path(
-            config.paths['replay'] or str(osu_path / 'Replays')
+            glob.config.paths['replay'] or str(osu_path / 'Replays')
         )
         
         if not glob.replay_folder.exists():
@@ -44,34 +94,30 @@ async def on_start_up() -> None:
 
     else:
         glob.songs_folder = (
-            Path(config.paths['songs']) if 
-            config.paths['songs'] else 
+            Path(glob.config.paths['songs']) if 
+            glob.config.paths['songs'] else 
             None
         )
 
         glob.replay_folder = (
-            Path(config.paths['replay']) if 
-            config.paths['replay'] else 
+            Path(glob.config.paths['replay']) if 
+            glob.config.paths['replay'] else 
             None
         )
     
         glob.screenshot_folder = (
-            Path(config.paths['screenshots']) if 
-            config.paths['screenshots'] else 
+            Path(glob.config.paths['screenshots']) if 
+            glob.config.paths['screenshots'] else 
             None
         )
 
-    if config.imgur_client_id:
-        glob.imgur = pyimgur.Imgur(config.imgur_client_id)
+    if glob.config.imgur_client_id:
+        glob.imgur = pyimgur.Imgur(glob.config.imgur_client_id)
     else:
         glob.imgur = None
 
     if glob.songs_folder:
         glob.modified_txt = glob.songs_folder / 'modified_mp3_list.txt'
-
-    data_folder = Path.cwd() / '.data'
-    if not data_folder.exists():
-        data_folder.mkdir(exist_ok=True)
     
     glob.pfps = JsonFile(data_folder / 'pfps.json')
     glob.beatmaps = JsonFile(data_folder / 'beatmaps.json')
