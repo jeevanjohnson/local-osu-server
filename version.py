@@ -1,7 +1,7 @@
 # don't touch this file just leave it here 
 # for updater lol
 
-version = '1.5.8'
+version = '1.5.9'
 
 file_structure = ['.gitignore',
  'commands.py',
