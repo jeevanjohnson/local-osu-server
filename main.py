@@ -70,6 +70,8 @@ async def on_start_up() -> None:
             orjson.dumps(glob.config.__dict__)
         )
 
+    glob.json_config = JsonFile(config_path)
+
     if (
         glob.config.auto_update and
         await updater.needs_updating()

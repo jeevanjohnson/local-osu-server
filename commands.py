@@ -1,8 +1,10 @@
+import utils
 import orjson
 import packets
 from ext import glob
 from objects import Mods
 from typing import Union
+from pprint import pformat
 from typing import Callable
 from typing import Optional
 from objects import Command
@@ -19,6 +21,9 @@ def edit_func(func: Callable) -> Callable:
         try:
             return await func(*args)
         except Exception as e:
+            glob.player.queue += packets.notification(
+                f'error: {e}'
+            )
             resp = DirectResponse.from_str(
                 f'error: {e}'
             )
@@ -240,4 +245,42 @@ async def avatar(img: str) -> None:
     )
     return
 
-# TODO: have the ability to update config through commands
+@command(
+    name = 'config',
+    docs = 'shows current config!'
+)
+async def config() -> DirectResponse:
+    return DirectResponse.from_str(
+        pformat(glob.config.__dict__)
+    )
+
+CHANGE_CONFIG_DOCS = (
+    'changes items in config // \n'
+    '----examples: !change_config key=auto_update value=true / \n'
+    '----!change_config key=paths.replay value=file_location / \n'
+    '----!change_config key=menu_icon.click_link value=https://osu.ppy.sh'
+)
+
+@command(
+    name = 'change_config',
+    docs = CHANGE_CONFIG_DOCS,
+    confirm_with_user = True
+)
+async def change_config(key: str, value: str) -> None:
+    path = key.removeprefix('key=').split('.')
+    value = utils.real_type(value.lower().removeprefix('value='))
+
+    if len(path) == 1:
+        key, = path
+        glob.json_config[key] = value
+        glob.config.__dict__[key] = value
+    else:
+        key1, key2 = path
+        glob.json_config[key1][key2] = value
+        glob.config.__dict__[key1][key2] = value
+
+    glob.player.queue += packets.notification( # type: ignore
+        f'{path} was updated to {value}'
+    )
+
+    utils.update_files()

@@ -1,7 +1,9 @@
 import base64
+import orjson
 import asyncio
 import colorama
 import subprocess
+from typing import Any
 import pyttanko as oppai
 from typing import Union
 from pathlib import Path
@@ -92,6 +94,7 @@ def update_files() -> None:
     glob.pfps.update_file()
     glob.beatmaps.update_file()
     glob.profiles.update_file()
+    glob.json_config.update_file()
     glob.modified_beatmaps.update_file()
 
 async def _add_to_player_queue(packets: bytes) -> None:
@@ -345,3 +348,15 @@ def setup_config() -> Config:
             break
     
     return config
+
+def real_type(value: str) -> Any:
+    if value.replace('-', '', 1).isdecimal():
+        return int(value)
+    
+    try: return float(value)
+    except: pass
+
+    try:
+        return orjson.loads(value)
+    except:
+        return value

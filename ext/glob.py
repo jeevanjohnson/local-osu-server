@@ -18,6 +18,7 @@ if TYPE_CHECKING:
 
 # config
 config = Config()
+json_config: 'JsonFile'
 
 # db
 pfps: 'JsonFile'
