@@ -400,7 +400,7 @@ async def direct(
     if mode != -1:
         args['m'] = mode
 
-    args['s'] = ranking_status
+    args['r'] = ranking_status
 
     try:
         async with glob.http.get(
