@@ -383,7 +383,7 @@ async def direct(
             else:
                 return Response(200, b'0')
 
-    if not glob.config.bancho_username or not glob.config.bancho_pw_md5:
+    if not glob.config.osu_username or not glob.config.osu_password:
         utils.add_to_player_queue(
             packets.notification("No username/password provided for direct!")
         )
