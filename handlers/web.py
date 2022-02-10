@@ -343,8 +343,8 @@ convert_param_rankstatus_to_api = lambda x: DIRECT_TO_API_STATUS[x]
 @web.get('/osu-search.php')
 async def direct(
     query: str = Query(urlparse.unquote_plus, Alias('q')),
-    mode: str = Query(convert_param_mode_to_api, Alias('m')),
-    ranking_status: str = Query(convert_param_rankstatus_to_api, Alias('r'))
+    mode: int = Alias('m'),
+    ranking_status: int = Alias('r')
 ) -> Response:
     if query.startswith(glob.config.command_prefix):
         query_no_prefix = query.removeprefix(glob.config.command_prefix)
