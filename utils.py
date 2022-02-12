@@ -347,7 +347,7 @@ def setup_config() -> Config:
         
             if key in md5s:
                 if key == 'osu_password':
-                    value = hashlib.md5(value).hexdigest()
+                    value = hashlib.md5(value.encode()).hexdigest()
                 else:
                    if len(value) < 32:
                         input('invalid value was entered\nclick enter to retry')
