@@ -32,18 +32,17 @@ async def cho_handler(
         token: str
         body, token = await login()
         return Response(
-            code = 200, 
-            body = body, 
+            body,
             headers = {"cho-token": token}
         )
 
     if not glob.player:
-        return Response(200, packets.systemRestart())
+        return Response(packets.systemRestart())
 
     if glob.player.queue:
-        return Response(200, glob.player.clear())
+        return Response(glob.player.clear())
 
-    return Response(200, b'')
+    return Response()
 
 # should be in web, but works with cho
 # to have login work "properly"
@@ -55,7 +54,7 @@ async def bancho_connect(
     global profile_name
     profile_name = username
     log('Got a player name of', username, color = Color.LIGHTBLUE_EX)
-    return Response(200, b'')
+    return Response()
 
 async def login() -> tuple[BODY, CHO_TOKEN]:
     global profile_name

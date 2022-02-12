@@ -1,6 +1,7 @@
 import base64
 import orjson
 import asyncio
+import hashlib
 import colorama
 import subprocess
 from typing import Any
@@ -326,10 +327,10 @@ def setup_config() -> Config:
     password_doc = (
         'osu! password\n'
         'If you want direct working this is needed\n'
-        'password must be hashed in md5 in order for this to work!\n'
-        'you can hash your password on https://www.md5hashgenerator.com/\n'
         'Type `None` if you want direct/bmap downloading not to work'
     )
+
+    md5s = ('osu_api_key', 'osu_daily_api_key', 'osu_password')
 
     for prompt, key in (
         (osu_api_doc, 'osu_api_key'),
@@ -345,14 +346,14 @@ def setup_config() -> Config:
                 break
         
             if (
-                key in ('osu_api_key', 'osu_daily_api_key', 'osu_password') and 
+                key in md5s and 
                 len(value) < 32
             ):
-                if key != 'osu_password':
-                    input('invalid api key\nclick enter to retry')
-                else:
-                    input('password is not md5\nclick enter to retry')
+                input('invalid value was entered\nclick enter to retry')
                 continue
+
+            if key == 'osu_password':
+                value = hashlib.md5(value).hexdigest()
 
             config.__dict__[key] = value
             break

@@ -5,4 +5,4 @@ website = Router('/')
 
 @website.get('favicon.ico')
 async def favicon() -> Response:
-    return Response(200, b'')
+    return Response()

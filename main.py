@@ -8,30 +8,12 @@ import sys
 import subprocess
 
 print('ensuring all needed packages are installed!')
-
-if sys.version == 'linux':
-    version_info = sys.version_info
-    major = version_info.major
-    minor = version_info.minor
-    subprocess.run(
-        f'python{major}.{minor} -m pip install -r requirements.txt',
-        stdin = subprocess.DEVNULL,
-        stderr = subprocess.DEVNULL,
-        stdout = subprocess.DEVNULL
-    )
-else:
-    subprocess.run(
-        'pip install -r requirements.txt',
-        stdin = subprocess.DEVNULL,
-        stderr = subprocess.DEVNULL,
-        stdout = subprocess.DEVNULL
-    )
-    subprocess.run(
-        'python -m pip install -r requirements.txt',
-        stdin = subprocess.DEVNULL,
-        stderr = subprocess.DEVNULL,
-        stdout = subprocess.DEVNULL
-    )
+subprocess.run(
+    f'{sys.executable} -m pip install -r requirements.txt',
+    stdin = subprocess.DEVNULL,
+    stderr = subprocess.DEVNULL,
+    stdout = subprocess.DEVNULL
+)
 
 import os
 import orjson
@@ -51,7 +33,7 @@ glob.http_server = http_server = HTTPServer()
 
 @http_server.starting
 async def on_start_up() -> None:
-    glob.http = ClientSession(json_serialize=orjson.loads)
+    glob.http = ClientSession()
 
     data_folder = Path.cwd() / '.data'
     if not data_folder.exists():

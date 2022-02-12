@@ -31,7 +31,7 @@ web = Router((
 ))
 
 async def DEFAULT_RESPONSE_FUNC() -> Response:
-    return Response(200, b'')
+    return Response()
 
 # unusable or unused handlers
 for hand in [
@@ -52,7 +52,6 @@ OSU_API_BASE = 'https://osu.ppy.sh/api'
 async def get_ss(link: str) -> Response:
     return Response(
         code = 301,
-        body = b'',
         headers = {'Location': link}
     )
 
@@ -60,7 +59,6 @@ async def get_ss(link: str) -> Response:
 async def bmap_web(full_path: str) -> Response:
     return Response(
         code = 301,
-        body = b'',
         headers = {'Location': f'https://osu.ppy.sh/{full_path}'}
     )
 
@@ -71,14 +69,13 @@ async def get_osz(setid: int) -> Response:
         await cmd.func(*cmd.args)
         cmd.args = []
         glob.current_cmd = None
-        return Response(200, b'')
+        return Response()
     
     if setid == -1:
-        return Response(200, b'')
+        return Response()
 
     return Response(
         code = 301,
-        body = b'',
         headers = {
             'Location': f'https://osu.gatari.pw/d/{setid}'
     })
@@ -86,7 +83,7 @@ async def get_osz(setid: int) -> Response:
 @web.get('/osu-screenshot.php')
 async def osu_screenshots() -> Response:
     if not glob.screenshot_folder:
-        return Response(200, b'error: no')
+        return Response(b'error: no')
 
     latest_screenshot = glob.screenshot_folder / max(
         glob.screenshot_folder.glob('*'), 
@@ -94,7 +91,7 @@ async def osu_screenshots() -> Response:
     )
 
     if not glob.imgur:
-        return Response(200, str(latest_screenshot))
+        return Response(str(latest_screenshot))
 
     uploaded_image = glob.imgur.upload_image(
         path = str(latest_screenshot),
@@ -102,7 +99,7 @@ async def osu_screenshots() -> Response:
     )
 
     pyperclip.copy(uploaded_image.link)
-    return Response(200, uploaded_image.link.encode())
+    return Response(uploaded_image.link.encode())
 
 REMINDER = None
 DEFAULT_CHARTS = '\n'.join([
@@ -115,7 +112,9 @@ DEFAULT_CHARTS = '\n'.join([
 async def score_sub() -> Response:
     global REMINDER
     if not glob.player:
-        return Response(404, b'')
+        return Response(
+            code = 404
+        )
 
     if REMINDER is None:
         glob.player.queue += packets.notification((
@@ -141,7 +140,7 @@ async def score_sub() -> Response:
     glob.player.queue += packets.userStats(glob.player)
 
     log_success(f"{glob.player.name}'s playcount increased!")
-    return Response(200, DEFAULT_CHARTS)
+    return Response(DEFAULT_CHARTS)
 
 @web.get('/osu-getseasonal.php')
 async def get_bgs() -> Response:
@@ -150,7 +149,7 @@ async def get_bgs() -> Response:
     else:
         bgs = orjson.dumps(glob.config.seasonal_bgs)
 
-    return Response(200, bgs)
+    return Response(bgs)
 
 @web.get('/osu-getreplay.php')
 async def get_replay(
@@ -168,13 +167,13 @@ async def get_replay(
             params = params
         ) as resp:
             if not resp or resp.status != 200:
-                return Response(200, b'error: no')
+                return Response(b'error: no')
 
             json = await resp.json()
 
         replay_frames = utils.string_to_bytes(json["content"])
         log('bancho replay handled', color = Color.LIGHTGREEN_EX)
-        return Response(200, replay_frames)
+        return Response(replay_frames)
 
     elif (glob.player and glob.current_profile):
         real_id = abs(scoreid) - 1
@@ -185,7 +184,7 @@ async def get_replay(
             play['replay_frames'] is None
         ):
             log_error(f'no replay frames were found for scoreid: {real_id}')
-            return Response(200, b'error: no')
+            return Response(b'error: no')
         else:
             log(
                 f"{glob.player.name}'s replay was handled",
@@ -197,13 +196,10 @@ async def get_replay(
             else:
                 replay = utils.string_to_bytes(play['replay_frames'])
 
-            return Response(
-                code = 200,
-                body = replay
-            )
+            return Response(replay)
     else:
         log_error('error handling replay')
-        return Response(200, b'error: no')
+        return Response(b'error: no')
 
 NOT_SUPPORTED = bytes(NotSupported())
 
@@ -217,7 +213,7 @@ async def leaderboard(
     md5: str = Alias('c')
 ) -> Response:
     if not glob.player:
-        return Response(404, b'')
+        return Response(code = 404)
 
     valid_rank_types = (
         LeaderboardTypes.LOCAL, 
@@ -231,7 +227,7 @@ async def leaderboard(
     )
 
     if not supported:
-        return Response(200, NOT_SUPPORTED)
+        return Response(NOT_SUPPORTED)
 
     parsed_params = ParsedParams(
         filename = filename,
@@ -313,7 +309,7 @@ async def leaderboard(
     else:
         log_success(f'handled map of setid: {setid}')
 
-    return Response(200, lb.as_binary)
+    return Response(lb.as_binary)
 
 DIRECT_TO_API_STATUS = {
     0: 'ranked',
@@ -354,7 +350,7 @@ async def direct(
             not split or
             split[0] not in glob.commands
         ):
-            return Response(200, COMMAND_NOT_FOUND)
+            return Response(COMMAND_NOT_FOUND)
         
         cmd, *args = split
 
@@ -374,20 +370,19 @@ async def direct(
                 msg, start_id = -1
             ).as_binary
 
-            return Response(200, execute_button)
+            return Response(execute_button)
         else:
             resp = await command.func(*args)
 
-            if resp:
-                return Response(200, bytes(resp))
-            else:
-                return Response(200, b'0')
+            return Response(
+                bytes(resp) if resp else b'0'
+            )
 
     if not glob.config.osu_username or not glob.config.osu_password:
         utils.add_to_player_queue(
             packets.notification("No username/password provided for direct!")
         )
-        return Response(200, b'0')
+        return Response(b'0')
 
     args: dict[str, Union[int, str]] = {
         'u': glob.config.osu_username,
@@ -410,10 +405,7 @@ async def direct(
             ret = await resp.read()
     except aiohttp.ClientConnectorError:
         log_error('mirror currently down')
-        return Response(200, b'0')
+        return Response(b'0')
     
     log_success(f'maps loaded for query: `{query}` !')
-    return Response(
-        code = 200, 
-        body = ret
-    )
+    return Response(ret)

@@ -262,11 +262,11 @@ class HTTPServer:
                     )
                 elif isinstance(resp, bytearray):
                     await self.loop.sock_sendall(
-                        client, Response(200, bytes(resp)).to_bytes()
+                        client, Response(bytes(resp)).to_bytes()
                     )
                 elif isinstance(resp, str):
                     await self.loop.sock_sendall(
-                        client, Response(200, resp.encode()).to_bytes()
+                        client, Response(resp.encode()).to_bytes()
                     )
                 elif isinstance(resp, bytes):
                     await self.loop.sock_sendall(
@@ -275,7 +275,7 @@ class HTTPServer:
                 else:
                     try:
                         await self.loop.sock_sendall(
-                            client, Response(200, bytes(resp)).to_bytes()
+                            client, Response(bytes(resp)).to_bytes()
                         )
                     except:
                         raise Exception(f'unknown type for resp, type: {type(resp)}')

@@ -8,7 +8,7 @@ from server import ImageResponse
 
 avatar = Router('/a')
 
-DEFAULT_404_RESPONSE = Response(404, b'')
+DEFAULT_404_RESPONSE = Response(code = 404)
 response = Union[Response, ImageResponse]
 
 @avatar.get(re.compile(r'\/(?P<userid>[0-9]*)'))

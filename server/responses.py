@@ -13,7 +13,8 @@ HTTP_STATUS_CODES = {
 
 class Response:
     def __init__(
-        self, code: int, body: Union[str, bytes, bytearray], 
+        self, body: Union[str, bytes, bytearray] = b'', 
+        code: int = 200, 
         headers: dict[str, Any] = {}
     ) -> None:
         self.code = code
