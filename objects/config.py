@@ -40,8 +40,9 @@ class Config:
         self.osu_api_key: Optional[str] = None
         self.imgur_client_id: Optional[str] = None
         self.osu_daily_api_key: Optional[str] = None
-        self.beatconnect_api_key: Optional[str] = None
         self.seasonal_bgs: Optional[Iterable[str]] = []
+        self.osu_username: Optional[str] = None
+        self.osu_password: Optional[str] = None
 
         self.__dict__.update(kwargs)
     

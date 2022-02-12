@@ -21,13 +21,13 @@ if sys.version == 'linux':
     )
 else:
     subprocess.run(
-        'python -m pip install -r requirements.txt',
+        'pip install -r requirements.txt',
         stdin = subprocess.DEVNULL,
         stderr = subprocess.DEVNULL,
         stdout = subprocess.DEVNULL
     )
     subprocess.run(
-        'python3 -m pip install -r requirements.txt',
+        'python -m pip install -r requirements.txt',
         stdin = subprocess.DEVNULL,
         stderr = subprocess.DEVNULL,
         stdout = subprocess.DEVNULL

@@ -64,7 +64,6 @@ async def bmap_web(full_path: str) -> Response:
         headers = {'Location': f'https://osu.ppy.sh/{full_path}'}
     )
 
-BASE_URL = 'https://beatconnect.io'
 @web.get(re.compile(r'/d/(?P<setid>[-0-9]*)'))
 async def get_osz(setid: int) -> Response:
     if setid == -1 and glob.current_cmd:
@@ -77,21 +76,12 @@ async def get_osz(setid: int) -> Response:
     if setid == -1:
         return Response(200, b'')
 
-    url = f'{BASE_URL}/b/{setid}'
-    async with glob.http.get(url) as resp:
-        if (
-            not resp or
-            resp.status != 200 or
-            not (osz_binary := await resp.content.read())
-        ):
-            log_success(f"can't downloaded map set, id: {setid}")
-            return Response(200, b'')
-
-    log_success(f'succesfully downloaded map set, id: {setid}')
     return Response(
-        code = 200,
-        body = osz_binary,
-    )
+        code = 301,
+        body = b'',
+        headers = {
+            'Location': f'https://osu.gatari.pw/d/{setid}'
+    })
 
 @web.get('/osu-screenshot.php')
 async def osu_screenshots() -> Response:
@@ -343,8 +333,6 @@ DIRECT_TO_MIRROR_MODE = {
     3: 'mania'
 }
 
-DIRECT_BASE_API = 'https://beatconnect.io/api'
-
 COMMAND_NOT_FOUND = DirectResponse.from_str(
     'command not found!'
 ).as_binary
@@ -355,8 +343,8 @@ convert_param_rankstatus_to_api = lambda x: DIRECT_TO_API_STATUS[x]
 @web.get('/osu-search.php')
 async def direct(
     query: str = Query(urlparse.unquote_plus, Alias('q')),
-    mode: str = Query(convert_param_mode_to_api, Alias('m')),
-    ranking_status: str = Query(convert_param_rankstatus_to_api, Alias('r'))
+    mode: int = Alias('m'),
+    ranking_status: int = Alias('r')
 ) -> Response:
     if query.startswith(glob.config.command_prefix):
         query_no_prefix = query.removeprefix(glob.config.command_prefix)
@@ -395,38 +383,31 @@ async def direct(
             else:
                 return Response(200, b'0')
 
-    if not glob.config.beatconnect_api_key:
+    if not glob.config.osu_username or not glob.config.osu_password:
         utils.add_to_player_queue(
-            packets.notification("No api key given for direct!")
+            packets.notification("No username/password provided for direct!")
         )
         return Response(200, b'0')
 
-    beatconnect_params: dict[str, Union[int, str]] = {
-        'token': glob.config.beatconnect_api_key
+    args: dict[str, Union[int, str]] = {
+        'u': glob.config.osu_username,
+        'h': glob.config.osu_password
     }
 
     if query not in ("Newest", "Top Rated", "Most Played"):
-        beatconnect_params['q'] = query
+        args['q'] = query
 
     if mode != -1:
-        beatconnect_params['m'] = mode
+        args['m'] = mode
 
-    beatconnect_params['s'] = ranking_status
+    args['r'] = ranking_status
 
     try:
         async with glob.http.get(
-            url = f'{DIRECT_BASE_API}/search',
-            params = beatconnect_params
+            url = 'https://osu.ppy.sh/web/osu-search.php',
+            params = args
         ) as resp:
-        
-            if (
-                not resp or
-                resp.status != 200 or
-                not (resp_dict := await resp.json())
-            ):
-                log_error('no maps found')
-                return Response(200, b'0')
-        
+            ret = await resp.read()
     except aiohttp.ClientConnectorError:
         log_error('mirror currently down')
         return Response(200, b'0')
@@ -434,7 +415,5 @@ async def direct(
     log_success(f'maps loaded for query: `{query}` !')
     return Response(
         code = 200, 
-        body = DirectResponse(
-            bmaps = resp_dict['beatmaps']
-        ).as_binary
+        body = ret
     )

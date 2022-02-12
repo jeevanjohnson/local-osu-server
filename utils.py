@@ -318,10 +318,16 @@ def setup_config() -> Config:
         'you will need this api key which you can find here https://github.com/Adrriii/osudaily-api/wiki\n'
         'Type `None` if you want your rank to show as 1 the whole time'    
     )
-    beatconnect_doc = (
-        'beatconnect api key\n'
+    username_doc = (
+        'osu! username\n'
         'If you want direct working this is needed\n'
-        'Sign up for a key right here https://beatconnect.io/accounts/privatesignup/\n'
+        'Type `None` if you want direct/bmap downloading not to work'
+    )
+    password_doc = (
+        'osu! password\n'
+        'If you want direct working this is needed\n'
+        'password must be hashed in md5 in order for this to work!\n'
+        'you can hash your password on https://www.md5hashgenerator.com/\n'
         'Type `None` if you want direct/bmap downloading not to work'
     )
 
@@ -329,7 +335,8 @@ def setup_config() -> Config:
         (osu_api_doc, 'osu_api_key'),
         (imgur_doc, 'imgur_client_id'),
         (osu_daily_api_doc, 'osu_daily_api_key'),
-        (beatconnect_doc, 'beatconnect_api_key')
+        (username_doc, 'osu_username'),
+        (password_doc, 'osu_password')
     ):
         while True:
             value = altered_input(f'{prompt}\n>> ')
@@ -338,10 +345,13 @@ def setup_config() -> Config:
                 break
         
             if (
-                key in ('osu_api_key', 'osu_daily_api_key', 'beatconnect_api_key') and 
+                key in ('osu_api_key', 'osu_daily_api_key', 'osu_password') and 
                 len(value) < 32
             ):
-                input('invalid api key\nclick enter to retry')
+                if key != 'osu_password':
+                    input('invalid api key\nclick enter to retry')
+                else:
+                    input('password is not md5\nclick enter to retry')
                 continue
 
             config.__dict__[key] = value
