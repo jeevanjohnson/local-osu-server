@@ -345,15 +345,13 @@ def setup_config() -> Config:
                 config.__dict__[key] = None
                 break
         
-            if (
-                key in md5s and 
-                len(value) < 32
-            ):
-                input('invalid value was entered\nclick enter to retry')
-                continue
-
-            if key == 'osu_password':
-                value = hashlib.md5(value).hexdigest()
+            if key in md5s:
+                if key == 'osu_password':
+                    value = hashlib.md5(value).hexdigest()
+                else:
+                   if len(value) < 32:
+                        input('invalid value was entered\nclick enter to retry')
+                        continue
 
             config.__dict__[key] = value
             break
