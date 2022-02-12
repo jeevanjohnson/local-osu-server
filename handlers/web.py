@@ -21,6 +21,7 @@ from utils import log_success
 import urllib.parse as urlparse
 from objects import Leaderboard
 from objects import NotSupported
+from constants import InvalidMods
 from constants import ParsedParams
 from objects import DirectResponse
 from objects import LeaderboardTypes
@@ -236,49 +237,39 @@ async def leaderboard(
         rank_type = rank_type,
         set_id = setid,
         md5 = md5,
-        name_data =  None
+        name_data = None
     )
 
-    if mods & Mods.RELAX:
-        if (
-            not glob.mode or
-            not glob.mode & Mods.RELAX
-        ):
-            glob.mode = Mods.RELAX
-            glob.invalid_mods = (
-                Mods.AUTOPILOT | Mods.AUTOPLAY |
-                Mods.CINEMA | Mods.TARGET
-            )
-            glob.player.queue += packets.notification(
-                'Mode was switched to rx!'
-            )
-            asyncio.create_task(glob.player.update(glob.mode))
-    elif mods & Mods.AUTOPILOT:
-        if (
-            not glob.mode or
-            not glob.mode & Mods.AUTOPILOT
-        ):
-            glob.mode = Mods.AUTOPILOT
-            glob.invalid_mods = (
-                Mods.RELAX | Mods.AUTOPLAY |
-                Mods.CINEMA | Mods.TARGET
-            )
-            glob.player.queue += packets.notification(
-                'Mode was switched to ap!'
-            )
-            asyncio.create_task(glob.player.update(glob.mode))
-    elif not mods & (Mods.RELAX | Mods.AUTOPILOT):
-        if glob.mode:
-            glob.mode = None
-            glob.invalid_mods = (
-                Mods.AUTOPILOT | Mods.RELAX |
-                Mods.AUTOPLAY | Mods.CINEMA |
-                Mods.TARGET
-            )
-            glob.player.queue += packets.notification(
-                'Mode was switched to vanilla!'
-            )
-            asyncio.create_task(glob.player.update(glob.mode))
+    if (
+        mods & Mods.RELAX and
+        glob.mode != Mods.RELAX
+    ):
+        glob.mode = Mods.RELAX
+        glob.invalid_mods = InvalidMods.Relax
+        glob.player.queue += packets.notification(
+            'Mode was switched to rx!'
+        )
+        asyncio.create_task(glob.player.update(glob.mode))
+    elif (
+        mods & Mods.AUTOPILOT and
+        glob.mode != Mods.AUTOPILOT
+    ):
+        glob.mode = Mods.AUTOPILOT
+        glob.invalid_mods = InvalidMods.AutoPilot
+        glob.player.queue += packets.notification(
+            'Mode was switched to ap!'
+        )
+        asyncio.create_task(glob.player.update(glob.mode))
+    elif (
+        not mods & (Mods.RELAX | Mods.AUTOPILOT) and
+        glob.mode is not None
+    ):
+        glob.mode = None
+        glob.invalid_mods = InvalidMods.Standard
+        glob.player.queue += packets.notification(
+            'Mode was switched to vanilla!'
+        )
+        asyncio.create_task(glob.player.update(glob.mode))
 
     if glob.config.osu_api_key:
         lb = await Leaderboard.from_bancho(parsed_params)

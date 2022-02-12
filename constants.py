@@ -1,6 +1,23 @@
 import re
+from objects import Mods
 from typing import Optional
 from typing import TypedDict
+class InvalidMods:
+    Standard = (
+        Mods.AUTOPILOT | Mods.RELAX |
+        Mods.AUTOPLAY | Mods.CINEMA |
+        Mods.TARGET
+    )
+
+    AutoPilot = (
+        Mods.RELAX | Mods.AUTOPLAY |
+        Mods.CINEMA | Mods.TARGET
+    )
+
+    Relax = (
+        Mods.AUTOPILOT | Mods.AUTOPLAY |
+        Mods.CINEMA | Mods.TARGET
+    )
 
 class ParsedParams(TypedDict):
     filename: str

@@ -181,30 +181,6 @@ class Score:
             replay = parsed_replay
         )
 
-    @classmethod
-    def from_score_sub(cls) -> Optional['Score']:
-        if (
-            not glob.player or
-            not glob.replay_folder
-        ):
-            return
-
-        files = glob.replay_folder.glob('*.osr')
-        replay_path = glob.replay_folder / max(files , key=os.path.getctime)
-        replay = Replay.from_file(replay_path)
-
-        s = cls(
-            glob.player.mode, replay.beatmap_md5, replay.player_name, # type: ignore
-            replay.n300, replay.n100, replay.n50, replay.geki, # type: ignore
-            replay.katu, replay.miss, replay.total_score, # type: ignore
-            replay.combo, bool(replay.perfect), int(replay.mods), # type: ignore
-            int(time.time()), replay, int(replay.additional_mods or 0),
-            replay_md5 = replay.replay_md5, # type: ignore
-            replay_frames = replay.raw_frames # type: ignore
-        )
-
-        return s
-
     @property
     def as_leaderboard_score(self) -> dict:
         if self.scoreid and self.replay_frames:

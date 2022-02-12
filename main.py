@@ -23,6 +23,7 @@ import asyncio
 from ext import glob
 from pathlib import Path
 from objects import Config
+from utils import NONE_FILE
 from objects import JsonFile
 from server import HTTPServer
 from utils import log_success
@@ -80,19 +81,19 @@ async def on_start_up() -> None:
         glob.songs_folder = (
             Path(glob.config.paths['songs']) if 
             glob.config.paths['songs'] else 
-            None
+            NONE_FILE
         )
 
         glob.replay_folder = (
             Path(glob.config.paths['replay']) if 
             glob.config.paths['replay'] else 
-            None
+            NONE_FILE
         )
     
         glob.screenshot_folder = (
             Path(glob.config.paths['screenshots']) if 
             glob.config.paths['screenshots'] else 
-            None
+            NONE_FILE
         )
 
     if glob.config.imgur_client_id:
@@ -130,7 +131,7 @@ async def check_for_score_sub() -> None:
     from objects import Score
     from handlers import score_submit
 
-    if not glob.replay_folder or not glob.replay_folder.exists():
+    if glob.replay_folder.exists():
         print(
             "replay folder doesn't exist\n"
             "please restart server to have score sub working."

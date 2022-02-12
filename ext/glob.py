@@ -9,6 +9,7 @@ from objects.mods import Mods
 from server import HTTPServer
 from typing import TYPE_CHECKING
 from aiohttp import ClientSession
+from constants import InvalidMods
 from objects.config import Config
 
 if TYPE_CHECKING:
@@ -28,21 +29,16 @@ modified_beatmaps: 'JsonFile'
 
 # paths
 modified_txt: Path
-osu_exe_path: Optional[Path] = None
-songs_folder: Optional[Path] = None
-replay_folder: Optional[Path] = None
-screenshot_folder: Optional[Path] = None
+osu_exe_path: Path
+songs_folder: Path
+replay_folder: Path
+screenshot_folder: Path
 
 # session
 mode: Optional[Mods] = None
 current_profile: dict[str, Any]
 player: Optional['Player'] = None
-invalid_mods: int = (
-    Mods.AUTOPILOT | Mods.RELAX |
-    Mods.AUTOPLAY | Mods.CINEMA |
-    Mods.TARGET
-)
-
+invalid_mods: Mods = InvalidMods.Standard
 current_cmd: Optional['Command'] = None
 
 # services

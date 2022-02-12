@@ -369,3 +369,5 @@ def real_type(value: str) -> Any:
         return orjson.loads(value)
     except:
         return value
+
+NONE_FILE = Path('none'*1000)
