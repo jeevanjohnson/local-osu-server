@@ -131,7 +131,7 @@ async def check_for_score_sub() -> None:
     from objects import Score
     from handlers import score_submit
 
-    if glob.replay_folder.exists():
+    if not glob.replay_folder.exists():
         print(
             "replay folder doesn't exist\n"
             "please restart server to have score sub working."
