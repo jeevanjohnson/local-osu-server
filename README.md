@@ -5,7 +5,7 @@ It was going great for a while along with the frequent updates recieved, right? 
 New design, new mindset, new me, new everything. The same features from v1 will be included, but the code base and idea of the project will be completely different.
 
 # Design of V2
-```Mermaid
+```mermaid
 flowchart LR
 USER(user)
 APPLICATION(application)
@@ -31,7 +31,7 @@ CONTROL_POINT --> SCORE_SUBMISSION_SERVICE
 ```
 
 # Directory Structure
-```Mermaid
+```mermaid
 flowchart LR
 coming_soon
 ```
