@@ -6,27 +6,30 @@ New design, new mindset, new me, new everything. The same features from v1 will 
 
 # Design of V2
 ```mermaid
-flowchart LR
+flowchart TB
 USER(user)
+USER_SYSTEM(user's system)
 APPLICATION(application)
 OSU_CLIENT(osu! client)
 BANCHO_SERVICE{bancho service}
 WEB_SERVICE{web service}
 AVATAR_SERVICE{avatar service}
 CONTROL_POINT{control service}
-SCORE_SUBMISSION_SERVICE{score-submission service}
+SCORE_SUBMISSION_SERVICE{score-submission daemon}
 DOMAIN((domain))
 CLOUD_FLARE((cloudflare))
 
 %% =================================
+USER -.-> USER_SYSTEM
+
 USER --> APPLICATION --> CONTROL_POINT
+USER_SYSTEM --> SCORE_SUBMISSION_SERVICE
 
 USER --> OSU_CLIENT --> DOMAIN --> CLOUD_FLARE  --> CONTROL_POINT
 
 CONTROL_POINT --> BANCHO_SERVICE
 CONTROL_POINT --> WEB_SERVICE
 CONTROL_POINT --> AVATAR_SERVICE
-CONTROL_POINT --> SCORE_SUBMISSION_SERVICE
 ```
 
 # Directory Structure
