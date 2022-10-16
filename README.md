@@ -10,19 +10,18 @@ flowchart LR
 USER(user)
 APPLICATION(application)
 OSU_CLIENT(osu! client)
-PARSING_SERVICE{parsing service} 
 BANCHO_SERVICE{bancho service}
 WEB_SERVICE{web service}
 AVATAR_SERVICE{avatar service}
 CONTROL_POINT{control service}
 SCORE_SUBMISSION_SERVICE{score-submission service}
 DOMAIN((domain))
-CLOUD_FLARE((cloud flare))
+CLOUD_FLARE((cloudflare))
 
 %% =================================
 USER --> APPLICATION --> CONTROL_POINT
 
-USER --> OSU_CLIENT --> DOMAIN --> CLOUD_FLARE --> PARSING_SERVICE --> CONTROL_POINT
+USER --> OSU_CLIENT --> DOMAIN --> CLOUD_FLARE  --> CONTROL_POINT
 
 CONTROL_POINT --> BANCHO_SERVICE
 CONTROL_POINT --> WEB_SERVICE
