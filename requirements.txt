@@ -1,8 +1,0 @@
-orjson
-aiohttp
-pyimgur
-colorama
-pyttanko
-pydantic
-colorama
-pyperclip
