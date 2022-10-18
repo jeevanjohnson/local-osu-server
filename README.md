@@ -9,11 +9,12 @@ New design, new mindset, new me, new everything. The same features from v1 will 
 flowchart TB
 USER(user)
 USER_SYSTEM(user's system)
-APPLICATION(application)
+FRONTEND(frontend)
 OSU_CLIENT(osu! client)
-BANCHO_ROUTERS{bancho routers}
-WEB_ROUTERS{web routers}
-AVATAR_ROUTERS{avatar routers}
+FRONTEND_ROUTER{frontend router}
+BANCHO_ROUTER{bancho router}
+WEB_ROUTER{web router}
+AVATAR_ROUTER{avatar router}
 SERVER{server}
 SCORE_SUBMISSION_DAEMON{score-submission daemon}
 DOMAIN((domain))
@@ -23,14 +24,14 @@ USECASES{usecases\n\nTODO: expand on this idea}
 %% =================================
 USER -.-> USER_SYSTEM
 
-USER --> APPLICATION --> USECASES
+USER --> FRONTEND --> SERVER --> FRONTEND_ROUTER --> USECASES
 USER_SYSTEM --> SCORE_SUBMISSION_DAEMON --> USECASES
 
 USER --> OSU_CLIENT --> DOMAIN --> CLOUD_FLARE  --> SERVER
 
-SERVER --> BANCHO_ROUTERS --> USECASES
-SERVER --> WEB_ROUTERS --> USECASES
-SERVER --> AVATAR_ROUTERS --> USECASES
+SERVER --> BANCHO_ROUTER --> USECASES
+SERVER --> WEB_ROUTER --> USECASES
+SERVER --> AVATAR_ROUTER --> USECASES
 ```
 
 # Notion Dashboard
