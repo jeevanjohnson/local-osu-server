@@ -33,8 +33,5 @@ CONTROL_POINT --> WEB_ROUTERS
 CONTROL_POINT --> AVATAR_ROUTERS
 ```
 
-# Directory Structure
-```mermaid
-flowchart LR
-coming_soon
-```
+# Notion Dashboard
+If you want to see the specific parts of the project I'm working on or will work on, check out [my notion page on this project!](https://kindhearted-behavior-65b.notion.site/Local-osu-server-edc82b4582e94a6eae641fefdfcfcc4f)
