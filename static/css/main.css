@@ -1,0 +1,29 @@
+body {
+    background-color: black;
+    color: white;
+    text-align: center;
+    font-family: 'Noto Sans', sans-serif;
+}
+
+.welcome {
+    position: relative;
+    top: 300px;
+    text-shadow: 0px 0px 20px white !important;
+}
+
+button {
+    position: relative;
+    top: 400px;
+    font-family: 'Noto Sans', sans-serif;
+    font-size: 150%;
+    color: white;
+    background-color: black;
+    border-color: white;
+    border-radius: 5px;
+    transition: transform 200ms, background-color 200ms;
+}
+
+button:hover {
+    transform: translateY(-2px);
+    background-color: gray;
+}

@@ -9,7 +9,7 @@ New design, new mindset, new me, new everything. The same features from v1 will 
 flowchart TB
 USER(user)
 USER_SYSTEM(user's system)
-APPLICATION(application)
+WEB_APPLICATION(web app)
 OSU_CLIENT(osu! client)
 BANCHO_ROUTERS{bancho routers}
 WEB_ROUTERS{web routers}
@@ -23,7 +23,7 @@ CLOUD_FLARE((cloudflare))
 %% =================================
 USER -.-> USER_SYSTEM
 
-USER --> APPLICATION --> SERVER --> CONTROL_POINT
+USER --> WEB_APPLICATION --> SERVER --> CONTROL_POINT
 USER_SYSTEM --> SCORE_SUBMISSION_DAEMON
 
 USER --> OSU_CLIENT --> DOMAIN --> CLOUD_FLARE  --> SERVER --> CONTROL_POINT
