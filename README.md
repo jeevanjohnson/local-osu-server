@@ -9,7 +9,7 @@ New design, new mindset, new me, new everything. The same features from v1 will 
 flowchart TB
 USER(user)
 USER_SYSTEM(user's system)
-APPLICATION(application)
+FRONTEND(frontend)
 OSU_CLIENT(osu! client)
 FRONTEND_ROUTER{frontend router}
 BANCHO_ROUTER{bancho router}
@@ -24,8 +24,8 @@ USECASES{usecases\n\nTODO: expand on this idea}
 %% =================================
 USER -.-> USER_SYSTEM
 
-USER --> APPLICATION --> SERVER --> CONTROL_POINT
-USER_SYSTEM --> SCORE_SUBMISSION_DAEMON
+USER --> FRONTEND --> SERVER --> FRONTEND_ROUTER --> USECASES
+USER_SYSTEM --> SCORE_SUBMISSION_DAEMON --> USECASES
 
 USER --> OSU_CLIENT --> DOMAIN --> CLOUD_FLARE  --> SERVER
 
