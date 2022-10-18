@@ -9,32 +9,30 @@ New design, new mindset, new me, new everything. The same features from v1 will 
 flowchart TB
 USER(user)
 USER_SYSTEM(user's system)
-WEB_APPLICATION(web app)
+APPLICATION(application)
 OSU_CLIENT(osu! client)
-BANCHO_ROUTERS{bancho routers}
-WEB_ROUTERS{web routers}
-AVATAR_ROUTERS{avatar routers}
-CONTROL_POINT{control routers}
+FRONTEND_ROUTER{frontend router}
+BANCHO_ROUTER{bancho router}
+WEB_ROUTER{web router}
+AVATAR_ROUTER{avatar router}
 SERVER{server}
 SCORE_SUBMISSION_DAEMON{score-submission daemon}
 DOMAIN((domain))
 CLOUD_FLARE((cloudflare))
+USECASES{usecases\n\nTODO: expand on this idea}
 
 %% =================================
 USER -.-> USER_SYSTEM
 
-USER --> WEB_APPLICATION --> SERVER --> CONTROL_POINT
+USER --> APPLICATION --> SERVER --> CONTROL_POINT
 USER_SYSTEM --> SCORE_SUBMISSION_DAEMON
 
-USER --> OSU_CLIENT --> DOMAIN --> CLOUD_FLARE  --> SERVER --> CONTROL_POINT
+USER --> OSU_CLIENT --> DOMAIN --> CLOUD_FLARE  --> SERVER
 
-CONTROL_POINT --> BANCHO_ROUTERS
-CONTROL_POINT --> WEB_ROUTERS
-CONTROL_POINT --> AVATAR_ROUTERS
+SERVER --> BANCHO_ROUTER --> USECASES
+SERVER --> WEB_ROUTER --> USECASES
+SERVER --> AVATAR_ROUTER --> USECASES
 ```
 
-# Directory Structure
-```mermaid
-flowchart LR
-coming_soon
-```
+# Notion Dashboard
+If you want to see the specific parts of the project I'm working on or will work on, check out [my notion page on this project!](https://kindhearted-behavior-65b.notion.site/Local-osu-server-edc82b4582e94a6eae641fefdfcfcc4f)
