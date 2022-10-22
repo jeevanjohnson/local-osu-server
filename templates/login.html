@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title></title>
+    <link rel="stylesheet" href="/static/css/main.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans:wght@300&display=swap');
+    </style>
+</head>
+
+<body>
+
+    {% for profile in profiles %}
+    <a href="{{ settings.BASE_URL }}/login/{{ profile.name }}"><button class="centerobjects">
+
+            {% if profile.avatar_url is not none %}
+            <img src="{{ profile.avatar_url }}" />
+            {% else %}
+            <img width="200" height="200"
+                src="https://cdn.discordapp.com/attachments/484532623792930820/888948278194995230/unknown.png" />
+            {% endif %}
+            <br>
+            {{ profile.name }}
+        </button></a>
+    {% endfor %}
+
+    <a href="{{ settings.BASE_URL }}/create"><button class="centerobjects">+</button></a>
+
+</body>
+
+</html>

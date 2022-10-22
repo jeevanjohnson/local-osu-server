@@ -11,9 +11,12 @@ body {
     text-shadow: 0px 0px 20px white !important;
 }
 
-button {
+.centerobjects {
     position: relative;
     top: 400px;
+}
+
+button {
     font-family: 'Noto Sans', sans-serif;
     font-size: 150%;
     color: white;

@@ -4,6 +4,7 @@ from fastapi import FastAPI
 import globals
 import httpx
 import routers
+import sqlmodel
 import asyncio
 from fastapi.staticfiles import StaticFiles
 from daemons.score_submission import score_submission
@@ -22,6 +23,16 @@ def init_events(app: FastAPI):
     @app.on_event("startup")
     async def startup() -> None:
         globals.http.client = httpx.AsyncClient()
+
+        import models  # initialize models
+
+        globals.database.engine = sqlmodel.create_engine(
+            url="sqlite:///./.data/server.db", echo=True
+        )
+
+        sqlmodel.SQLModel.metadata.create_all(
+            globals.database.engine,
+        )
 
     print("Initialized events")
 
