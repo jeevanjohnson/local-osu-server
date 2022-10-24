@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title></title>
+    <link rel="stylesheet" href="/static/css/main.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans:wght@300&display=swap');
+
+        .profile_card {
+            background-color: grey;
+            color: rgb(255, 255, 255);
+            width: 50%;
+            height: 50%;
+        }
+
+        .avatar_border {
+            border: 3px solid #555;
+            border-radius: 15px;
+        }
+
+        .text_glow {
+            text-shadow: 1px 1px 10px #fff, 1px 1px 10px #ccc;
+        }
+
+        .text_spacing {
+            letter-spacing: 3px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <center>
+        <div class="profile_card">
+            <br>
+            {% if profile.avatar_url is not none %}
+            <img class="avatar_border" src="{{ profile.avatar_url }}" />
+            {% else %}
+            <img class="avatar_border" width="200" height="200"
+                src="https://cdn.discordapp.com/attachments/484532623792930820/888948278194995230/unknown.png" />
+            {% endif %}
+            <br>
+            <h1 class="text_glow text_spacing">{{ profile.name }}</h1>
+            <br>
+            <button>
+                Stats
+            </button>
+            <button>Top Plays</button>
+            <button>Recent Plays</button>
+            <button>Settings</button>
+        </div>
+    </center>
+
+</body>
+
+</html>

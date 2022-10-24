@@ -1,13 +1,10 @@
 from fastapi import HTTPException
 from typing import Optional
-import globals
 import settings
-from fastapi import Body
 from fastapi import APIRouter
 from fastapi import Request
 import usecases
 from fastapi.responses import RedirectResponse
-from sqlmodel import Session
 from fastapi import Depends
 from fastapi.templating import Jinja2Templates
 
@@ -56,11 +53,11 @@ async def create(
         if profile_name is None:
             raise HTTPException(status_code=404, detail="profile name is none?")
 
-        profile_exist = usecases.profiles.profile_exist(profile_name)
+        profile_exist = usecases.profiles.exist(profile_name)
         if profile_exist:
             raise HTTPException(status_code=409, detail="profile name already exist")
 
-        profile_id = usecases.profiles.create_profile(profile_name)
+        profile_id = usecases.profiles.create(profile_name)
 
         return RedirectResponse(
             url=f"{settings.BASE_URL}/profile/{profile_name}",
@@ -76,7 +73,7 @@ async def create(
 async def login(
     request: Request,
 ):
-    profiles = usecases.profiles.get_all()
+    profiles = usecases.profiles.all()
 
     return templates.TemplateResponse(
         name="login.html",
@@ -84,5 +81,28 @@ async def login(
             "request": request,
             "settings": settings,
             "profiles": profiles,
+        },
+    )
+
+
+@router.get("/login/{profile_name}")
+async def profile(
+    request: Request,
+    profile_name: str,
+):
+    profile = usecases.profiles.from_name(profile_name)
+
+    if not profile:
+        raise HTTPException(
+            status_code=404,
+            detail="profile not found",
+        )
+
+    return templates.TemplateResponse(
+        name="profile.html",
+        context={
+            "request": request,
+            "settings": settings,
+            "profile": profile,
         },
     )

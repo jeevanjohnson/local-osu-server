@@ -24,6 +24,9 @@ def init_events(app: FastAPI):
     async def startup() -> None:
         globals.http.client = httpx.AsyncClient()
 
+        if not os.path.exists('./.data'):
+            os.mkdir('./.data')
+
         import models  # initialize models
 
         globals.database.engine = sqlmodel.create_engine(

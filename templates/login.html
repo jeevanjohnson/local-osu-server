@@ -12,7 +12,7 @@
 <body>
 
     {% for profile in profiles %}
-    <a href="{{ settings.BASE_URL }}/login/{{ profile.name }}"><button class="centerobjects">
+    <a href="{{ settings.BASE_URL }}/login/{{ profile.name }}"><button class="centerobjects main_button">
 
             {% if profile.avatar_url is not none %}
             <img src="{{ profile.avatar_url }}" />
@@ -25,7 +25,7 @@
         </button></a>
     {% endfor %}
 
-    <a href="{{ settings.BASE_URL }}/create"><button class="centerobjects">+</button></a>
+    <a href="{{ settings.BASE_URL }}/create"><button class="centerobjects main_button">+</button></a>
 
 </body>
 
