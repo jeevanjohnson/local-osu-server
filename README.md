@@ -16,7 +16,7 @@ Why do I even care for this server? Well when I got restricted on osu! back in 2
 
 4. Open the folder and double click the `main.py` file, from there the rest of the instructions are there for you to read and you should be good to go! (Note: most important information you will want to fill in is the paths, osu api key, and osu daily api key!)
 
-5. Just a note, when doing the `-devserver` method be sure to put the domain `coverbancho.tk` in as the domain, all this does is allow all osu! connections be redirected to your localhost.
+5. Just a note, when doing the `-devserver` method be sure to put the domain `catboy.click` in as the domain, all this does is allow all osu! connections be redirected to your localhost.
 
 # Linux Setup
 coming soon
