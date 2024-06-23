@@ -1,13 +1,14 @@
 # How to Setup mitmproxy
 
 ## Install mitmproxy
-[Watch this video tutorial](https://www.youtube.com/watch?v=AacH2L_D2B8&t=294s&pp=ygUjaG93IHRvIGluc3RhbGwgbWl0bXByb3h5IG9uIHdpbmRvd3M%3D) for detailed instructions on installing mitmproxy.
+[Watch this video tutorial](https://youtu.be/AacH2L_D2B8) for detailed instructions on installing mitmproxy.
 
 ## Download the Certificate
 Ensure that you've downloaded the certificate required for mitmproxy.
 
 ## Configure Proxies
 Make sure your proxy settings look like this:
+
 ![Proxy Settings](https://i.imgur.com/LrPBr4U.png)
 
 ## Install mitmproxy Python Package
