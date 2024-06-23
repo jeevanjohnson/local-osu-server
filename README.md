@@ -17,10 +17,10 @@ I was restricted on osu! in 2018. This project was born out of a desire to conti
 2. **Download and Set Up the Project:**
    - Clone or download the LOS project files.
    - Rename the `example.env` file to `.env`. (Automatic renaming is planned for a future update)
-   - Navigate to the `scripts` folder within the project directory.
    - Run the following batch files:
      - `run_server.bat` (starts the server)
      - `run_web_client.bat` (launches the web client)
+     - `update_packages.bat` (installs and updates packages)
 
 **Troubleshooting and Support**
 
