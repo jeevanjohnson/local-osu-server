@@ -1,8 +1,6 @@
-orjson
-aiohttp
-pyimgur
-colorama
-pyttanko
-pydantic
-colorama
-pyperclip
+fastapi==0.111.0
+mitmproxy==10.3.1
+python-dotenv==1.0.1
+selenium==4.22.0
+uvicorn==0.30.1
+webdriver_manager==4.0.1

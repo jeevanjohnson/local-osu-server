@@ -1,32 +1,35 @@
-# Local osu! server
+# LOS (Local osu! server)
 
-Just imagine normal bancho, but you can have multiple profiles and funorange speed up maps ranked!
+**Purpose**
 
-# Purpose
-Main purpose of this server is that it can replicate the bancho like experiences with lbs and ranking, but also have its own cool little features, like osu!trainer rankings. The idea for the server is so that anyone can run it on any machine (aiming user friendly) without having the hassle of nginx, certificates, linux, etc.
+LOS aims to simulate the experience of playing on the official osu! server (bancho). It provides features like leaderboards and rankings, while also offering unique functionalities not found on bancho. This includes the ability to rank scores achieved on modified maps using the osutrainer application (https://github.com/FunOrange/osu-trainer).
 
-Why do I even care for this server? Well when I got restricted on osu! back in 2018, I wanted to feel the bancho experience like gaining ranks and such without breaking rules while being restricted, that same idea came back to me this year (2021) and now that I have the knowledge I can finally bring that to reality.
+**Why LOS?**
 
-# Windows Setup
-1. Install python, specifically [python3.9.5](https://www.python.org/downloads/release/python-395/)! [64-bit download](https://www.python.org/ftp/python/3.9.5/python-3.9.5-amd64.exe), [32-bit download](https://www.python.org/ftp/python/3.9.5/python-3.9.5.exe) 
+I was restricted on osu! in 2018. This project was born out of a desire to continue enjoying the experience of gaining ranks and improving gameplay without violating any rules while I restricted. Now, with the acquired knowledge, I aim to make that dream a reality for others who might be in a similar situation.
 
-~~2. You will most likely need to uninstall python3.10 from your system, due to instability~~
+**Windows Setup**
 
-3. Download [the code](https://github.com/coverosu/local-osu-server/archive/refs/heads/main.zip) and extract to a folder
+1. **Install Python:**
+   Download and install Python 3.11.9
+   - [Direct Link](https://www.python.org/downloads/release/python-3119/)
 
-4. Open the folder and double click the `main.py` file, from there the rest of the instructions are there for you to read and you should be good to go! (Note: most important information you will want to fill in is the paths, osu api key, and osu daily api key!)
+2. **Download and Set Up the Project:**
+   - Clone or download the LOS project files.
+   - Rename the `example.env` file to `.env`. (Automatic renaming is planned for a future update)
+   - Navigate to the `scripts` folder within the project directory.
+   - Run the following batch files:
+     - `run_server.bat` (starts the server)
+     - `run_web_client.bat` (launches the web client)
 
-5. Just a note, when doing the `-devserver` method be sure to put the domain `coverbancho.tk` in as the domain, all this does is allow all osu! connections be redirected to your localhost.
+**Troubleshooting and Support**
 
-# Linux Setup
-coming soon
+If you encounter any issues while running LOS, please feel free to reach out to coverrrr on Discord.
 
-# Reminders
-Any unknown errors you see when setting up or just playing, please report them to me on discord `cover#0675` :)
+**Current Status**
 
-To make/play with different profiles, when logging in be sure to put the username of the profile you want to play/make and it will automaticly make/go onto the profile.
+[X] LOS is currently functional for its intended purpose.
 
-# Huge TODOS(?)
+**Developer Notes**
 
-- Support other modes?
-- switch to sqlite rather then use json as db
+This project utilizes the "todo-to-issue" GitHub Marketplace action. Please be mindful that any committed TODO items might be automatically converted into GitHub issues.

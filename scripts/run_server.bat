@@ -1,0 +1,1 @@
+py ./server/main.py
