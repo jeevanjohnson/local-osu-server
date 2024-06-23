@@ -7,6 +7,9 @@ Main purpose of this server is that it can replicate the bancho like experiences
 
 Why do I even care for this server? Well when I got restricted on osu! back in 2018, I wanted to feel the bancho experience like gaining ranks and such without breaking rules while being restricted, that same idea came back to me this year (2021) and now that I have the knowledge I can finally bring that to reality.
 
+# LOS V3
+I'm currently working on a new version of LOS to stay up to date with it, [check it out here](https://github.com/jeevanjohnson/local-osu-server/tree/v3) & since the server is getting some traction, I'll most likely be making a discord server for the production and allows the community to help others as well rather than soley me
+
 # Windows Setup
 1. Install python, specifically [python3.9.5](https://www.python.org/downloads/release/python-395/)! [64-bit download](https://www.python.org/ftp/python/3.9.5/python-3.9.5-amd64.exe), [32-bit download](https://www.python.org/ftp/python/3.9.5/python-3.9.5.exe) 
 
