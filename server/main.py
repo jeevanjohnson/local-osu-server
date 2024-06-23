@@ -40,9 +40,6 @@ async def lifespan(app: FastAPI):
     # TODO: Add an easier method of connecting without mitmproxy
     # preferably the "cloudflare method"
 
-    if settings.MITMPROXY:
-        print("Run the 'mitmproxy.sh'")
-    
     yield 
             
 
