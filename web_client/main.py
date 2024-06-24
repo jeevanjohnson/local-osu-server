@@ -4,10 +4,15 @@ import os
 from webdriver_manager.chrome import ChromeDriverManager
 import settings
 import constants
+import os
+import time
+
+os.environ['WDM_SSL_VERIFY'] = '0'
+
 
 def infinite_loop():
     while True:
-        pass
+        time.sleep(10)
 
 
 def main() -> None:
