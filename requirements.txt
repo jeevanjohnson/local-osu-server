@@ -4,3 +4,5 @@ python-dotenv==1.0.1
 selenium==4.22.0
 uvicorn==0.30.1
 webdriver_manager==4.0.1
+sqlmodel
+psutil

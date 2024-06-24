@@ -1,1 +1,1 @@
-py ./server/main.py
+py ./app/server/main.py

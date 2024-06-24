@@ -4,6 +4,9 @@ from fastapi import Request, Response
 from fastapi import Header, Depends
 from uuid import uuid4
 
+import login_handler
+from login_handler import LoginData
+
 bancho_handling_router = APIRouter(default_response_class=Response, prefix="/c")
 
 
@@ -21,11 +24,14 @@ async def handle_request(request: Request):
 
 
 async def handle_login(request: Request):
-    login_data = await request.body()
-    print(login_data)
+    raw_login_data = await request.body()
+
+    login_data: LoginData = login_handler.parse_login(raw_login_data)
+
 
     # import hashlib
     # hashlib.md5()
+    # verify login
 
     response = bytearray()
 

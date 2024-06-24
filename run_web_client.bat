@@ -1,1 +1,1 @@
-py ./web_client/main.py
+py ./app/web_client/main.py
