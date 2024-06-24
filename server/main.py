@@ -38,12 +38,12 @@ async def lifespan(app: FastAPI):
     # static is the default folder that fastapi uses for grabbing
     # javascript and css files
 
-    # web_path_for_css_and_javascript_files = '/static'
-    # app.mount(
-    #     web_path_for_css_and_javascript_files,
-    #     StaticFiles(directory='./server/frontend/static'),
-    #     name='static'
-    # )
+    web_path_for_css_and_javascript_files = '/static'
+    app.mount(
+        web_path_for_css_and_javascript_files,
+        StaticFiles(directory='./server/frontend/static'),
+        name='static'
+    )
 
     # TODO: Add an easier method of connecting without mitmproxy
     # preferably the "cloudflare method"
