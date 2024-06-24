@@ -24,6 +24,7 @@ async def lifespan(app: FastAPI):
     # If a component is making multiple responsibilities, then it should be split into multiple components 👍    
     import frontend # Responsible for being the "GUI" for the user
     import osu_client # Responsible for capturing and processing requests from the osu! client and redirecting them to the according components
+                      # Also responsible for managing the osu! client
     import api # Responsible for retriving and processing information for the sake of manging the sqlite db of the server
     import local_data_fetcher # Responsible for fetching local data from the user's computer
     

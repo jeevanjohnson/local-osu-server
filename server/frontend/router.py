@@ -28,3 +28,12 @@ async def first_launch(
     
 # TODO: Setup an `open/close osu` button on the home page
 # Basically run `osu!.exe -devserver localosuserver.com` in the background
+
+@web_client_router.get("/dashboard")
+async def dashboard(
+    request: Request
+):
+    return templates.TemplateResponse(
+        name="dashboard.html", 
+        context={"request": request},
+    )
