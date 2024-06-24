@@ -1,9 +1,9 @@
 from fastapi import FastAPI
 import uvicorn
-import settings
 from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
 from fastapi.logger import logger
+import settings
 # import pipreqs
 
 # TODO: Use Relic for data
@@ -37,18 +37,19 @@ async def lifespan(app: FastAPI):
 
     # static is the default folder that fastapi uses for grabbing
     # javascript and css files
+
     web_path_for_css_and_javascript_files = '/static'
     app.mount(
-        web_path_for_css_and_javascript_files, 
-        StaticFiles(directory='./server/frontend/static'), 
+        web_path_for_css_and_javascript_files,
+        StaticFiles(directory='./server/frontend/static'),
         name='static'
     )
-    
+
     # TODO: Add an easier method of connecting without mitmproxy
     # preferably the "cloudflare method"
 
-    yield 
-            
+    yield
+
 
 app = FastAPI(lifespan=lifespan)
 
@@ -56,5 +57,6 @@ app = FastAPI(lifespan=lifespan)
 def root():
     return {"message": "FastAPI server is running!"}
 
-if __name__ == "__main__":   
+
+if __name__ == "__main__":
     uvicorn.run("main:app", port=8000, reload=True)
