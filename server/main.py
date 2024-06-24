@@ -18,15 +18,21 @@ from fastapi.logger import logger
 async def lifespan(app: FastAPI):
     if settings.DEVELOPER:
         logger.info("Running on Developer Mode")
-    
-    # add all necessary routerefs
-    import frontend
-    import osu_client
-    import api
+
+    # Each component is responsible for a different part of the server and SOLEY that part
+    # This is to make sure that the server is modular and easy to maintain
+    # If a component is making multiple responsibilities, then it should be split into multiple components 👍    
+    import frontend # Responsible for being the "GUI" for the user
+    import osu_client # Responsible for capturing and processing requests from the osu! client and redirecting them to the according components
+    import api # Responsible for retriving and processing information for the sake of manging the sqlite db of the server
+    import local_data_fetcher # Responsible for fetching local data from the user's computer
     
     app.include_router(frontend.web_client_router)
     app.include_router(osu_client.bancho_handling_router)
+    app.include_router(osu_client.application_router)
     app.include_router(api.api_authentication_router)
+    app.include_router(api.api_configuration_router)
+    app.include_router(local_data_fetcher.api_local_data_fetching_router)
 
     # static is the default folder that fastapi uses for grabbing
     # javascript and css files
@@ -50,4 +56,4 @@ def root():
     return {"message": "FastAPI server is running!"}
 
 if __name__ == "__main__":   
-    uvicorn.run("main:app", port=8000)#, #reload=True)
+    uvicorn.run("main:app", port=8000, reload=True)

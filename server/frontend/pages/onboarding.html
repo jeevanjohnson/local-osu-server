@@ -1,1 +1,140 @@
-HI HIHI
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Onboarding</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+
+        h1 {
+            text-align: center;
+        }
+
+        form {
+            max-width: 500px;
+            margin: 0 auto;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 10px;
+        }
+
+        input[type="file"],
+        input[type="checkbox"],
+        input[type="number"],
+        input[type="text"],
+        input[type="password"] {
+            width: 100%;
+            padding: 5px;
+            margin-bottom: 10px;
+        }
+
+        input[type="submit"] {
+            width: auto;
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Onboarding (Before You Hit Submit Make Sure Your osu! Client is opened.)</h1>
+    <form>
+        <label for="display_pp_on_leaderboard">
+            Do you want to display pp leaderboards? (meaning do you want to show pp for each individual score or just
+            the score on the leaderboard)
+        </label>
+        <input type="checkbox" id="display_pp_on_leaderboard" name="display_pp_on_leaderboard">
+
+        <label for="rank_scores_by_pp_or_score">Do you want to rank your scores based on pp or score? (meaning do you
+            want your score to
+            be overwritten by the max score you get or max pp)</label>
+        <input type="checkbox" id="rank_scores_by_pp_or_score" name="rank_scores_by_pp_or_score">
+
+        <label for="num_scores_seen_on_leaderboards">How many scores do you want to see on the leaderboard (max
+            100)?</label>
+        <input type="number" id="num_scores_seen_on_leaderboards" name="num_scores_seen_on_leaderboards" min="1"
+            max="100">
+
+        <label for="allow_pp_from_modified_maps">Do you want to have the ability to modify maps through the fun orange
+            application and
+            gain pp from it?</label>
+        <input type="checkbox" id="allow_pp_from_modified_maps" name="allow_pp_from_modified_maps">
+
+        <label for="osu_api_key">osu API key:</label>
+        <input type="text" id="osu_api_key" name="osu_api_key">
+
+        <label for="osu_daily_api_key">osu Daily API key:</label>
+        <input type="text" id="osu_daily_api_key" name="osu_daily_api_key">
+
+        <label for="osu_api_v2_key">osu API v2 key:</label>
+        <input type="text" id="osu_api_v2_key" name="osu_api_v2_key">
+
+        <label for="osu_username">osu username:</label>
+        <input type="text" id="osu_username" name="osu_username">
+
+        <label for="osu_password">osu password:</label>
+        <input type="password" id="osu_password" name="osu_password">
+
+    </form>
+
+    <input type="submit" value="Submit" onclick="sendData()" style="display: block; margin: 0 auto;">
+
+    <script>
+        // async function
+        const sendData = async () => {
+
+            // Get the form data
+            const form = document.querySelector('form');
+            const formData = new FormData(form);
+
+            const jsonObject = {};
+
+            // Convert formData to a JSON object
+            for (const [key, value] of formData.entries()) {
+                jsonObject[key] = value;
+            }
+
+            // get osu! path from /local_data_fetcher/osu_path and add it to the jsonObject
+            const osu_path_response = await fetch('/local_data_fetcher/osu_path');
+            if (osu_path_response.status >= 400) {
+                alert("Could not get osu! path because osu! isn't opened.");
+                return;
+            }
+
+            const osu_path_data = await osu_path_response.json();
+            jsonObject['osu_path'] = osu_path_data.osu_path;
+
+            const configuration_response = await fetch('/api/v1/configuration/update?from_onboarding=true', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(jsonObject)
+            });
+
+            if (configuration_response.status >= 400) {
+                alert('Not all data is correct or filled');
+                return;
+            }
+
+            // now kill the client
+            const kill_response = await fetch('/application/kill', {
+                method: 'POST'
+            });
+            if (kill_response.status >= 400) {
+                alert("Could not kill osu! client.");
+                return;
+            }
+        }
+    </script>
+</body>
+
+</html>

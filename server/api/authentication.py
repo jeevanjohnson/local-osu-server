@@ -2,4 +2,4 @@
 
 from fastapi.routing import APIRouter
 
-api_authentication_router = APIRouter(prefix="/api/v1")
+api_authentication_router = APIRouter(prefix="/api/v1/authentication")
