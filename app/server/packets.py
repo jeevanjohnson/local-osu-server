@@ -115,7 +115,7 @@ class PacketIDS(IntEnum):
 
 def write_uleb128(num: int) -> bytes:
     if num == 0:
-        return bytearray(b'\x00')
+        return bytearray(b"\x00")
 
     ret = bytearray()
     length = 0
@@ -131,28 +131,28 @@ def write_uleb128(num: int) -> bytes:
 
 def write_string(string: str) -> bytes:
     s = string.encode()
-    return b'\x0b' + write_uleb128(len(s)) + s
+    return b"\x0b" + write_uleb128(len(s)) + s
 
 def write_int(i: int) -> bytes:
-    return struct.pack('<i', i)
+    return struct.pack("<i", i)
 
 def write_unsigned_int(i: int) -> bytes:
-    return struct.pack('<I', i)
+    return struct.pack("<I", i)
 
 def write_float(f: float) -> bytes:
-    return struct.pack('<f', f)
+    return struct.pack("<f", f)
 
 def write_byte(b: int) -> bytes:
-    return struct.pack('<b', b)
+    return struct.pack("<b", b)
 
 def write_unsigned_byte(b: int) -> bytes:
-    return struct.pack('<B', b)
+    return struct.pack("<B", b)
 
 def write_short(s: int) -> bytes:
-    return struct.pack('<h', s)
+    return struct.pack("<h", s)
 
 def write_long_long(l: int) -> bytes:
-    return struct.pack('<q', l)
+    return struct.pack("<q", l)
 
 def write_list32(l: tuple[int]) -> bytes:
     ret = bytearray(write_short(len(l)))
@@ -163,86 +163,86 @@ def write_list32(l: tuple[int]) -> bytes:
     return bytes(ret)
 
 def write(packetid: int, *args) -> bytes:
-    p = bytearray(struct.pack('<Hx', packetid))
+    p = bytearray(struct.pack("<Hx", packetid))
 
     for ctx, _type in args:
-        if _type == 'str':
+        if _type == "str":
             p += write_string(ctx)
-        elif _type == 'int':
+        elif _type == "int":
             p += write_int(ctx)
-        elif _type == 'unint':
+        elif _type == "unint":
             p += write_unsigned_int(ctx)
-        elif _type == 'short':
+        elif _type == "short":
             p += write_short(ctx)
-        elif _type == 'float':
+        elif _type == "float":
             p += write_float(ctx)
-        elif _type == 'long':
+        elif _type == "long":
             p += write_long_long(ctx)
-        elif _type == 'byte':
+        elif _type == "byte":
             p += write_byte(ctx)
-        elif _type == 'unbyte':
+        elif _type == "unbyte":
             p += write_unsigned_byte(ctx)
-        elif _type == 'list_32':
+        elif _type == "list_32":
             p += write_list32(ctx)
         else:
-            p += struct.pack(f'<{_type}', ctx)
+            p += struct.pack(f"<{_type}", ctx)
 
-    p[3:3] = struct.pack('<I', len(p) - 3)
+    p[3:3] = struct.pack("<I", len(p) - 3)
     return bytes(p)
 
 def user_id(i: int) -> bytes:
     return write(
         PacketIDS.CHO_USER_ID,
-        (i, f"{'unint' if i > 0 else 'int'}")
+        (i, f"{"unint" if i > 0 else "int"}")
     )
 
 def notification(msg: str) -> bytes:
     return write(
         PacketIDS.CHO_NOTIFICATION,
-        (msg, 'str')
+        (msg, "str")
     )
 
 def protocol_version(i: int = 19):
     return write(
-        PacketIDS.CHO_PROTOCOL_VERSION, (i, 'int')
+        PacketIDS.CHO_PROTOCOL_VERSION, (i, "int")
     )
 
-def bancho_orivs(p: 'Player') -> bytes:
+def bancho_orivs(p: "Player") -> bytes:
     return write(
-        PacketIDS.CHO_PRIVILEGES, (p.bancho_privs, 'int')
+        PacketIDS.CHO_PRIVILEGES, (p.bancho_privs, "int")
     )
 
-def user_presence(p: 'Player') -> bytes:
+def user_presence(p: "Player") -> bytes:
     return write(
         PacketIDS.CHO_USER_PRESENCE,
-        (p.userid, 'int'), (p.name, 'str'),
-        (p.utc_offset + 24, 'unbyte'), (p.country, 'unbyte'),
-        (p.bancho_privs | p.mode << 5, 'unbyte'), (p.location[0], 'float'),
-        (p.location[1], 'float'), (p.rank, 'int')
+        (p.userid, "int"), (p.name, "str"),
+        (p.utc_offset + 24, "unbyte"), (p.country, "unbyte"),
+        (p.bancho_privs | p.mode << 5, "unbyte"), (p.location[0], "float"),
+        (p.location[1], "float"), (p.rank, "int")
     )
 
-def user_stats(p: 'Player') -> bytes:
+def user_stats(p: "Player") -> bytes:
     return write(
         PacketIDS.CHO_USER_STATS,
-        (p.userid, 'int'), (p.action, 'byte'),
-        (p.info_text, 'str'), (p.map_md5, 'str'),
-        (p.mods, 'int'), (p.mode, 'unbyte'),
-        (p.map_id, 'int'), (p.ranked_score, 'long'),
-        (p.acc / 100.0, 'float'), (p.playcount, 'int'),
-        (p.total_score, 'long'), (p.rank, 'int'),
-        (p.pp, 'short')
+        (p.userid, "int"), (p.action, "byte"),
+        (p.info_text, "str"), (p.map_md5, "str"),
+        (p.mods, "int"), (p.mode, "unbyte"),
+        (p.map_id, "int"), (p.ranked_score, "long"),
+        (p.acc / 100.0, "float"), (p.playcount, "int"),
+        (p.total_score, "long"), (p.rank, "int"),
+        (p.pp, "short")
     )
 
 def menu_icon(menu_icon: tuple[str, str]) -> bytes:
     return write(
         PacketIDS.CHO_MAIN_MENU_ICON,
-        ('|'.join(menu_icon), 'str')
+        ("|".join(menu_icon), "str")
     )
 
 def friends_list(*friends: int) -> bytes:
     return write(
         PacketIDS.CHO_FRIENDS_LIST,
-        (friends, 'list_32')
+        (friends, "list_32")
     )
 
 def channel_info_end() -> bytes:
@@ -250,7 +250,7 @@ def channel_info_end() -> bytes:
 
 def channelJoin(channel_name: str) -> bytes:
     return write(
-        PacketIDS.CHO_CHANNEL_JOIN_SUCCESS, (channel_name, 'str')
+        PacketIDS.CHO_CHANNEL_JOIN_SUCCESS, (channel_name, "str")
     )
 
 def channel_info(
@@ -260,35 +260,35 @@ def channel_info(
 ) -> bytes:
     return write(
         PacketIDS.CHO_CHANNEL_INFO,
-        (channel_name, 'str'), (channel_description, 'str'), (channel_player_count, 'short')
+        (channel_name, "str"), (channel_description, "str"), (channel_player_count, "short")
     )
 
 def friends_list(*friends) -> bytes:
     return write(
         PacketIDS.CHO_FRIENDS_LIST,
-        (friends, 'list_32')
+        (friends, "list_32")
     )
 
 def system_restart(ms: int = 0) -> bytes:
     return write(
-        PacketIDS.CHO_RESTART, (ms, 'int')
+        PacketIDS.CHO_RESTART, (ms, "int")
     )
 
 def logout(uid: int) -> bytes:
     return write(
         PacketIDS.CHO_USER_LOGOUT,
-        (uid, 'int'), (0, 'unbyte')
+        (uid, "int"), (0, "unbyte")
     )
 
 def send_message(client: str, msg: str, target: str, userid: int):
     return write(
         PacketIDS.CHO_SEND_MESSAGE,
-        (client, 'str'), (msg, 'str'),
-        (target, 'str'), (userid, 'int')
+        (client, "str"), (msg, "str"),
+        (target, "str"), (userid, "int")
     )
 
 def user_silenced(userid: int) -> bytes:
     return write(
         PacketIDS.CHO_USER_SILENCED,
-        (userid, 'int')
+        (userid, "int")
     )
