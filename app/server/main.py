@@ -7,7 +7,6 @@ import settings
 # import pipreqs
 
 
-
 # TODO: Use Relic for data
 # The idea is to allow the user to either accept/reject the offer to send data to relic
 # so that I have some more data that I can use if their is a bug or something
@@ -43,7 +42,7 @@ async def lifespan(app: FastAPI):
     web_path_for_css_and_javascript_files = '/static'
     app.mount(
         web_path_for_css_and_javascript_files,
-        StaticFiles(directory='./server/frontend/static'),
+        StaticFiles(directory='./app/server/frontend/static'),
         name='static'
     )
 

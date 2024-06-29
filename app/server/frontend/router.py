@@ -2,7 +2,7 @@ from fastapi.routing import APIRouter
 from fastapi.templating import Jinja2Templates
 from fastapi import Request
 
-templates = Jinja2Templates(directory="./server/frontend/pages")
+templates = Jinja2Templates(directory="./pages")
 
 web_client_router = APIRouter()
 
@@ -20,9 +20,9 @@ async def first_launch(
     # osu api v2 key (str)
     # osu username (str)
     # osu password (str)
-    
+
     return templates.TemplateResponse(
-        name="onboarding.html", 
+        name="onboarding.html",
         context={"request": request},
     )
 
@@ -31,6 +31,6 @@ async def dashboard(
     request: Request
 ):
     return templates.TemplateResponse(
-        name="dashboard.html", 
+        name="dashboard.html",
         context={"request": request},
     )
