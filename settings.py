@@ -3,8 +3,11 @@ import os
 
 load_dotenv()
 
-MITMPROXY = os.getenv("MITMPROXY") == "True"
-MITMPROXY_PORT= int(os.environ["MITMPROXY_PORT"]) or 8080
-DEVELOPER = os.getenv("DEVELOPER") == "True"
-OSU_PATH = os.getenv("OSU_PATH")
+MITMPROXY = os.environ["MITMPROXY"]
+MITMPROXY_PORT= int(os.environ.get("MITMPROXY_PORT", 8080))
+DEVELOPER = os.environ["DEVELOPER"]
+OSU_PATH = os.environ["OSU_PATH"]
 
+DEVELOPER = os.environ["DEVELOPER"]
+
+SQLLITE_FILE_NAME = os.environ["SQLLITE_FILE_NAME"]
