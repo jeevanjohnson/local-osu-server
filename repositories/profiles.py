@@ -63,9 +63,10 @@ class ProfilesRepository:
                     force_scorev2=False,
                     force_nf=False,
                     osu_trainer_beatmaps=osuTrainerBeatmapConfig(
-                        allow_submission=False,
-                        sync_rank_status_with_bancho=False,
-                    )
+                        allow_submission=True,
+                        sync_rank_status_with_bancho=True,
+                    ),
+                    self_rank=False
                 ),
             )
 

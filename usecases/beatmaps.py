@@ -25,7 +25,11 @@ def get_ossapi() -> Ossapi:
 
 def get_beatmap_from_md5(beatmap_md5: str) -> Beatmap | None:
     osuApi = get_ossapi()
-    beatmap = osuApi.beatmap(checksum=beatmap_md5)
+    try:
+        beatmap = osuApi.beatmap(checksum=beatmap_md5)
+    except ValueError:
+        return None
+    
     if not beatmap:
         return None
     
@@ -33,7 +37,11 @@ def get_beatmap_from_md5(beatmap_md5: str) -> Beatmap | None:
 
 def get_beatmap_from_id(beatmap_id: int) -> Beatmap | None:
     osuApi = get_ossapi()
-    beatmap = osuApi.beatmap(beatmap_id=beatmap_id)
+    try:
+        beatmap = osuApi.beatmap(beatmap_id=beatmap_id)
+    except ValueError:
+        return None
+
     if not beatmap:
         return None
     

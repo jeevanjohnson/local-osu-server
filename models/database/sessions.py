@@ -5,8 +5,6 @@ Purpose/Domain/Concept:
 
 from typing import TypedDict
 
-# Only one session will be active at a time so we can just
-
 class Session(TypedDict):
     profile_name: str | None
     loaded_beatmap_md5: str | None

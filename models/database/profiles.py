@@ -16,6 +16,7 @@ class Settings(TypedDict):
     force_scorev2: bool
     force_nf: bool
     osu_trainer_beatmaps: osuTrainerBeatmapConfig
+    self_rank: bool
 
 class Performance(TypedDict):
     rank: int

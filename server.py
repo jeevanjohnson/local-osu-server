@@ -5,10 +5,12 @@ Purpose/Domain/Concept:
 
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
-from controllers.osuRouters.assets import assets
-from controllers.osuRouters.beatmaps import beatmaps
-from controllers.osuRouters.bancho import bancho
-from controllers.osuRouters.avatar import avatar
+from controllers.subdomains.assets import assets
+from controllers.subdomains.beatmaps import beatmaps
+from controllers.subdomains.bancho import bancho
+from controllers.subdomains.avatar import avatar
+from controllers.subdomains.osu import osu
+from controllers.subdomains.resources import resources
 from constants import DATA_FOLDER
 from pathlib import Path
 import usecases.server_settings
@@ -33,6 +35,8 @@ app = FastAPI(lifespan=lifespan)
 app.include_router(assets)
 app.include_router(beatmaps)
 app.include_router(avatar)
+app.include_router(osu)
+app.include_router(resources)
 
 for subdomain in [
     '/c4', '/c5', '/c6', '/ce', '/c'

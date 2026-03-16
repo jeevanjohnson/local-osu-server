@@ -167,8 +167,6 @@ def handle_ping(packet: Ping):
     packet_type=ChangeAction
 )
 def on_action_change(packet: ChangeAction):
-    print(packet)
-
     session = usecases.sessions.get_current_session()
     if session is None or session["profile_name"] is None:
         return osuProtocol.server_packets.client_relog_response().build()
