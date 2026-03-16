@@ -216,14 +216,6 @@ class ChangeAction(Packet):
     current_game_mode: osuUnsignedChar = field(init=False)
     beatmap_id: osuIntSigned32Bit = field(init=False)
 
-    def __post_init__(self):
-        self.action = osuUnsignedChar(0)
-        self.info_text = osuString("")
-        self.beatmap_md5 = osuString("")
-        self.current_mods = osuIntUnsigned32Bit(0)
-        self.current_game_mode = osuUnsignedChar(0)
-        self.beatmap_id = osuIntSigned32Bit(0)
-
     def __repr__(self) -> str:
         return pformat({
             "action": self.action,
@@ -233,7 +225,15 @@ class ChangeAction(Packet):
             "current_game_mode": self.current_game_mode,
             "beatmap_id": self.beatmap_id,
         })
-    
+
+@handles(ClientPackets.PING)
+@dataclass
+class Ping(Packet):
+    pass
+
+    def __repr__(self) -> str:
+        return "<Ping Packet>"
+
 class Packets(list[Packet]):
     def __init__(self, raw_packet_data: bytes) -> None:
         self.raw_packet_data = raw_packet_data
@@ -270,7 +270,7 @@ class Packets(list[Packet]):
                 continue
 
             if packet_id not in READABLE_PACKETS:
-                print("Skipping unimplemented packet with ID:", packet_id)
+                print("Skipping unimplemented packet with ID:", packet_id.name)
                 self.offset += packet_length
                 continue
             
@@ -280,16 +280,18 @@ class Packets(list[Packet]):
                 raw_data=self.remaining_data[:packet_header["packet_length"]]
             )
 
-            consumed = packet.read()
-            if consumed != packet_length:
-                print(
-                    "Packet length mismatch:",
-                    packet_id,
-                    "declared=",
-                    packet_length,
-                    "consumed=",
-                    consumed,
-                )
+            # consumed = packet.read()
+            # if consumed != packet_length:
+            #     print(
+            #         "Packet length mismatch:",
+            #         packet_id,
+            #         "declared=",
+            #         packet_length,
+            #         "consumed=",
+            #         consumed,
+            #     )
 
+            packet.read()
+            
             self.offset += packet_length
             self.append(packet)

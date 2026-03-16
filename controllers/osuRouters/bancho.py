@@ -13,7 +13,7 @@ import usecases.profiles
 import osuProtocol.server_packets
 from osuProtocol.server_packets import bytes_to_string, osuGameMode, osuCountryCode, string_to_bytes, ClientRelog
 from osuProtocol.server_packets import PlayerStats, Packets as ServerPackets, osuAction, osuMods, osuGameMode
-from osuProtocol.client_packets import Packets, ClientPackets, ChangeAction, Packet
+from osuProtocol.client_packets import Packets, ClientPackets, ChangeAction, Packet, Ping
 from typing import Callable
 
 bancho = APIRouter()
@@ -114,15 +114,16 @@ async def client_request_handler(
 
     for packet in incoming_packets:
         if packet._id not in PACKET_HANDLERS:
-            print(f"Received packet with ID {ClientPackets(packet._id)} but no handler is registered for this packet type.")
+            print(f"Received packet with ID {ClientPackets(packet._id).name} but no handler is registered for this packet type.")
             continue
 
         emergency_response = PACKET_HANDLERS[ClientPackets(packet._id)](packet)
 
         if emergency_response is not None:
-            print(
-                f"Emergency response triggered for packet ID {ClientPackets(packet._id)}. Sending response to client and skipping remaining packets in the queue."
-            )
+            print((
+                f"Emergency response triggered for packet ID {ClientPackets(packet._id).name}. "
+                "Sending response to client and skipping remaining packets in the queue."
+            ))
             return Response(
                 content=emergency_response,
             )
@@ -132,8 +133,6 @@ async def client_request_handler(
         return Response(content=b"")
 
     response_packets = string_to_bytes(packet_queue)
-
-    print("Sending response to client with the following packets in the queue: ", response_packets)
 
     session["packet_queue"] = None
     usecases.sessions.update_current_session(session)
@@ -154,6 +153,13 @@ def register_packet_handler(packet_id: ClientPackets, packet_type: type[PacketTy
         PACKET_HANDLERS[packet_id] = wrapper
         return func
     return inner
+
+@register_packet_handler(
+    ClientPackets.PING,
+    packet_type=Ping
+)
+def handle_ping(packet: Ping):
+    return
 
 @register_packet_handler(
     ClientPackets.CHANGE_ACTION, 
@@ -180,6 +186,25 @@ def on_action_change(packet: ChangeAction):
         session["loaded_beatmap_md5"] = None
     
     session["loaded_beatmap_id"] = packet.beatmap_id.value
+
+    beatmap = usecases.beatmaps.get_beatmap(
+        md5 = packet.beatmap_md5.value,
+        beatmap_id = packet.beatmap_id.value
+    )
+
+    # start working on apiv1 & v2 implemention within the server to do more stuff
+    # will now need a global config to reference for api keys
+    # but profile specific config for stuff tailored to specific profiles
+    # ex. pp calc, allowing relax / autopilot scores, 
+    # will have to update readme
+    # also I would like to add a bio section to each profile on gui
+    # also import score button would be epic
+    # 
+
+    if beatmap is not None:
+        session["loaded_beatmap_set_id"] = beatmap["beatmap_set_id"]
+    else:
+        session["loaded_beatmap_set_id"] = None
 
     ranked_score = profile[profile_name]["performance"][str(packet.current_game_mode.value)]["ranked_score"]
     accuracy = profile[profile_name]["performance"][str(packet.current_game_mode.value)]["accuracy"]

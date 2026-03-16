@@ -181,9 +181,8 @@ async def dashboard():
     else:
         profile_picture = "https://a.ppy.sh/"
     
-    pfp_file_upload: FileUpload | None = None
-
     # profile picture changing
+    pfp_file_upload: FileUpload | None = None
 
     async def _on_change_profile_picture_click():
         dialog.close()
@@ -244,7 +243,30 @@ async def dashboard():
             size = (256, 256)
         )
     
-    render_profile_picture(profile_picture)
+    @ui.refreshable
+    def render_currently_looking_at():
+        session = usecases.sessions.get_current_session()
+        if session is None:
+            ui.label("No active session found. Please log in again.")
+            return
+    
+        beatmap_set_id = session["loaded_beatmap_set_id"]
+    
+        import time
+
+        if beatmap_set_id is None:
+            ui.label(f"Not currently looking at any beatmap in game.")
+            return        
+
+        ui.interactive_image(
+            f"https://assets.ppy.sh/beatmaps/{beatmap_set_id}/covers/cover.jpg"
+        )
+
+    with ui.row():
+        render_profile_picture(profile_picture)
+        render_currently_looking_at()
+
+        ui.timer(2, render_currently_looking_at.refresh) 
     
     ui.button(
         "Change Profile Picture", 

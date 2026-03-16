@@ -795,7 +795,7 @@ def bancho_bot() -> Packets:
         user_id=3,
         username="BanchoBot",
         utc_offset=0,
-        country_code=osuCountryCode.XX,
+        country_code=osuCountryCode.NA,
         user_privileges=ALL_PRIVILEGES,
         game_mode=osuGameMode.STANDARD,
         longitude=0.0,

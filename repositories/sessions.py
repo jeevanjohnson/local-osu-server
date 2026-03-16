@@ -30,6 +30,7 @@ class SessionsRepository:
                 current_game_mode=None,
                 packet_queue=None,
                 loaded_beatmap_id=None,
+                loaded_beatmap_set_id=None,
             ))
     
     def update_current_session(self, session: Session) -> None:
