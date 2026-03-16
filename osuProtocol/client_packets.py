@@ -3,3 +3,293 @@ Purpose/Domain/Concept:
 - This module defines the packet IDs for packets sent BY the osu! client TO the server.
 - These are the packets the server needs to READ and handle.
 """
+
+from dataclasses import dataclass, field
+from enum import IntEnum
+from enum import unique
+import struct
+from typing import TypedDict
+from typing import Type, TypeVar, Callable
+from osuProtocol.osuTypes import osuIntSigned32Bit, osuIntUnsigned32Bit, osuString, osuUnsignedChar, osuBaseType
+from dataclasses import fields
+from pprint import pformat
+from typing import get_type_hints
+
+@unique
+class ClientPackets(IntEnum):
+    """
+    Packet IDs that the osu! client sends to the server.
+    
+    These are organized by functionality:
+    - 0-9: User status and messaging
+    - 10-15: Spectating
+    - 16-27: Channel and chat
+    - 28-35: Match/lobby
+    - 36-50: Multiplayer match
+    - 51-61: Match gameplay
+    - 62-70: Beatmaps and friends
+    - 71-82: User features
+    - 83-95: Presence and settings
+    - 96-109: Tournament and advanced features
+    """
+
+    # ===================
+    # User & Messaging
+    # ===================
+    
+    UNKNOWN_PACKET = -1  # Unmapped packet
+    
+    CHANGE_ACTION = 0           # User status change (playing, idle, etc.)
+    SEND_PUBLIC_MESSAGE = 1    # Send message to a channel
+    LOGOUT = 2                 # Player logout
+    REQUEST_STATUS_UPDATE = 3 # Request user status update
+    PING = 4                   # Keepalive ping
+
+    # ===================
+    # Spectating
+    # ===================
+    
+    START_SPECTATING = 16      # Start spectating a player
+    STOP_SPECTATING = 17      # Stop spectating
+    SPECTATE_FRAMES = 18       # Spectator frame data
+    ERROR_REPORT = 20          # Client error report
+    CANT_SPECTATE = 21         # Cannot spectate (in game)
+
+    # ===================
+    # Private Messaging
+    # ===================
+    
+    SEND_PRIVATE_MESSAGE = 25  # Send DM to a player
+
+    # ===================
+    # Lobby
+    # ===================
+    
+    PART_LOBBY = 29            # Leave the lobby
+    JOIN_LOBBY = 30            # Join the lobby
+
+    # ===================
+    # Match
+    # ===================
+    
+    CREATE_MATCH = 31          # Create multiplayer match
+    JOIN_MATCH = 32           # Join a match
+    PART_MATCH = 33            # Leave a match
+
+    MATCH_CHANGE_SLOT = 38    # Change slot in match
+    MATCH_READY = 39          # Ready up in match
+    MATCH_LOCK = 40            # Lock/unlock slot
+    MATCH_CHANGE_SETTINGS = 41 # Change match settings
+    MATCH_START = 44           # Start match
+    MATCH_SCORE_UPDATE = 47    # Update score during play
+    MATCH_COMPLETE = 49        # Match finished
+
+    # ===================
+    # Match Mods & Gameplay
+    # ===================
+    
+    MATCH_CHANGE_MODS = 51    # Change mods in match
+    MATCH_LOAD_COMPLETE = 52  # Finished loading beatmap
+    MATCH_NO_BEATMAP = 54      # No beatmap selected
+    MATCH_NOT_READY = 55       # Not ready in match
+    MATCH_FAILED = 56          # Player failed
+    MATCH_HAS_BEATMAP = 59     # Has beatmap selected
+    MATCH_SKIP_REQUEST = 60   # Request to skip
+
+    # ===================
+    # Channels
+    # ===================
+    
+    CHANNEL_JOIN = 63          # Join a channel
+    CHANNEL_PART = 78          # Leave a channel
+    RECEIVE_UPDATES = 79       # Toggle receiving updates
+
+    # ===================
+    # Beatmaps & Info
+    # ===================
+    
+    BEATMAP_INFO_REQUEST = 68  # Request beatmap info
+    MATCH_TRANSFER_HOST = 70   # Transfer host in match
+
+    # ===================
+    # Friends
+    # ===================
+    
+    FRIEND_ADD = 73            # Add friend
+    FRIEND_REMOVE = 74        # Remove friend
+
+    # ===================
+    # Match Teams
+    # ===================
+    
+    MATCH_CHANGE_TEAM = 77     # Change team in match
+
+    # ===================
+    # User Status
+    # ===================
+    
+    SET_AWAY_MESSAGE = 82      # Set away message
+    IRC_ONLY = 84              # IRC only mode
+    USER_STATS_REQUEST = 85    # Request user stats
+
+    # ===================
+    # Match Invites
+    # ===================
+    
+    MATCH_INVITE = 87          # Invite to match
+    MATCH_CHANGE_PASSWORD = 90 # Change match password
+
+    # ===================
+    # Tournament
+    # ===================
+    
+    TOURNAMENT_MATCH_INFO_REQUEST = 93 # Tournament match info
+    TOURNAMENT_JOIN_MATCH_CHANNEL = 108 # Join tournament match channel
+    TOURNAMENT_LEAVE_MATCH_CHANNEL = 109 # Leave tournament match channel
+
+    # ===================
+    # Presence
+    # ===================
+    
+    USER_PRESENCE_REQUEST = 97        # Request user presence
+    USER_PRESENCE_REQUEST_ALL = 98    # Request all users' presence
+
+    # ===================
+    # Settings
+    # ===================
+    
+    TOGGLE_BLOCK_NON_FRIEND_DMS = 99  # Block DMs from non-friends
+
+class PacketHeader(TypedDict):
+    packet_id: int
+    packet_length: int
+
+@dataclass
+class Packet:
+    _id: ClientPackets
+
+    raw_data: bytes
+    offset: int # = 0
+
+    def __repr__(self) -> str:
+        return f"<Packet id={self._id} raw_data={self.raw_data} offset={self.offset}>"
+
+    @property
+    def remaining_data(self) -> bytes:
+        return self.raw_data[self.offset:]
+
+    def read(self) -> int:
+        base_fields = {'_id', 'raw_data', 'offset'}
+        type_hints = get_type_hints(type(self))
+
+        for field in fields(self):
+            if field.name in base_fields:
+                continue
+            
+            data_type: osuBaseType = type_hints[field.name]
+            data, offset = data_type.osu_protocol_deserialize(
+                self.remaining_data
+            )
+
+            setattr(self, field.name, data)
+            self.offset += offset
+
+        return self.offset
+
+READABLE_PACKETS: dict[ClientPackets, Type[Packet]] = {}
+
+PacketClass = TypeVar("PacketClass", bound=Type[Packet])
+
+def handles(packet_id: ClientPackets) -> Callable[[PacketClass], PacketClass]:
+    def inner(cls: PacketClass) -> PacketClass:
+        READABLE_PACKETS[packet_id] = cls
+        return cls
+    return inner
+
+@handles(ClientPackets.CHANGE_ACTION)
+@dataclass
+class ChangeAction(Packet):
+    action: osuUnsignedChar = field(init=False)
+    info_text: osuString = field(init=False)
+    beatmap_md5: osuString = field(init=False)
+    current_mods: osuIntUnsigned32Bit = field(init=False)
+    current_game_mode: osuUnsignedChar = field(init=False)
+    beatmap_id: osuIntSigned32Bit = field(init=False)
+
+    def __post_init__(self):
+        self.action = osuUnsignedChar(0)
+        self.info_text = osuString("")
+        self.beatmap_md5 = osuString("")
+        self.current_mods = osuIntUnsigned32Bit(0)
+        self.current_game_mode = osuUnsignedChar(0)
+        self.beatmap_id = osuIntSigned32Bit(0)
+
+    def __repr__(self) -> str:
+        return pformat({
+            "action": self.action,
+            "info_text": self.info_text,
+            "beatmap_md5": self.beatmap_md5,
+            "current_mods": self.current_mods,
+            "current_game_mode": self.current_game_mode,
+            "beatmap_id": self.beatmap_id,
+        })
+    
+class Packets(list[Packet]):
+    def __init__(self, raw_packet_data: bytes) -> None:
+        self.raw_packet_data = raw_packet_data
+        self.offset: int = 0
+        super().__init__()
+    
+    @property
+    def remaining_data(self) -> bytes:
+        return self.raw_packet_data[self.offset:]
+
+    def read_packet_header(self) -> PacketHeader:
+        packet_header = struct.unpack_from(
+            "<HxI", self.remaining_data
+        )
+        self.offset += 7
+
+        packet_id, packet_length = packet_header
+        return {
+            "packet_id": packet_id,
+            "packet_length": packet_length
+        }
+
+    def read(self) -> None:
+        while self.remaining_data:
+            packet_header = self.read_packet_header()
+            packet_id_raw = packet_header["packet_id"]
+            packet_length = packet_header["packet_length"]
+
+            try:
+                packet_id = ClientPackets(packet_id_raw)
+            except ValueError:
+                print("Skipping unknown packet ID:", packet_id_raw)
+                self.offset += packet_length
+                continue
+
+            if packet_id not in READABLE_PACKETS:
+                print("Skipping unimplemented packet with ID:", packet_id)
+                self.offset += packet_length
+                continue
+            
+            packet = READABLE_PACKETS[packet_id](
+                _id=packet_id,
+                offset=0,
+                raw_data=self.remaining_data[:packet_header["packet_length"]]
+            )
+
+            consumed = packet.read()
+            if consumed != packet_length:
+                print(
+                    "Packet length mismatch:",
+                    packet_id,
+                    "declared=",
+                    packet_length,
+                    "consumed=",
+                    consumed,
+                )
+
+            self.offset += packet_length
+            self.append(packet)

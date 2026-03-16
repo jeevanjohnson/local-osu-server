@@ -5,13 +5,16 @@ Purpose/Domain/Concept:
 
 from fastapi import APIRouter, Response
 from fastapi import Request, Header
-from typing import Literal
+from typing import Literal, TypeVar
 import usecases.gui
 import usecases.bancho
 import usecases.sessions
 import usecases.profiles
 import osuProtocol.server_packets
-from osuProtocol.server_packets import osuGameMode, osuCountryCode
+from osuProtocol.server_packets import bytes_to_string, osuGameMode, osuCountryCode, string_to_bytes, ClientRelog
+from osuProtocol.server_packets import PlayerStats, Packets as ServerPackets, osuAction, osuMods, osuGameMode
+from osuProtocol.client_packets import Packets, ClientPackets, ChangeAction, Packet
+from typing import Callable
 
 bancho = APIRouter()
 
@@ -99,5 +102,112 @@ async def client_request_handler(
             content=successful_login_response.build(),
             headers={"cho-token": f"login-successful-for-{username}"},
         )
+    
+    session = usecases.sessions.get_current_session()
+    if session is None:
+        return Response(
+            content=osuProtocol.server_packets.client_relog_response().build(),
+        )
 
-    # handle other packets that we recieve from the client after login here
+    incoming_packets = Packets(await request.body())
+    incoming_packets.read()
+
+    for packet in incoming_packets:
+        if packet._id not in PACKET_HANDLERS:
+            print(f"Received packet with ID {ClientPackets(packet._id)} but no handler is registered for this packet type.")
+            continue
+
+        emergency_response = PACKET_HANDLERS[ClientPackets(packet._id)](packet)
+
+        if emergency_response is not None:
+            print(
+                f"Emergency response triggered for packet ID {ClientPackets(packet._id)}. Sending response to client and skipping remaining packets in the queue."
+            )
+            return Response(
+                content=emergency_response,
+            )
+
+    packet_queue = session["packet_queue"]
+    if packet_queue is None:
+        return Response(content=b"")
+
+    response_packets = string_to_bytes(packet_queue)
+
+    print("Sending response to client with the following packets in the queue: ", response_packets)
+
+    session["packet_queue"] = None
+    usecases.sessions.update_current_session(session)
+
+    return Response(content=response_packets)
+
+PACKET_HANDLERS: dict[ClientPackets, Callable[[Packet], bytes | None]] = {}
+PacketType = TypeVar("PacketType", bound=Packet)
+
+def register_packet_handler(packet_id: ClientPackets, packet_type: type[PacketType]):
+    def inner(func: Callable[[PacketType], bytes | None]):
+        def wrapper(packet: Packet) -> bytes | None:
+            if not isinstance(packet, packet_type):
+                return None
+
+            return func(packet)
+
+        PACKET_HANDLERS[packet_id] = wrapper
+        return func
+    return inner
+
+@register_packet_handler(
+    ClientPackets.CHANGE_ACTION, 
+    packet_type=ChangeAction
+)
+def on_action_change(packet: ChangeAction):
+    # update session & update user's client
+
+    session = usecases.sessions.get_current_session()
+    if session is None or session["profile_name"] is None:
+        return osuProtocol.server_packets.client_relog_response().build()
+    
+    profile_name = session["profile_name"]
+
+    profile = usecases.profiles.get_profile(profile_name)
+    if profile is None:
+        return osuProtocol.server_packets.client_relog_response().build()
+
+    session["current_game_mode"] = packet.current_game_mode.value
+
+    if packet.beatmap_md5.value != "":
+        session["loaded_beatmap_md5"] = packet.beatmap_md5.value
+    else:
+        session["loaded_beatmap_md5"] = None
+    
+    session["loaded_beatmap_id"] = packet.beatmap_id.value
+
+    ranked_score = profile[profile_name]["performance"][str(packet.current_game_mode.value)]["ranked_score"]
+    accuracy = profile[profile_name]["performance"][str(packet.current_game_mode.value)]["accuracy"]
+    play_count = profile[profile_name]["performance"][str(packet.current_game_mode.value)]["playcount"]
+    total_score = profile[profile_name]["performance"][str(packet.current_game_mode.value)]["total_score"]
+    rank = profile[profile_name]["performance"][str(packet.current_game_mode.value)]["rank"]
+    performance_points = profile[profile_name]["performance"][str(packet.current_game_mode.value)]["performance_points"]
+
+    packet_enqueue = ServerPackets()
+    packet_enqueue += PlayerStats(
+        user_id=2,
+        action= osuAction(packet.action.value),
+        info_text=packet.info_text.value,
+        beatmap_md5=packet.beatmap_md5.value,
+        mods=osuMods(packet.current_mods.value),
+        game_mode=osuGameMode(packet.current_game_mode.value),
+        beatmap_id=packet.beatmap_id.value,
+        ranked_score=ranked_score,
+        accuracy=accuracy,
+        play_count=play_count,
+        total_score=total_score,
+        rank=rank,
+        performance_points=performance_points
+    )
+
+    updated_session = usecases.sessions.enqueue_packets_to_current_session(packet_enqueue)
+
+    if updated_session is None:
+        return osuProtocol.server_packets.client_relog_response().build()
+
+    usecases.sessions.update_current_session(updated_session)

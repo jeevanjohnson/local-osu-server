@@ -27,7 +27,9 @@ class SessionsRepository:
                 profile_name=None,
                 loaded_beatmap_md5=None,
                 loaded_replay_id=None,
-                current_game_mode=None
+                current_game_mode=None,
+                packet_queue=None,
+                loaded_beatmap_id=None,
             ))
     
     def update_current_session(self, session: Session) -> None:

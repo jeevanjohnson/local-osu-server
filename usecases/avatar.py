@@ -30,6 +30,6 @@ def get_session_avatar() -> str | Path | None:
         return "https://a.ppy.sh/"
 
     if os.path.exists(profile_picture):
-        return profile_picture
+        return Path(profile_picture)
 
     return profile_picture

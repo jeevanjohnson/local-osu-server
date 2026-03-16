@@ -12,6 +12,13 @@ from osuProtocol.osuTypes import osuMainMenuIcon
 from osuProtocol.osuTypes import osuFriendList
 from osuProtocol.osuTypes import osuIntSigned32Bit, osuUTCOffset
 from osuProtocol.osuTypes import osuFloat32Bit, osuIntUnsigned64Bit, osuAccuracy
+import base64
+
+def bytes_to_string(b: bytes) -> str:
+    return base64.b64encode(b).decode('ascii')
+
+def string_to_bytes(s: str) -> bytes:
+    return base64.b64decode(s.encode('ascii'))
 
 @unique
 class ServerPackets(IntEnum):
@@ -590,8 +597,15 @@ class Packet:
         raw_packet += self.raw_data()
 
         return bytes(raw_packet)
+    
+    def build_str(self) -> str:
+        return bytes_to_string(self.build())
 
 class Packets(list[Packet]):
+
+    def build_str(self) -> str:
+        return bytes_to_string(self.build())
+
     def build(self) -> bytes:
         raw_data = bytearray()
 
@@ -721,8 +735,8 @@ class PlayerStats(Packet):
             ranked_score: int,
             accuracy: float,
             play_count: int,
-                total_score: int,
-                rank: int,
+            total_score: int,
+            rank: int,
             performance_points: int
     ) ->None:
         super().__init__(
@@ -738,9 +752,18 @@ class PlayerStats(Packet):
                 "ranked_score": osuIntUnsigned64Bit(ranked_score),
                 "accuracy": osuAccuracy(accuracy),
                 "play_count": osuIntUnsigned32Bit(play_count),
-                    "total_score": osuIntUnsigned64Bit(total_score),
-                    "rank": osuIntSigned32Bit(rank),
+                "total_score": osuIntUnsigned64Bit(total_score),
+                "rank": osuIntSigned32Bit(rank),
                 "performance_points": osuShort(performance_points)
+            }
+        )
+
+class ClientRelog(Packet):
+    def __init__(self, millisecond_delay: int) -> None:
+        super().__init__(
+            _id=ServerPackets.RESTART,
+            data={
+                "millisecond_delay": osuIntSigned32Bit(millisecond_delay)
             }
         )
 
@@ -815,7 +838,7 @@ def successful_login_response(
     packets += PlayerStats(
         user_id=2,
         action=osuAction.Idle,
-        info_text="You can't see me", # ʕ•̫͡•ʔ
+        info_text="ʕ•̫͡•ʔ", # 
         beatmap_md5="",
         mods=osuMods.NOMOD,
         game_mode=game_mode,
@@ -824,8 +847,21 @@ def successful_login_response(
         accuracy=accuracy,
         play_count=play_count,
         total_score=total_score,
-            rank=rank,
+        rank=rank,
         performance_points=performance_points
     )
+
+    return packets
+
+def client_relog_response(
+        millisecond_delay: int = 0, 
+        message: str | None = None
+    ) -> Packets:
+    packets = Packets()
+
+    if message is not None:
+        packets += Notification(message)
+    
+    packets += ClientRelog(millisecond_delay)
 
     return packets
