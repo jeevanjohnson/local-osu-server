@@ -12,4 +12,4 @@ RESOURCES_FOLDER = Path("./resources")
 PROFILES_FILE = DATA_FOLDER / "profiles.json"  # The file where user profiles will be stored
 SESSIONS_FILE = DATA_FOLDER / "sessions.json"  # The file where session information will be stored
 SERVER_SETTINGS_FILE = DATA_FOLDER / "server_settings.json"  # The file where server settings will be storeds
-SEASONAL_BG_GIT_URL = ""
+SEASONAL_BG_GIT_URL = "https://raw.githubusercontent.com/jeevanjohnson/local-osu-server/refs/heads/2026/resources/seasonal_bg.png"
