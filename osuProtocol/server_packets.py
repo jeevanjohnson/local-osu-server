@@ -228,6 +228,15 @@ class PlayerPrivileges(IntFlag):
     DEVELOPER = 1 << 4
     TOURNAMENT = 1 << 5
 
+ALL_PRIVILEGES = (
+    PlayerPrivileges.NORMAL
+    | PlayerPrivileges.MODERATOR
+    | PlayerPrivileges.SUPPORTER
+    | PlayerPrivileges.OWNER
+    | PlayerPrivileges.DEVELOPER
+    | PlayerPrivileges.TOURNAMENT
+)
+
 @unique
 class LoginFailureReason(IntEnum):
     """Reasons for login failure (negative user IDs)."""
@@ -614,8 +623,12 @@ class Packets(list[Packet]):
 
         return bytes(raw_data)
     
-    def __iadd__(self, other: Packet) -> "Packets":
-        self.append(other)
+    def __iadd__(self, other: "Packet | Packets") -> "Packets":
+        if isinstance(other, Packets):
+            self.extend(other)
+        else:
+            self.append(other)
+        
         return self
 
 class UserID(Packet):
@@ -775,6 +788,39 @@ def failed_login_response(message: str) -> Packets:
 
     return packets
 
+def bancho_bot() -> Packets:
+    packets = Packets()
+
+    packets += PlayerPresence(
+        user_id=3,
+        username="BanchoBot",
+        utc_offset=0,
+        country_code=osuCountryCode.XX,
+        user_privileges=ALL_PRIVILEGES,
+        game_mode=osuGameMode.STANDARD,
+        longitude=0.0,
+        latitude=0.0,
+        rank=0
+    )
+
+    packets += PlayerStats(
+        user_id=3,
+        action=osuAction.Watching,
+        info_text="over the server... ʕ•̫͡•ʔ",
+        beatmap_md5="",
+        mods=osuMods.NOMOD,
+        game_mode=osuGameMode.STANDARD,
+        beatmap_id=0,
+        ranked_score=0,
+        accuracy=0.0,
+        play_count=0,
+        total_score=0,
+        rank=0,
+        performance_points=0
+    )
+
+    return packets
+
 def successful_login_response(
         username: str,
         friend_ids: list[int],
@@ -795,17 +841,9 @@ def successful_login_response(
     packets += UserID(2)
     packets += ProtocolVersion(19)
 
-    ALL_PRIVILEGES = (
-        PlayerPrivileges.NORMAL
-        | PlayerPrivileges.MODERATOR
-        | PlayerPrivileges.SUPPORTER
-        | PlayerPrivileges.OWNER
-        | PlayerPrivileges.DEVELOPER
-        | PlayerPrivileges.TOURNAMENT
-    )
     packets += UserPrivileges(ALL_PRIVILEGES)
 
-    packets += Notification(f"Welcome to LOS!, {username}")
+    packets += Notification(f"Welcome to LOS!, {username} ʕ•̫͡•ʔ")
 
     for channel in ["#osu", "#nothing"]:
         packets += ChannelInfo(
@@ -838,7 +876,7 @@ def successful_login_response(
     packets += PlayerStats(
         user_id=2,
         action=osuAction.Idle,
-        info_text="ʕ•̫͡•ʔ", # 
+        info_text="",
         beatmap_md5="",
         mods=osuMods.NOMOD,
         game_mode=game_mode,
@@ -850,6 +888,8 @@ def successful_login_response(
         rank=rank,
         performance_points=performance_points
     )
+
+    packets += bancho_bot()
 
     return packets
 
