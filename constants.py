@@ -10,3 +10,4 @@ LOS_GUI_PORT = 8000  # The port on which the GUI will run
 DATA_FOLDER = Path("./.data")
 PROFILES_FILE = DATA_FOLDER / "profiles.json"  # The file where user profiles will be stored
 SESSIONS_FILE = DATA_FOLDER / "sessions.json"  # The file where session information will be stored
+SERVER_SETTINGS_FILE = DATA_FOLDER / "server_settings.json"  # The file where server settings will be stored

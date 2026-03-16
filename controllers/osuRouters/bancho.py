@@ -10,6 +10,7 @@ import usecases.gui
 import usecases.bancho
 import usecases.sessions
 import usecases.profiles
+import usecases.beatmaps
 import osuProtocol.server_packets
 from osuProtocol.server_packets import bytes_to_string, osuGameMode, osuCountryCode, string_to_bytes, ClientRelog
 from osuProtocol.server_packets import PlayerStats, Packets as ServerPackets, osuAction, osuMods, osuGameMode
@@ -166,7 +167,7 @@ def handle_ping(packet: Ping):
     packet_type=ChangeAction
 )
 def on_action_change(packet: ChangeAction):
-    # update session & update user's client
+    print(packet)
 
     session = usecases.sessions.get_current_session()
     if session is None or session["profile_name"] is None:
@@ -180,31 +181,31 @@ def on_action_change(packet: ChangeAction):
 
     session["current_game_mode"] = packet.current_game_mode.value
 
-    if packet.beatmap_md5.value != "":
-        session["loaded_beatmap_md5"] = packet.beatmap_md5.value
-    else:
-        session["loaded_beatmap_md5"] = None
-    
-    session["loaded_beatmap_id"] = packet.beatmap_id.value
+    # this sections should probably not exists cause of osu-web
+    beatmap_md5 = packet.beatmap_md5.value
+    if beatmap_md5 == "":
+        beatmap_md5 = None
+
+    beatmap_id = packet.beatmap_id.value
+    if beatmap_id == 0:
+        beatmap_id = None
 
     beatmap = usecases.beatmaps.get_beatmap(
-        md5 = packet.beatmap_md5.value,
-        beatmap_id = packet.beatmap_id.value
+        beatmap_md5 = beatmap_md5,
+        beatmap_id = beatmap_id
     )
 
-    # start working on apiv1 & v2 implemention within the server to do more stuff
-    # will now need a global config to reference for api keys
-    # but profile specific config for stuff tailored to specific profiles
-    # ex. pp calc, allowing relax / autopilot scores, 
-    # will have to update readme
-    # also I would like to add a bio section to each profile on gui
-    # also import score button would be epic
-    # 
-
     if beatmap is not None:
-        session["loaded_beatmap_set_id"] = beatmap["beatmap_set_id"]
+        session["loaded_beatmap_set_id"] = beatmap.beatmapset_id
     else:
         session["loaded_beatmap_set_id"] = None
+    # this sections should probably not exists cause of osu-web ^
+
+    # will have to update readme cause of api key grabbing
+    # also import score button would be epic
+
+    # Persist gameplay/session state first so enqueue reads the latest session snapshot.
+    usecases.sessions.update_current_session(session)
 
     ranked_score = profile[profile_name]["performance"][str(packet.current_game_mode.value)]["ranked_score"]
     accuracy = profile[profile_name]["performance"][str(packet.current_game_mode.value)]["accuracy"]
@@ -234,5 +235,3 @@ def on_action_change(packet: ChangeAction):
 
     if updated_session is None:
         return osuProtocol.server_packets.client_relog_response().build()
-
-    usecases.sessions.update_current_session(updated_session)

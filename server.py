@@ -11,15 +11,20 @@ from controllers.osuRouters.bancho import bancho
 from controllers.osuRouters.avatar import avatar
 from constants import DATA_FOLDER
 from pathlib import Path
+import usecases.server_settings
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Startup
     paths: list[Path] = [DATA_FOLDER]
     for path in paths:
         if not path.exists():
             path.mkdir(parents=True, exist_ok=True)
 
-    # Startup
+    server_settings = usecases.server_settings.get_server_settings()
+    if server_settings is None or len(server_settings) == 0:
+        usecases.server_settings.initialize_server_settings()
+
     yield
     # Shutdown
 

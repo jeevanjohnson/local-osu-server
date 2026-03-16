@@ -4,7 +4,7 @@ Purpose/Domain/Concept:
 """
 
 from database.jsonfile import JsonFile
-from models.database.profiles import ProfileData, Profile, Performance
+from models.database.profiles import ProfileData, Profile, Performance, Settings, osuTrainerBeatmapConfig
 from osuProtocol.server_packets import osuGameMode
 from pathlib import Path
 from osuProtocol.server_packets import osuCountryCode
@@ -54,7 +54,19 @@ class ProfilesRepository:
                 profile_picture = None,
                 friend_ids = [],
                 country_code = osuCountryCode.NA.value,
-                performance = performance
+                performance = performance,
+                notes=None,
+                settings = Settings(
+                    relax_submission=False,
+                    auto_pilot_submission=False,
+                    score_v2_submission=False,
+                    force_scorev2=False,
+                    force_nf=False,
+                    osu_trainer_beatmaps=osuTrainerBeatmapConfig(
+                        allow_submission=False,
+                        sync_rank_status_with_bancho=False,
+                    )
+                ),
             )
 
     def create_profile(self, profile_name: str, profile_data: ProfileData) -> None:

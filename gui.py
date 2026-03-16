@@ -10,7 +10,9 @@ import emoji
 from models.database.profiles import Profile
 from nicegui.elements.upload_files import FileUpload
 from nicegui.events import UploadEventArguments
+import usecases.server_settings
 import os
+from types import NoneType
 
 def contains_emoji(string: str) -> bool:
     return emoji.emoji_count(string) > 0
@@ -154,6 +156,64 @@ async def login():
         ui.button("Login", on_click=on_login_click)
         ui.button("Delete Profile", on_click=on_delete_click)
         create_profile = ui.button("Create Profile", on_click=on_create_click)
+    
+    ui.button("Server Settings", on_click=lambda: ui.navigate.to("/server_settings"))
+
+@ui.page("/server_settings")
+async def server_settings():
+    dark_mode()
+
+    ui.label("Server Settings")
+
+    server_settings = usecases.server_settings.get_server_settings()
+
+    if server_settings is None:
+        ui.label("No server settings found. This should never happen, please contact the developer.")
+        return
+
+    def on_setting_change(setting_name: str, setting_value):
+        server_settings = usecases.server_settings.get_server_settings()
+
+        if server_settings is None:
+            ui.notify("No server settings found. This should never happen, please contact the developer.")
+            return
+
+        if setting_value == "":
+            setting_value = None
+            
+        server_settings[setting_name] = setting_value
+
+        usecases.server_settings.update_server_settings(server_settings)
+
+        ui.notify(f"Updated setting '{setting_name}' to '{setting_value}'")
+
+    for setting_name, setting_value in server_settings.items():
+        if isinstance(setting_value, bool):
+            ui.checkbox(
+                setting_name,
+                value=setting_value,
+                on_change=lambda e, name=setting_name: on_setting_change(name, e.value)
+            )
+        elif setting_value is None:
+            ui.textarea(
+                f"{setting_name}", 
+                value="",
+                on_change=lambda e, name=setting_name: on_setting_change(name, e.value)
+            )
+        else:
+            ui.textarea(
+                f"{setting_name}", 
+                value=str(setting_value),
+                on_change=lambda e, name=setting_name: on_setting_change(name, e.value)
+            )
+
+    ui.button("Previous Page", on_click=ui.navigate.back)
+
+@ui.page("/profile_settings")
+async def profile_settings():
+    ...
+
+    ui.button("Previous Page", on_click=ui.navigate.back)
 
 @ui.page("/dashboard")
 async def dashboard():
@@ -243,31 +303,41 @@ async def dashboard():
             size = (256, 256)
         )
     
-    @ui.refreshable
-    def render_currently_looking_at():
+    last_cover_url: str | None = None
+
+    def render_currently_looking_at_if_changed():
+        nonlocal last_cover_url
+
         session = usecases.sessions.get_current_session()
         if session is None:
-            ui.label("No active session found. Please log in again.")
+            cover_url = None
+        else:
+            beatmap_set_id = session["loaded_beatmap_set_id"]
+            if beatmap_set_id is None:
+                cover_url = None
+            else:
+                cover_url = f"https://assets.ppy.sh/beatmaps/{beatmap_set_id}/covers/cover.jpg"
+
+        if cover_url == last_cover_url:
             return
-    
-        beatmap_set_id = session["loaded_beatmap_set_id"]
-    
-        import time
 
-        if beatmap_set_id is None:
-            ui.label(f"Not currently looking at any beatmap in game.")
-            return        
+        last_cover_url = cover_url
+        currently_looking_at_container.clear()
 
-        ui.interactive_image(
-            f"https://assets.ppy.sh/beatmaps/{beatmap_set_id}/covers/cover.jpg"
-        )
+        with currently_looking_at_container:
+            if cover_url is None:
+                ui.label("Not currently looking at any beatmap in game.")
+            else:
+                ui.interactive_image(cover_url)
 
     with ui.row():
         render_profile_picture(profile_picture)
-        render_currently_looking_at()
+        with ui.column() as currently_looking_at_container:
+            ui.label("Not currently looking at any beatmap in game.")
 
-        ui.timer(2, render_currently_looking_at.refresh) 
-    
+    render_currently_looking_at_if_changed()
+    ui.timer(2, render_currently_looking_at_if_changed)
+
     ui.button(
         "Change Profile Picture", 
         on_click=change_pfp_confirmation
@@ -279,6 +349,28 @@ async def dashboard():
         ui.navigate.to("/")
 
     ui.button("Logout", on_click=on_logout_click)
+
+    def update_notes(new_notes: str):
+        profile = usecases.profiles.get_profile(profile_name)
+        if profile is None:
+            ui.notify("Profile not found. Please log in again.")
+            ui.navigate.to("/")
+            return
+        
+        profile_data = profile[profile_name]
+        profile_data["notes"] = new_notes
+
+        usecases.profiles.update_profile(profile_name, profile_data)
+
+        ui.notify("Notes updated successfully!")
+
+    ui.textarea(
+        "Notes", 
+        value=profile_data["notes"] if profile_data["notes"] is not None else "",
+        on_change=lambda e: update_notes(e.value)
+    )
+
+    ui.button("Server Settings", on_click=lambda: ui.navigate.to("/server_settings"))
 
 try:
     ui.run(

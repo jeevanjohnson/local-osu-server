@@ -5,6 +5,18 @@ Purpose/Domain/Concept:
 
 from typing import TypedDict
 
+class osuTrainerBeatmapConfig(TypedDict):
+    allow_submission: bool
+    sync_rank_status_with_bancho: bool
+
+class Settings(TypedDict):
+    relax_submission: bool
+    auto_pilot_submission: bool
+    score_v2_submission: bool
+    force_scorev2: bool
+    force_nf: bool
+    osu_trainer_beatmaps: osuTrainerBeatmapConfig
+
 class Performance(TypedDict):
     rank: int
     accuracy: float
@@ -18,6 +30,8 @@ class ProfileData(TypedDict):
     friend_ids: list[int]
     country_code: int
     performance: dict[str, Performance]
+    notes: str | None
+    settings: Settings
 
 ProfileName = str
 Profile = dict[ProfileName, ProfileData]

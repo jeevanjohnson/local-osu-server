@@ -6,7 +6,6 @@ from repositories.sessions import SessionsRepository
 from models.database.sessions import Session
 from constants import SESSIONS_FILE
 from osuProtocol.server_packets import Packets, bytes_to_string, string_to_bytes
-import base64
 
 def delete_current_session() -> None:
     sessions_repo = SessionsRepository(SESSIONS_FILE)

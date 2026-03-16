@@ -13,7 +13,7 @@ class JsonFile(Generic[T]):
     def __init__(
             self, 
             path: Path | str, 
-            generate_backups: bool = False
+            generate_backups: bool = False,
         ):
         if isinstance(path, str):
             if not path.endswith(".json"):
