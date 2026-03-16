@@ -14,7 +14,7 @@ import usecases.beatmaps
 import osuProtocol.server_packets
 from osuProtocol.server_packets import bytes_to_string, osuGameMode, osuCountryCode, string_to_bytes, ClientRelog
 from osuProtocol.server_packets import PlayerStats, Packets as ServerPackets, osuAction, osuMods, osuGameMode
-from osuProtocol.client_packets import Packets, ClientPackets, ChangeAction, Packet, Ping
+from osuProtocol.client_packets import Packets, ClientPackets, ChangeAction, Packet, Ping, LogOut
 from typing import Callable
 
 bancho = APIRouter()
@@ -98,6 +98,9 @@ async def client_request_handler(
             total_score=total_score,
             performance_points=performance_points,
         )
+
+        session["client_opened"] = True
+        usecases.sessions.update_current_session(session)
 
         return Response(
             content=successful_login_response.build(),
@@ -233,3 +236,22 @@ def on_action_change(packet: ChangeAction):
 
     if updated_session is None:
         return osuProtocol.server_packets.client_relog_response().build()
+    
+@register_packet_handler(
+    ClientPackets.LOGOUT,
+    packet_type=LogOut
+)
+def on_logout(packet: LogOut):
+    session = usecases.sessions.get_current_session()
+    if session is None or session["profile_name"] is None:
+        return
+
+    session["current_game_mode"] = None
+    session["loaded_beatmap_id"] = None
+    session["loaded_beatmap_md5"] = None
+    session["loaded_beatmap_set_id"] = None
+    session["loaded_replay_id"] = None
+    session["packet_queue"] = None
+    session["client_opened"] = False
+
+    usecases.sessions.update_current_session(session)

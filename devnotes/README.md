@@ -2,6 +2,16 @@
 
 This directory contains personal notes I have taken while working on this project.
 
+# 3.16.2026
+- Fix GUI now since we know when the client is opened or not
+- Begin tackling leaderboards and score_submission
+- - Support lazer scores being seen on lbs but nots its replys
+- - Have personal tags `[rxonly] cover` and then server tags `cover (1.2x Rate)`, server tags can allow us for when we rate change on a map we can see the og leaderboard map and everyone's rate but now we can see our rate in terms of speed and do score multiplying accordingly
+- GUI profile specific settings
+- rank button click for gui
+- recently loaded score on gui
+- when storing scores, store the osu file in case if stuff gets lost, we can still figure out a way to load replay
+
 ## 3.15.2026
 
 `field(init=False)` excludes the field from being included in the generated `__init__` method of a dataclass.

@@ -226,6 +226,11 @@ class ChangeAction(Packet):
             "beatmap_id": self.beatmap_id,
         })
 
+@handles(ClientPackets.LOGOUT)
+@dataclass
+class LogOut(Packet):
+    padding: osuIntSigned32Bit = field(init=False)
+
 @handles(ClientPackets.PING)
 @dataclass
 class Ping(Packet):
@@ -292,6 +297,6 @@ class Packets(list[Packet]):
             #     )
 
             packet.read()
-            
+
             self.offset += packet_length
             self.append(packet)

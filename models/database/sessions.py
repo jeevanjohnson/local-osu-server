@@ -13,3 +13,4 @@ class Session(TypedDict):
     loaded_replay_id: int | None
     current_game_mode: int | None
     packet_queue: str | None # base64 encoding
+    client_opened: bool

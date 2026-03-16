@@ -31,6 +31,7 @@ class SessionsRepository:
                 packet_queue=None,
                 loaded_beatmap_id=None,
                 loaded_beatmap_set_id=None,
+                client_opened=False
             ))
     
     def update_current_session(self, session: Session) -> None:

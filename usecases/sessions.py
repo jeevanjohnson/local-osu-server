@@ -24,6 +24,7 @@ def create_session(profile_name: str) -> None:
             packet_queue=None,
             loaded_beatmap_id=None,
             loaded_beatmap_set_id=None,
+            client_opened=False
         )
     )
 
