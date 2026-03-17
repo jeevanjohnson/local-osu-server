@@ -13,7 +13,7 @@ import usecases.profiles
 import usecases.beatmaps
 import osuProtocol.server_packets
 from osuProtocol.server_packets import bytes_to_string, osuGameMode, osuCountryCode, string_to_bytes, ClientRelog
-from osuProtocol.server_packets import PlayerStats, Packets as ServerPackets, osuAction, osuMods, osuGameMode
+from osuProtocol.server_packets import PlayerStats, Packets as ServerPackets, osuAction, osuMods, osuGameMode, Packet as ServerPacket, Notification
 from osuProtocol.client_packets import Packets, ClientPackets, ChangeAction, Packet, Ping, LogOut
 from typing import Callable
 
@@ -121,15 +121,11 @@ async def client_request_handler(
             print(f"Received packet with ID {ClientPackets(packet._id).name} but no handler is registered for this packet type.")
             continue
 
-        emergency_response = PACKET_HANDLERS[ClientPackets(packet._id)](packet)
+        emergency_response: ServerPackets | ServerPacket | None = PACKET_HANDLERS[ClientPackets(packet._id)](packet)
 
         if emergency_response is not None:
-            print((
-                f"Emergency response triggered for packet ID {ClientPackets(packet._id).name}. "
-                "Sending response to client and skipping remaining packets in the queue."
-            ))
             return Response(
-                content=emergency_response,
+                content=emergency_response.build(),
             )
 
     packet_queue = session["packet_queue"]
@@ -137,18 +133,16 @@ async def client_request_handler(
         return Response(content=b"")
 
     response_packets = string_to_bytes(packet_queue)
-
-    session["packet_queue"] = None
-    usecases.sessions.update_current_session(session)
+    usecases.sessions.clear_packet_queue()
 
     return Response(content=response_packets)
 
-PACKET_HANDLERS: dict[ClientPackets, Callable[[Packet], bytes | None]] = {}
+PACKET_HANDLERS: dict[ClientPackets, Callable[[Packet], ServerPackets | ServerPacket | None]] = {}
 PacketType = TypeVar("PacketType", bound=Packet)
 
 def register_packet_handler(packet_id: ClientPackets, packet_type: type[PacketType]):
-    def inner(func: Callable[[PacketType], bytes | None]):
-        def wrapper(packet: Packet) -> bytes | None:
+    def inner(func: Callable[[PacketType], ServerPackets | ServerPacket | None]):
+        def wrapper(packet: Packet) -> ServerPackets | ServerPacket | None:
             if not isinstance(packet, packet_type):
                 return None
 
@@ -162,23 +156,23 @@ def register_packet_handler(packet_id: ClientPackets, packet_type: type[PacketTy
     ClientPackets.PING,
     packet_type=Ping
 )
-def handle_ping(packet: Ping):
+def handle_ping(packet: Ping) -> ServerPackets | ServerPacket | None:
     return
 
 @register_packet_handler(
     ClientPackets.CHANGE_ACTION, 
     packet_type=ChangeAction
 )
-def on_action_change(packet: ChangeAction):
+def on_action_change(packet: ChangeAction) -> ServerPackets | ServerPacket | None:
     session = usecases.sessions.get_current_session()
     if session is None or session["profile_name"] is None:
-        return osuProtocol.server_packets.client_relog_response().build()
+        return osuProtocol.server_packets.client_relog_response()
     
     profile_name = session["profile_name"]
 
     profile = usecases.profiles.get_profile(profile_name)
     if profile is None:
-        return osuProtocol.server_packets.client_relog_response().build()
+        return osuProtocol.server_packets.client_relog_response()
 
     session["current_game_mode"] = packet.current_game_mode.value
 
@@ -191,10 +185,15 @@ def on_action_change(packet: ChangeAction):
     if beatmap_id == 0:
         beatmap_id = None
 
-    beatmap = usecases.beatmaps.get_beatmap(
-        beatmap_md5 = beatmap_md5,
-        beatmap_id = beatmap_id
-    )
+    try:
+        beatmap = usecases.beatmaps.get_beatmap(
+            beatmap_md5 = beatmap_md5,
+            beatmap_id = beatmap_id
+        )
+    except usecases.beatmaps.ApiV2CredentialsError:
+        return Notification(
+            message="osu! API v2 credentials error. Unexpected Behavior may occur. Please check the server logs for more details.",
+        )
 
     if beatmap is not None:
         session["loaded_beatmap_set_id"] = beatmap.beatmapset_id
@@ -235,7 +234,7 @@ def on_action_change(packet: ChangeAction):
     updated_session = usecases.sessions.enqueue_packets_to_current_session(packet_enqueue)
 
     if updated_session is None:
-        return osuProtocol.server_packets.client_relog_response().build()
+        return osuProtocol.server_packets.client_relog_response()
     
 @register_packet_handler(
     ClientPackets.LOGOUT,

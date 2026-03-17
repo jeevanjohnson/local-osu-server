@@ -4,10 +4,11 @@ Purpose/Domain/Concept:
 """
 
 from database.jsonfile import JsonFile
-from models.database.profiles import ProfileData, Profile, Performance, Settings, osuTrainerBeatmapConfig
+from models.database.profiles import ProfileData, LeaderboardConfig, Profile, Performance, Settings, osuTrainerBeatmapConfig
 from osuProtocol.server_packets import osuGameMode
 from pathlib import Path
 from osuProtocol.server_packets import osuCountryCode
+from osuProtocol.client_web import ScoringAlgorithm
 
 class ProfilesRepository:
     def __init__(self, path: Path):
@@ -66,7 +67,12 @@ class ProfilesRepository:
                         allow_submission=True,
                         sync_rank_status_with_bancho=True,
                     ),
-                    self_rank=False
+                    self_rank=False,
+                    leaderboard=LeaderboardConfig(
+                        leaderboard_score_limit=50,
+                        show_lazer_scores_on_leaderboard=True,
+                    ),
+                    scoring_algorithm=ScoringAlgorithm.LAZER
                 ),
             )
 

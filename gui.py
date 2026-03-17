@@ -12,7 +12,6 @@ from nicegui.elements.upload_files import FileUpload
 from nicegui.events import UploadEventArguments
 import usecases.server_settings
 import os
-from types import NoneType
 
 def contains_emoji(string: str) -> bool:
     return emoji.emoji_count(string) > 0
@@ -226,7 +225,46 @@ async def dashboard():
         return
 
     profile_name = session["profile_name"]
-    ui.label(f"Welcome to Los! {profile_name}, If you haven't already, login from your osu! client!")
+
+    client_opened: bool = session["client_opened"]
+    def render_if_client_opened():
+        nonlocal client_opened
+
+        session = usecases.sessions.get_current_session()
+        if session is None:
+            ui.notify("No active session found. Please log in first.")
+            ui.navigate.to("/")
+            return
+        
+        if session["client_opened"] and not client_opened:
+            message = "osu! client opened! Dashboard features are now active."
+
+            ui.notify(message)
+            client_opened = True
+            render_welcome_message.refresh(message)
+
+        elif not session["client_opened"] and client_opened:
+            message = "osu! client closed. Dashboard features are now inactive."
+
+            ui.notify(message)
+            client_opened = False
+            render_welcome_message.refresh(message)
+        else:
+            pass # no change, do nothing
+
+    @ui.refreshable
+    def render_welcome_message(message: str | None = None):
+        if message is None:
+            ui.label(f"Welcome to Los! {profile_name}")
+        else:
+            ui.label(f"Welcome to Los! {profile_name}, {message}")
+
+    if client_opened:
+        render_welcome_message("osu! client opened! Dashboard features are now active.")
+    else:
+        render_welcome_message("To get started, please open your osu! client shortcut and log in with any credentials.")
+
+    ui.timer(2, render_if_client_opened)
 
     profile = usecases.profiles.get_profile(profile_name)
     if profile is None:

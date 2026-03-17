@@ -9,6 +9,10 @@ class osuTrainerBeatmapConfig(TypedDict):
     allow_submission: bool
     sync_rank_status_with_bancho: bool
 
+class LeaderboardConfig(TypedDict):
+    leaderboard_score_limit: int
+    show_lazer_scores_on_leaderboard: bool
+
 class Settings(TypedDict):
     relax_submission: bool
     auto_pilot_submission: bool
@@ -17,6 +21,8 @@ class Settings(TypedDict):
     force_nf: bool
     osu_trainer_beatmaps: osuTrainerBeatmapConfig
     self_rank: bool
+    leaderboard: LeaderboardConfig
+    scoring_algorithm: int
 
 class Performance(TypedDict):
     rank: int

@@ -12,5 +12,8 @@ class Session(TypedDict):
     loaded_beatmap_set_id: int | None
     loaded_replay_id: int | None
     current_game_mode: int | None
+    loaded_mods: int | None
     packet_queue: str | None # base64 encoding
     client_opened: bool
+    status: int | None
+    status_message: str | None

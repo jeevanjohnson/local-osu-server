@@ -309,6 +309,61 @@ class osuMods(IntFlag):
     SCOREV2 = 1 << 29
     MIRROR = 1 << 30
 
+    @classmethod
+    def from_mod_string(cls, mod_string: str) -> "osuMods":
+        if mod_string in ["CL"]: # Lazer specific mods
+            return cls.NOMOD
+    
+        try:
+            return {
+                "DT": cls.DOUBLETIME,
+                "NC": cls.NIGHTCORE,
+                "HR": cls.HARDROCK,
+                "HD": cls.HIDDEN,
+                "FL": cls.FLASHLIGHT,
+                "EZ": cls.EASY,
+                "NF": cls.NOFAIL,
+                "SD": cls.SUDDENDEATH,
+                "TD": cls.TOUCHSCREEN,
+                "RX": cls.RELAX,
+                "HT": cls.HALFTIME,
+                "AU": cls.AUTOPLAY,
+                "SO": cls.SPUNOUT,
+                "AP": cls.AUTOPILOT,
+                "PF": cls.PERFECT,
+                "4K": cls.KEY4,
+                "5K": cls.KEY5,
+                "6K": cls.KEY6,
+                "7K": cls.KEY7,
+                "8K": cls.KEY8,
+                "FI": cls.FADEIN,
+                "RN": cls.RANDOM,
+                "CM": cls.CINEMA,
+                "TP": cls.TARGET,
+                "9K": cls.KEY9,
+                "COOP": cls.KEYCOOP,
+                "1K": cls.KEY1,
+                "3K": cls.KEY3,
+                "2K": cls.KEY2,
+                "SV2": cls.SCOREV2,
+                "MR": cls.MIRROR,
+            }[mod_string.strip().upper()]
+        except KeyError:
+            raise ValueError(f"Invalid mod string: {mod_string}")
+
+    @classmethod
+    def from_mod_strings(cls, mod_strings: list[str]) -> "osuMods":
+        mod_value = cls.NOMOD
+
+        for mod_str in mod_strings:
+            try:
+                mod = cls.from_mod_string(mod_str)
+                mod_value |= mod
+            except KeyError:
+                raise ValueError(f"Invalid mod string: {mod_str}")
+
+        return mod_value
+
 @unique
 class osuCountryCode(IntEnum):
     OC = 1
