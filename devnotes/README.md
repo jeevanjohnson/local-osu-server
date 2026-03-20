@@ -2,6 +2,25 @@
 
 This directory contains personal notes I have taken while working on this project.
 
+# 3.20.2026
+
+- MODS STABLE -> LAZER CONVERSION (int -> list[str])
+- WORK ON LB REWORK
+- FIND THE DIFFERENCE BETWEEN SCOREV2 & LAZER SCORING TO ENSURE ACCURATE LEADERBOARD SYNCING
+- For trying to watch replays from lazer, we'll manually download to the user's system and ask them to open it in osu! lazer themselves
+- Either hardcode settings or figure out how to doctype them in pydantic model
+- use more custom error cases
+- make log library 
+- - bypass errors, save errors, use pydantic model to save
+- - decorator on top of funcs to save time 
+- - timestamp, func name, error type, error message, traceback, and other relevant info like states of objects when error happened
+- - can ask to log and save but not crash, or log and save and crash, or just log and save
+- map updates (when md5s don't match but ids do)
+- convert db mods from stable format to lazer format (list[str])
+- forget about katu & geki count saving since lazer doesn't use them anymore
+- scoring algorithm probably a calculator folder of all calculators, example: calculator/pp.py, calculator/score.py, calculator/fundamentals.py, calculator/prediction.py
+- btw for prediction.py we don't need to scan all 10k users we can just get a couple from a wide range and then map the line of best fit
+
 # 3.17.2026
 
 You want a concrete architecture plan before coding, focused on 3 pain points: stable+lazer score sync, async leaderboard loading, and beatmap lookup fallbacks. I’ll quickly inspect the current flow in your score/usecase/repository layers so the recommendations are specific to your codebase, then I’ll give you a proposed architecture and migration path.

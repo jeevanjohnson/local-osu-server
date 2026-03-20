@@ -3,17 +3,51 @@ Purpose/Domain/Concept:
 - This file contains the database models/architecture for the project regarding a user's sessions. (sessions.json)
 """
 
-from typing import TypedDict
+import base64
 
-class Session(TypedDict):
-    profile_name: str | None
-    loaded_beatmap_md5: str | None
-    loaded_beatmap_id: int | None
-    loaded_beatmap_set_id: int | None
-    loaded_replay_id: int | None
-    current_game_mode: int | None
-    loaded_mods: int | None
-    packet_queue: str | None # base64 encoding
-    client_opened: bool
-    status: int | None
-    status_message: str | None
+from jays_tools.json_database import MigratableModel
+from osuProtocol.server_packets import osuGameMode, osuAction, osuMods
+from pydantic import Field, field_serializer, field_validator
+from datetime import datetime
+
+class SessionOsuClientActivityV1(MigratableModel):
+    opened: bool = Field(default=False)
+    logged_in_at: datetime = Field(
+        default_factory=datetime.now
+    )
+    status: osuAction = Field(default=osuAction.Idle)
+    status_message: str = Field(default="")
+
+CurrentSessionOsuClientActivity = SessionOsuClientActivityV1
+
+class SessionBeatmapInfoV1(MigratableModel):
+    md5: str = Field(default="")
+    id: int = Field(default=0)
+    set_id: int = Field(default=0)
+
+CurrentSessionBeatmapInfo = SessionBeatmapInfoV1
+
+class SessionV1(MigratableModel):
+    loaded: bool = Field(default=False)
+    profile_name: str = Field(default="")
+    packet_queue: bytes = Field(default=b"")
+
+    latest_replay_id: int = Field(default=0)
+    current_game_mode: osuGameMode  = Field(default=osuGameMode.STANDARD)
+    # TODO: List of str mods to be compatible with lazer?
+    latest_enabled_mods: osuMods = Field(default=osuMods.NOMOD)
+    latest_beatmap: CurrentSessionBeatmapInfo | None = Field(default=None)
+    osu_client: CurrentSessionOsuClientActivity = Field(
+        default_factory=CurrentSessionOsuClientActivity
+    )
+    
+    @field_serializer("packet_queue")
+    def serialize_packet_queue(self, value: bytes) -> str:
+        return base64.b64encode(value).decode('ascii')
+    
+    @field_validator("packet_queue", mode="before")
+    @classmethod
+    def deserialize_packet_queue(cls, value: str) -> bytes:
+        return base64.b64decode(value.encode('ascii'))
+
+CurrentSession = SessionV1

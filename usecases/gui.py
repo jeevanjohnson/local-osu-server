@@ -5,19 +5,19 @@ Purpose/Domain/Concept:
 """
 
 from repositories.profiles import ProfilesRepository
-from repositories.sessions import SessionsRepository
+from repositories.sessions import SessionRepository
 from constants import PROFILES_FILE, SESSIONS_FILE
 
 def logged_in() -> bool:
-    sessions_repo = SessionsRepository(SESSIONS_FILE)
-    session = sessions_repo.get_current_session()
-    if session is None or session["profile_name"] is None:
-        return False
-
-    profile_name = session["profile_name"]
-
+    sessions_repo = SessionRepository(SESSIONS_FILE)
     profile_repo = ProfilesRepository(PROFILES_FILE)
-    profile = profile_repo.get_profile(profile_name)
+    
+    session = sessions_repo.get_current_session()
+    if session is None:
+        print("Attempted to check if user is logged in but no active session was found.")
+        return False
+    
+    profile = profile_repo.get_profile(session.profile_name)
     
     if profile is None:
        return False

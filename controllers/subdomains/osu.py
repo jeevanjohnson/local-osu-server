@@ -48,19 +48,18 @@ async def get_leaderboard(
     aqn_files_found: bool = Query(..., alias="a"),
 ):
     session = usecases.sessions.get_current_session()
-    if session is None or session["profile_name"] is None:
+    if session is None:
         return NULL_RESPONSE
     
-    profile = usecases.profiles.get_profile(session["profile_name"])
+    profile = usecases.profiles.get_profile(session.profile_name)
     if profile is None:
         return NULL_RESPONSE
     
-    profile_data = profile[session["profile_name"]]
     leaderboard_type = LeaderboardType(leaderboard_type)
     mode_arg = osuGameMode(mode_arg)
 
-    if session["current_game_mode"] != mode_arg.value:
-        session["current_game_mode"] = mode_arg.value
+    if session.current_game_mode != mode_arg:
+        session.current_game_mode = mode_arg
 
         usecases.sessions.update_current_session(session)
         usecases.sessions.update_in_game_stats()
@@ -83,7 +82,7 @@ async def get_leaderboard(
 
     mods = osuMods(mods_arg)
 
-    if profile_data["settings"]["leaderboard"]["show_lazer_scores_on_leaderboard"]:
+    if profile.settings.leaderboard.show_lazer_scores_on_leaderboard:
         legacy_leaderboard = False
     else:
         legacy_leaderboard = True
@@ -92,7 +91,7 @@ async def get_leaderboard(
         leaderboard_type=leaderboard_type,
         game_mode=mode_arg,
         mods=mods,
-        limit=profile_data["settings"]["leaderboard"]["leaderboard_score_limit"],
+        limit=profile.settings.leaderboard.leaderboard_score_limit,
         legacy_leaderboard=legacy_leaderboard,
         beatmap_md5=map_md5,
         beatmap_id=map_set_id
@@ -126,15 +125,16 @@ async def get_leaderboard(
             content=leaderboard.serialize()
         )
 
-    scoring_algorithm = ScoringAlgorithm(profile_data["settings"]["scoring_algorithm"])
 
     # removes potential stable / lazer crossovers
     scores.remove_duplicates()
 
-    scores.set_scoring_algorithm(scoring_algorithm)
+    scores.set_scoring_algorithm(
+        profile.settings.scoring_algorithm
+    )
     scores.sort_by_algorithm()
-
-    score_limit = profile_data["settings"]["leaderboard"]["leaderboard_score_limit"]
+    
+    score_limit = profile.settings.leaderboard.leaderboard_score_limit
     scores = scores[:score_limit]
 
     for index, score in enumerate(scores):

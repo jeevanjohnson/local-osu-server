@@ -7,7 +7,11 @@ from constants import LOS_GUI_PORT
 import usecases.profiles
 import usecases.sessions
 import emoji
-from models.database.profiles import Profile
+
+from models.database.profiles import (
+    CurrentProfile as Profile,
+    CurrentProfiles as Profiles
+)
 from nicegui.elements.upload_files import FileUpload
 from nicegui.events import UploadEventArguments
 import usecases.server_settings
@@ -34,17 +38,16 @@ async def login():
     profile_textarea = ui.textarea("Selected Profile", on_change=on_username_change)
 
     @ui.refreshable
-    def render_profiles(profiles: Profile | None):
+    def render_profiles(profiles: Profiles | None):
         if profiles is None:
             ui.label("No profiles found. Please create a new profile.")
             return
 
-        for profile_name, profile_data in profiles.items():
+        for profile_name, profile in profiles.all.items():
                 def on_profile_selection(username=profile_name):
                     profile_textarea.set_value(username)
                 
-                avatar_url = profile_data["profile_picture"]
-                if avatar_url is None:
+                if profile.profile_picture is None:
                     avatar_url = "https://a.ppy.sh/"
 
                 with ui.interactive_image(
@@ -57,7 +60,7 @@ async def login():
                     ).classes('absolute bottom-0 left-0 m-2')
 
     with ui.row():
-        profiles = usecases.profiles.get_all_profiles()
+        profiles = usecases.profiles.get_profiles()
         render_profiles(profiles)
 
     def on_login_click():
@@ -70,8 +73,9 @@ async def login():
             ui.notify("Profile not found. Please enter a valid profile name.")
             return
         
-        # delete any existing sessions
-        usecases.sessions.delete_current_session()
+        active_session = usecases.sessions.get_current_session()
+        if active_session:
+            usecases.sessions.delete_current_session()
 
         usecases.sessions.create_session(profile_textarea.value)
 
@@ -118,7 +122,7 @@ async def login():
         usecases.profiles.delete_profile(profile_textarea.value)
 
         render_profiles.refresh(
-            usecases.profiles.get_all_profiles()
+            usecases.profiles.get_profiles()
         )
 
         profile_textarea.set_value("")
@@ -143,7 +147,7 @@ async def login():
         usecases.profiles.create_profile(profile_textarea.value)
 
         render_profiles.refresh(
-            usecases.profiles.get_all_profiles()
+            usecases.profiles.get_profiles()
         )
 
         ui.notify((
@@ -179,14 +183,21 @@ async def server_settings():
 
         if setting_value == "":
             setting_value = None
-            
-        server_settings[setting_name] = setting_value
-
+        
+        server_settings = server_settings.model_copy(
+            update={
+                setting_name: setting_value
+            }
+        )
         usecases.server_settings.update_server_settings(server_settings)
 
         ui.notify(f"Updated setting '{setting_name}' to '{setting_value}'")
 
-    for setting_name, setting_value in server_settings.items():
+    # TODO: PROBABLY SHOULD BE HARDCODED?
+    for setting_name, setting_value in server_settings.model_dump().items():
+        if setting_name == "model_version":
+            continue # jays-tools specific, not a server setting
+
         if isinstance(setting_value, bool):
             ui.checkbox(
                 setting_name,
@@ -219,14 +230,14 @@ async def dashboard():
     dark_mode()
 
     session = usecases.sessions.get_current_session()
-    if session is None or session["profile_name"] is None:
+    if session is None:
         ui.notify("No active session found. Please log in first.")
         ui.navigate.to("/")
         return
 
-    profile_name = session["profile_name"]
+    profile_name = session.profile_name
 
-    client_opened: bool = session["client_opened"]
+    client_opened: bool = session.osu_client.opened
     def render_if_client_opened():
         nonlocal client_opened
 
@@ -236,14 +247,14 @@ async def dashboard():
             ui.navigate.to("/")
             return
         
-        if session["client_opened"] and not client_opened:
+        if session.osu_client.opened and not client_opened:
             message = "osu! client opened! Dashboard features are now active."
 
             ui.notify(message)
             client_opened = True
             render_welcome_message.refresh(message)
 
-        elif not session["client_opened"] and client_opened:
+        elif not session.osu_client.opened and client_opened:
             message = "osu! client closed. Dashboard features are now inactive."
 
             ui.notify(message)
@@ -271,12 +282,8 @@ async def dashboard():
         ui.notify("Profile not found. Please log in again.")
         ui.navigate.to("/")
         return
-    
-    profile_data = profile[profile_name]
 
-    if profile_data["profile_picture"] is not None:
-        profile_picture = profile_data["profile_picture"]
-    else:
+    if profile.profile_picture is None:
         profile_picture = "https://a.ppy.sh/"
     
     # profile picture changing
@@ -315,22 +322,20 @@ async def dashboard():
             ui.navigate.to("/")
             return
         
-        profile_data = profile[profile_name]
-        
         if profile_picture_input.value:
-            profile_data["profile_picture"] = profile_picture_input.value
+            profile.profile_picture = profile_picture_input.value
         elif pfp_file_upload is not None:
             file_extension = os.path.splitext(pfp_file_upload.name)[1]
             pfp_location = f"./.data/pfps/{profile_name}{file_extension}"
             await pfp_file_upload.save(pfp_location) 
-            profile_data["profile_picture"] = pfp_location
+            profile.profile_picture = pfp_location
         else:
             ui.notify("Please provide a profile picture URL or upload a profile picture.")
             return
         
-        usecases.profiles.update_profile(profile_name, profile_data)
+        usecases.profiles.update_profile(profile_name, profile)
 
-        render_profile_picture.refresh(profile_data["profile_picture"])
+        render_profile_picture.refresh(profile.profile_picture)
 
         ui.notify("Profile picture updated successfully!")
 
@@ -350,11 +355,10 @@ async def dashboard():
         if session is None:
             cover_url = None
         else:
-            beatmap_set_id = session["loaded_beatmap_set_id"]
-            if beatmap_set_id is None:
+            if session.latest_beatmap is None:
                 cover_url = None
             else:
-                cover_url = f"https://assets.ppy.sh/beatmaps/{beatmap_set_id}/covers/cover.jpg"
+                cover_url = f"https://assets.ppy.sh/beatmaps/{session.latest_beatmap.set_id}/covers/cover.jpg"
 
         if cover_url == last_cover_url:
             return
@@ -395,16 +399,15 @@ async def dashboard():
             ui.navigate.to("/")
             return
         
-        profile_data = profile[profile_name]
-        profile_data["notes"] = new_notes
+        profile.notes = new_notes
 
-        usecases.profiles.update_profile(profile_name, profile_data)
+        usecases.profiles.update_profile(profile_name, profile)
 
         ui.notify("Notes updated successfully!")
 
     ui.textarea(
         "Notes", 
-        value=profile_data["notes"] if profile_data["notes"] is not None else "",
+        value=profile.notes if profile.notes is not None else "",
         on_change=lambda e: update_notes(e.value)
     )
 

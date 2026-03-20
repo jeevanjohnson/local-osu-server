@@ -3,89 +3,55 @@ Purpose/Domain/Concept:
 - This file contains the repository (database interactions) related profiles.json file.
 """
 
-from database.jsonfile import JsonFile
-from models.database.profiles import ProfileData, LeaderboardConfig, Profile, Performance, Settings, osuTrainerBeatmapConfig
-from osuProtocol.server_packets import osuGameMode
+from jays_tools.json_database import JsonDatabase
+from models.database.profiles import CurrentProfiles as Profiles
+from models.database.profiles import CurrentProfile as Profile
 from pathlib import Path
-from osuProtocol.server_packets import osuCountryCode
-from osuProtocol.client_web import ScoringAlgorithm
 
 class ProfilesRepository:
     def __init__(self, path: Path):
-        self.profiles = JsonFile[Profile](path)
+        self.profiles = JsonDatabase(path, models=Profiles)
 
-    def get_profiles(self) -> Profile | None:
+    def get_profiles(self) -> Profiles | None:
         with self.profiles as profiles:
-            if not profiles:
+            if not profiles.all:
                 return None
             
             return profiles
     
     def get_profile(self, profile_name: str) -> Profile | None:
         with self.profiles as profiles:
-            if profile_name in profiles:
-                return {
-                    profile_name: profiles[profile_name]
-                }
+            if profile_name not in profiles.all:
+                return None
             
-            return None
+            return profiles.all[profile_name]
     
     def create_new_profile(self, profile_name: str) -> None:
         with self.profiles as profiles:
-            if profile_name in profiles:
+            if profile_name in profiles.all:
                 raise ValueError("Profile already exists.")
             
-            default_performance = Performance(
-                rank=0,
-                accuracy=0.0,
-                playcount=0,
-                total_score=0,
-                ranked_score=0,
-                performance_points=0,
-            )
+            profiles.all[profile_name] = Profile()
 
-            performance =  {
-                "0": default_performance,
-                "1": default_performance,
-                "2": default_performance,
-                "3": default_performance,
-            }
+            self.profiles.set(profiles)
 
-            profiles[profile_name] = ProfileData(
-                profile_picture = None,
-                friend_ids = [],
-                country_code = osuCountryCode.NA.value,
-                performance = performance,
-                notes=None,
-                settings = Settings(
-                    relax_submission=False,
-                    auto_pilot_submission=False,
-                    score_v2_submission=False,
-                    force_scorev2=False,
-                    force_nf=False,
-                    osu_trainer_beatmaps=osuTrainerBeatmapConfig(
-                        allow_submission=True,
-                        sync_rank_status_with_bancho=True,
-                    ),
-                    self_rank=False,
-                    leaderboard=LeaderboardConfig(
-                        leaderboard_score_limit=50,
-                        show_lazer_scores_on_leaderboard=True,
-                    ),
-                    scoring_algorithm=ScoringAlgorithm.LAZER
-                ),
-            )
-
-    def create_profile(self, profile_name: str, profile_data: ProfileData) -> None:
+    def create_profile(self, profile_name: str, profile_data: Profile) -> None:
         with self.profiles as profiles:
-            profiles[profile_name] = profile_data
+            profiles.all[profile_name] = profile_data
+            self.profiles.set(profiles)
         
     def delete_profile(self, profile_name: str) -> None:
         with self.profiles as profiles:
-            if profile_name in profiles:
-                del profiles[profile_name]
-    
-    def update_profile(self, profile_name: str, profile_data: ProfileData) -> None:
+            if profile_name in profiles.all:
+                del profiles.all[profile_name]
+            else:
+                raise ValueError("Profile does not exist.")
+            
+            self.profiles.set(profiles)
+
+    def update_profile(self, profile_name: str, profile: Profile) -> None:
         with self.profiles as profiles:
-            if profile_name in profiles:
-                profiles[profile_name] = profile_data
+            if profile_name in profiles.all:
+                profiles.all[profile_name] = profile
+            else:
+                raise ValueError("Profile does not exist.")

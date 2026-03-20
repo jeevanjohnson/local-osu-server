@@ -3,40 +3,48 @@ Purpose/Domain/Concept:
 - This file contains the repository (database interactions) related sessions.json file.
 """
 
-from database.jsonfile import JsonFile
-from models.database.sessions import Session
+from models.database.sessions import CurrentSession as Session
+from jays_tools.json_database import JsonDatabase
 
-class SessionsRepository:
+class SessionRepository:
     def __init__(self, path):
-        self.sessions = JsonFile[Session](path)
+        self.session = JsonDatabase(path, models=Session)
 
     def get_current_session(self) -> Session | None:
-        with self.sessions as sessions:
-            if not sessions:
+        with self.session as current_session:
+            if not current_session.loaded:
                 return None
             
-            return sessions
+            return current_session
 
-    def create_session(self, session: Session) -> None:
-        with self.sessions as sessions:
-            sessions.update(session)
+    def create_session(self, profile_name: str) -> None:
+        with self.session as current_session:
+            if current_session.loaded:
+                raise ValueError("Session already exists.")
+
+            current_session = Session(
+                loaded=True,
+                profile_name=profile_name
+            )
+
+            self.session.set(current_session)
 
     def delete_current_session(self) -> None:
-        with self.sessions as sessions:
-            sessions.update(Session(
-                profile_name=None,
-                loaded_beatmap_md5=None,
-                loaded_replay_id=None,
-                current_game_mode=None,
-                packet_queue=None,
-                loaded_beatmap_id=None,
-                loaded_beatmap_set_id=None,
-                client_opened=False,
-                status=None,
-                status_message=None,
-                loaded_mods=None
-            ))
-    
-    def update_current_session(self, session: Session) -> None:
-        with self.sessions as sessions:
-            sessions.update(session)
+        with self.session as current_session:
+            if not current_session.loaded:
+                raise ValueError("No session to delete.")
+
+            current_session = Session(
+                loaded=False
+            )
+
+            self.session.set(current_session)
+
+    def update_current_session(self, updated_session: Session) -> None:
+        with self.session as current_session:
+            if not current_session.loaded:
+                raise ValueError("No session to update.")
+
+            current_session = updated_session
+
+            self.session.set(current_session)

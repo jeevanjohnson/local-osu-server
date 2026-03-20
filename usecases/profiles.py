@@ -5,9 +5,12 @@ Purpose/Domain/Concept:
 
 from constants import PROFILES_FILE
 from repositories.profiles import ProfilesRepository
-from models.database.profiles import Profile, ProfileData
+from models.database.profiles import (
+    CurrentProfiles as Profiles,
+    CurrentProfile as Profile,
+)
 
-def get_all_profiles() -> Profile | None:
+def get_profiles() -> Profiles | None:
     profiles_repo = ProfilesRepository(PROFILES_FILE)
 
     return profiles_repo.get_profiles()
@@ -36,9 +39,9 @@ def delete_profile(profile_name: str) -> None:
 
     return
 
-def update_profile(profile_name: str, profile_data: ProfileData) -> None:
+def update_profile(profile_name: str, updated_profile: Profile) -> None:
     profiles_repo = ProfilesRepository(PROFILES_FILE)
 
-    profiles_repo.update_profile(profile_name, profile_data)
+    profiles_repo.update_profile(profile_name, updated_profile)
 
     return

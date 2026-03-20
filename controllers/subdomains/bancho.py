@@ -16,6 +16,10 @@ from osuProtocol.server_packets import bytes_to_string, osuGameMode, osuCountryC
 from osuProtocol.server_packets import PlayerStats, Packets as ServerPackets, osuAction, osuMods, osuGameMode, Packet as ServerPacket, Notification
 from osuProtocol.client_packets import Packets, ClientPackets, ChangeAction, Packet, Ping, LogOut
 from typing import Callable
+from models.database.sessions import (
+    CurrentSessionBeatmapInfo as SessionBeatmapInfo,
+)
+from datetime import datetime
 
 bancho = APIRouter()
 
@@ -44,7 +48,7 @@ async def client_request_handler(
         )
 
         session = usecases.sessions.get_current_session()
-        if session is None or session["profile_name"] is None:
+        if session is None:
             failed_login_response = osuProtocol.server_packets.failed_login_response(
                 "No active session found. Please log in through the GUI."
             )
@@ -54,9 +58,7 @@ async def client_request_handler(
                 headers={"cho-token": "no-active-session"},
             )
 
-        username = session["profile_name"]
-
-        profile = usecases.profiles.get_profile(username)
+        profile = usecases.profiles.get_profile(session.profile_name)
 
         if profile is None:
             failed_login_response = osuProtocol.server_packets.failed_login_response(
@@ -68,27 +70,27 @@ async def client_request_handler(
                 headers={"cho-token": "profile-not-found"},
             )
 
-        friend_ids = profile[username]["friend_ids"]
-        country_code = profile[username]["country_code"]
-        current_game_mode = session["current_game_mode"]
-        if current_game_mode is None:
-            current_game_mode = "0"
-        else:
-            current_game_mode = str(current_game_mode)
-        
-        rank = profile[username]["performance"][current_game_mode]["rank"]
-        ranked_score = profile[username]["performance"][current_game_mode]["ranked_score"]
-        accuracy = profile[username]["performance"][current_game_mode]["accuracy"]
-        play_count = profile[username]["performance"][current_game_mode]["playcount"]
-        total_score = profile[username]["performance"][current_game_mode]["total_score"]
-        performance_points = profile[username]["performance"][current_game_mode]["performance_points"]
+        # friend_ids = profile.friend_ids
+        # country_code = profile[session.profile_name]["country_code"]
+        # current_game_mode = session["current_game_mode"]
+        # if current_game_mode is None:
+        #     current_game_mode = "0"
+        # else:
+        #     current_game_mode = str(current_game_mode)
+
+        rank = profile.performance[session.current_game_mode].rank
+        ranked_score = profile.performance[session.current_game_mode].ranked_score
+        accuracy = profile.performance[session.current_game_mode].accuracy
+        play_count = profile.performance[session.current_game_mode].playcount
+        total_score = profile.performance[session.current_game_mode].total_score
+        performance_points = profile.performance[session.current_game_mode].performance_points
 
         successful_login_response = osuProtocol.server_packets.successful_login_response(
-            username=username,
-            friend_ids=friend_ids,
+            username=session.profile_name,
+            friend_ids=profile.friend_ids,
             utc_offset=login_data["utc_offset"],
-            country_code=osuCountryCode(country_code),
-            game_mode=osuGameMode(int(current_game_mode)),
+            country_code=profile.country_code,
+            game_mode=session.current_game_mode,
             longitude=0.0,
             latitude=0.0,
             rank=rank,
@@ -99,12 +101,13 @@ async def client_request_handler(
             performance_points=performance_points,
         )
 
-        session["client_opened"] = True
+        session.osu_client.opened = True
+        session.osu_client.logged_in_at = datetime.now()
         usecases.sessions.update_current_session(session)
 
         return Response(
             content=successful_login_response.build(),
-            headers={"cho-token": f"login-successful-for-{username}"},
+            headers={"cho-token": f"login-successful-for-{session.profile_name}"},
         )
     
     session = usecases.sessions.get_current_session()
@@ -128,11 +131,11 @@ async def client_request_handler(
                 content=emergency_response.build(),
             )
 
-    packet_queue = session["packet_queue"]
-    if packet_queue is None:
+    if not session.packet_queue:
         return Response(content=b"")
 
-    response_packets = string_to_bytes(packet_queue)
+    response_packets = session.packet_queue
+
     usecases.sessions.clear_packet_queue()
 
     return Response(content=response_packets)
@@ -165,16 +168,26 @@ def handle_ping(packet: Ping) -> ServerPackets | ServerPacket | None:
 )
 def on_action_change(packet: ChangeAction) -> ServerPackets | ServerPacket | None:
     session = usecases.sessions.get_current_session()
-    if session is None or session["profile_name"] is None:
+    if session is None:
         return osuProtocol.server_packets.client_relog_response()
-    
-    profile_name = session["profile_name"]
 
-    profile = usecases.profiles.get_profile(profile_name)
+    profile = usecases.profiles.get_profile(session.profile_name)
     if profile is None:
         return osuProtocol.server_packets.client_relog_response()
 
-    session["current_game_mode"] = packet.current_game_mode.value
+    session.osu_client.status = osuAction(
+        packet.action.value
+    )
+    session.osu_client.status_message = packet.info_text.value
+    session.osu_client.opened = True
+    
+    session.current_game_mode = osuGameMode(
+        packet.current_game_mode.value
+    )
+
+    session.latest_enabled_mods = osuMods(
+        packet.current_mods.value
+    )
 
     # this sections should probably not exists cause of osu-web
     beatmap_md5 = packet.beatmap_md5.value
@@ -195,24 +208,25 @@ def on_action_change(packet: ChangeAction) -> ServerPackets | ServerPacket | Non
             message="osu! API v2 credentials error. Unexpected Behavior may occur. Please check the server logs for more details.",
         )
 
-    if beatmap is not None:
-        session["loaded_beatmap_set_id"] = beatmap.beatmapset_id
+    if beatmap is None:
+        session.latest_beatmap = None
     else:
-        session["loaded_beatmap_set_id"] = None
+        session.latest_beatmap = SessionBeatmapInfo(
+            id=beatmap.id,
+            md5=beatmap.checksum, # type: ignore
+            set_id=beatmap.beatmapset_id
+        )
     # this sections should probably not exists cause of osu-web ^
 
     # will have to update readme cause of api key grabbing
     # also import score button would be epic
 
-    # Persist gameplay/session state first so enqueue reads the latest session snapshot.
-    usecases.sessions.update_current_session(session)
-
-    ranked_score = profile[profile_name]["performance"][str(packet.current_game_mode.value)]["ranked_score"]
-    accuracy = profile[profile_name]["performance"][str(packet.current_game_mode.value)]["accuracy"]
-    play_count = profile[profile_name]["performance"][str(packet.current_game_mode.value)]["playcount"]
-    total_score = profile[profile_name]["performance"][str(packet.current_game_mode.value)]["total_score"]
-    rank = profile[profile_name]["performance"][str(packet.current_game_mode.value)]["rank"]
-    performance_points = profile[profile_name]["performance"][str(packet.current_game_mode.value)]["performance_points"]
+    ranked_score = profile.performance[session.current_game_mode].ranked_score
+    accuracy = profile.performance[session.current_game_mode].accuracy
+    play_count = profile.performance[session.current_game_mode].playcount
+    total_score = profile.performance[session.current_game_mode].total_score
+    rank = profile.performance[session.current_game_mode].rank
+    performance_points = profile.performance[session.current_game_mode].performance_points
 
     packet_enqueue = ServerPackets()
     packet_enqueue += PlayerStats(
@@ -231,10 +245,12 @@ def on_action_change(packet: ChangeAction) -> ServerPackets | ServerPacket | Non
         performance_points=performance_points
     )
 
-    updated_session = usecases.sessions.enqueue_packets_to_current_session(packet_enqueue)
+    session.packet_queue += packet_enqueue.build()
+    usecases.sessions.update_current_session(session)
 
-    if updated_session is None:
-        return osuProtocol.server_packets.client_relog_response()
+    # TODO: Handle this error case?
+    # if updated_session is None:
+    #     return osuProtocol.server_packets.client_relog_response()
     
 @register_packet_handler(
     ClientPackets.LOGOUT,
@@ -242,15 +258,21 @@ def on_action_change(packet: ChangeAction) -> ServerPackets | ServerPacket | Non
 )
 def on_logout(packet: LogOut):
     session = usecases.sessions.get_current_session()
-    if session is None or session["profile_name"] is None:
+    if session is None:
+        return
+    
+    # osu! client logs out as soon as the user logs in
+    # just ensure that this packet is a valid logout
+    # 1+ s after login
+    if datetime.now().timestamp() - session.osu_client.logged_in_at.timestamp() < 1:
         return
 
-    session["current_game_mode"] = None
-    session["loaded_beatmap_id"] = None
-    session["loaded_beatmap_md5"] = None
-    session["loaded_beatmap_set_id"] = None
-    session["loaded_replay_id"] = None
-    session["packet_queue"] = None
-    session["client_opened"] = False
+    # Keep the GUI-authenticated session alive; only mark the osu client as disconnected.
+    session.osu_client.opened = False
+    session.osu_client.status = osuAction.Idle
+    session.osu_client.status_message = ""
+    session.latest_beatmap = None
+    session.latest_enabled_mods = osuMods.NOMOD
+    session.packet_queue = b""
 
     usecases.sessions.update_current_session(session)

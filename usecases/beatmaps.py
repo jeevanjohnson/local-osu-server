@@ -9,20 +9,20 @@ class ApiV2CredentialsError(Exception):
 def get_ossapi() -> Ossapi:
     server_settings_repo = ServerSettingsRepository(SERVER_SETTINGS_FILE)
     server_settings = server_settings_repo.get_server_settings()
-    if server_settings is None:
-        raise ValueError("Server settings not found. This should never happen, please contact the developer.")
-    
-    if server_settings["osu_api_v2_client_id"] is None or server_settings["osu_api_v2_client_secret"] is None:
-        raise ApiV2CredentialsError("osu! API v2 credentials not found in server settings. Please set them up in the server settings page.")
 
-    try:
-        client_id = int(server_settings["osu_api_v2_client_id"])
-    except ApiV2CredentialsError:
-        raise ApiV2CredentialsError("Invalid osu! API v2 client ID in server settings. Please ensure it's a valid integer.")
+    if server_settings.osu_api_v2_client_id is None:
+        raise ApiV2CredentialsError("osu! API v2 client id not found in server settings. Please set it up in the server settings page.")
 
-    client_secret = server_settings["osu_api_v2_client_secret"]
+    if server_settings.osu_api_v2_client_secret is None:
+        raise ApiV2CredentialsError("osu! API v2 client secret not found in server settings. Please set it up in the server settings page.")
 
-    osuApi = Ossapi(client_id, client_secret)
+    if not server_settings.osu_api_v2_client_id.isdecimal():
+        raise ApiV2CredentialsError("osu! API v2 client id must be a number. Please check the server settings page.")
+
+    osuApi = Ossapi(
+        int(server_settings.osu_api_v2_client_id), 
+        server_settings.osu_api_v2_client_secret
+    )
 
     return osuApi
 

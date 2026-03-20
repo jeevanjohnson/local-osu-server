@@ -22,11 +22,7 @@ async def lifespan(app: FastAPI):
     for path in paths:
         if not path.exists():
             path.mkdir(parents=True, exist_ok=True)
-
-    server_settings = usecases.server_settings.get_server_settings()
-    if server_settings is None or len(server_settings) == 0:
-        usecases.server_settings.initialize_server_settings()
-
+    
     yield
     # Shutdown
 

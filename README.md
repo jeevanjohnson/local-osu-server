@@ -153,4 +153,56 @@ These are the proxy settings used during both installation and when running the 
 
 ## Contributing
 
-*Documentation coming soon.*
+Since this project is in active production, every commit to `main` must be stable and non-breaking for end users. With that in mind:
+
+- **All changes go through PRs** — this applies to external contributors and my own changes alike.
+- **PRs should be reviewed thoroughly** — ideally by another person alongside an AI review (Copilot/Claude). Only merge once everything looks good.
+- **Version control is handled automatically** — users will be notified when an update is available. If auto-updates are off, they'll be prompted to update manually. Otherwise, the update applies on next boot.
+
+> In a perfect world nothing slips through, but emergencies happen and things get overlooked — that's understood. The goal is just to keep the bar high.
+
+---
+
+### Code Philosophy
+
+This project leans heavily towards **readability and layered architecture**. Every piece of code should be intentional — if something exists, there should be a clear and understood reason for why it's there. When in doubt, favor clarity over cleverness.
+
+---
+
+### All skill levels are welcome
+
+You don't need to be an expert to contribute. If you're newer to a concept or unsure about something, that's completely fine — questions are encouraged. If anything comes up during development, don't hesitate to join the [Discord and reach out!](https://discord.gg/KcgTtV25En)
+
+---
+
+### Editing `.json` files or database models
+
+The migration system is strict by design. **Never edit an existing versioned model directly.** Instead, create a new version class, set `previous_model` on it, implement the migration, and update the `Current*` alias used throughout the project.
+
+**Example:**
+
+```python
+# Original model — do NOT edit this
+class UserV1(MigrationModel):
+    name: str
+    age: int
+
+# Want to add an email field? Create UserV2 instead
+class UserV2(MigrationModel, previous_model=UserV1):
+    name: str
+    age: int
+    email: str
+
+    @staticmethod
+    def migrate_from_previous(previous_data: dict[str, Any]) -> dict[str, Any]:
+        """Migrate from UserV1 to UserV2: add email field."""
+        previous_data["email"] = ""
+        return previous_data
+
+# Update the alias — this is what the rest of the project references
+CurrentUser = UserV2
+```
+
+For more detail on how migrations work, see the [jays-tools migration docs](https://github.com/jeevanjohnson/jays-tools/tree/main?tab=readme-ov-file#migrations).
+
+---
