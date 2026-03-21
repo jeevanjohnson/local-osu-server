@@ -129,9 +129,9 @@ class LeaderboardScore:
             title = score.username
 
         if from_difficulty_adjusted:
-            # either Rate 1.5x for DT or NC
-            # Rate 0.75x for HT
-            # Or Rate 1x for all else
+            # https://capitalizemytitle.com/small-text-converter/
+            title = f"[ᵒᵍ ᵈⁱᶠᶠ] {title}"
+            
             if "DT" in score.enabled_mods or "NC" in score.enabled_mods:
                 title += " (1.5x)"
             elif "HT" in score.enabled_mods or "DC" in score.enabled_mods:
@@ -139,8 +139,8 @@ class LeaderboardScore:
             else:
                 title += " (1x)"
 
-            if not score.lazer or "DA" not in score.enabled_mods:
-                title += " (base diff)"
+            # if not score.lazer or "DA" not in score.enabled_mods:
+            #     title += " (base diff)"
         
         return cls(
             score_id=score.score_id,

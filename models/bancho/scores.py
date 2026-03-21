@@ -16,6 +16,85 @@ LAZER_MODS = list[str]
 
 class Mods(list[str]):
     """A list of mods, represented as their short names. For example: ["HD", "HR", "DT"]"""
+
+    def approximate_score_multiplier(self, rate: float) -> float:
+        """
+        Approximate the score multiplier for a given speed rate using linear interpolation.
+
+        In osu!lazer, only three exact speed rates have official, ranked multipliers:
+            - 0.75x → 0.30 (Half Time mod)
+            - 1.00x → 1.00 (no speed mod)
+            - 1.50x → 1.10 (Double Time / Nightcore mod)
+
+        For any other rate, the game normally gives a score multiplier of 0.0 (unranked),
+        but this function provides a smooth estimation by connecting the known points
+        with straight lines – a method called linear interpolation.
+
+        Linear interpolation assumes that the multiplier changes linearly between two
+        known (rate, multiplier) pairs. For a desired rate that lies between two
+        known rates, the multiplier is calculated as:
+            multiplier = y1 + (rate - x1) * (y2 - y1) / (x2 - x1)
+        where (x1, y1) and (x2, y2) are the neighboring known points.
+
+        For rates outside the range 0.75–1.5, the function extrapolates (extends the
+        line beyond the known points) using the nearest segment. This may produce
+        unrealistic results (e.g., negative multipliers) if the rate is far outside,
+        but is included for completeness.
+
+        Parameters:
+            rate (float): Desired speed multiplier (e.g., 1.0 for original speed).
+
+        Returns:
+            float: Estimated score multiplier based on linear interpolation.
+
+        Examples:
+            >>> approximate_score_multiplier(1.0)
+            1.0
+            >>> approximate_score_multiplier(1.5)
+            1.1
+            >>> approximate_score_multiplier(0.75)
+            0.3
+            >>> approximate_score_multiplier(1.125)   # Between 1.0 and 1.5
+            1.05
+            >>> approximate_score_multiplier(1.6)     # Extrapolated beyond 1.5
+            1.1333...
+        """
+        # Known (rate, multiplier) points
+        points = [
+            (0.75, 0.30), 
+            (1.00, 1.00), 
+            (1.50, 1.10)
+        ]
+        # HT → 0.75x speed → 0.30x score
+        # No speed change → 1.00x speed → 1.00x score
+        # DT/NC → 1.50x speed → 1.10x score
+
+        # Default to first segment so these are always defined.
+        x1, y1 = points[0]
+        x2, y2 = points[1]
+
+        # Determine the segment to use (or extrapolate if outside)
+        if rate < points[0][0]:
+            # Extrapolate backward using the first segment
+            x1, y1 = points[0]
+            x2, y2 = points[1]
+        elif rate > points[-1][0]:
+            # Extrapolate forward using the last segment
+            x1, y1 = points[-2]
+            x2, y2 = points[-1]
+        else:
+            # Find the segment containing rate
+            for i in range(len(points) - 1):
+                if points[i][0] <= rate <= points[i + 1][0]:
+                    x1, y1 = points[i]
+                    x2, y2 = points[i + 1]
+                    break
+
+        # Linear interpolation / extrapolation formula
+        if x2 == x1:  # safety, should not happen
+            return y1
+        t = (rate - x1) / (x2 - x1)
+        return y1 + t * (y2 - y1)
     
     def to_stable_mods(self) -> tuple[osuMods, LAZER_MODS]:
         stable_mods = osuMods.NOMOD
@@ -43,8 +122,6 @@ class Mods(list[str]):
         multiplier = 1.0
         
         # Score multiplier mods in lazer
-        # TODO: implement rest of the mods
-        # https://osu.ppy.sh/community/forums/topics/1959149?n=2https://osu.ppy.sh/community/forums/topics/1959149?n=2
         mod_multipliers = {
             # Difficulty Reduction
             "EZ": 0.50,      # Easy
@@ -110,6 +187,10 @@ class Mods(list[str]):
             "SY": 0.80,      # Synesthesia
             "DP": 1.00,      # Depth
         }
+
+        # if DT is 1.10x and adjustes speed by 1.5x
+        # & if HT is 0.30x and adjusts speed by 0.75x
+        # & no speec changes is 1.00x
         
         for mod in self:
             if mod in mod_multipliers:
@@ -118,8 +199,14 @@ class Mods(list[str]):
                     rate_change = [m for m in self if m.endswith("x")]
                     if rate_change:
                         continue
-
+                
                 multiplier *= mod_multipliers[mod]
+            elif mod.endswith("x"):
+                rate = float(mod[:-1])
+                multiplier *= self.approximate_score_multiplier(rate)
+            else:
+                print(f"Warning: unknown mod {mod} with no defined multiplier, ignoring in score calculation")
+                continue
         
         return multiplier
 
