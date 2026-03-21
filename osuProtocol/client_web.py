@@ -2,8 +2,11 @@ from enum import IntEnum
 from enum import unique
 from dataclasses import dataclass
 
+import ossapi.enums
+
 from osuProtocol.server_packets import osuMods
-from ossapi.enums import RankStatus
+import ossapi.enums
+from models.bancho.scores import Score, LazerScore, StableScore
 
 @unique
 class osuMapStatus(IntEnum):
@@ -19,15 +22,15 @@ class osuMapStatus(IntEnum):
     LOVED = 5
 
     @classmethod
-    def from_api_v2_ranked_status(cls, ranked_status: RankStatus) -> 'osuMapStatus':
+    def from_api_v2(cls, ranked_status: ossapi.enums.RankStatus) -> 'osuMapStatus':
         return {
-            RankStatus.GRAVEYARD: cls.PENDING,
-            RankStatus.WIP: cls.PENDING,
-            RankStatus.PENDING: cls.PENDING,
-            RankStatus.RANKED: cls.RANKED,
-            RankStatus.APPROVED: cls.APPROVED,
-            RankStatus.QUALIFIED: cls.QUALIFIED,
-            RankStatus.LOVED: cls.LOVED,
+            ossapi.enums.RankStatus.GRAVEYARD: cls.PENDING,
+            ossapi.enums.RankStatus.WIP: cls.PENDING,
+            ossapi.enums.RankStatus.PENDING: cls.PENDING,
+            ossapi.enums.RankStatus.RANKED: cls.RANKED,
+            ossapi.enums.RankStatus.APPROVED: cls.APPROVED,
+            ossapi.enums.RankStatus.QUALIFIED: cls.QUALIFIED,
+            ossapi.enums.RankStatus.LOVED: cls.LOVED,
         }[ranked_status]
         
 @unique
@@ -95,38 +98,60 @@ class LeaderboardScore:
         return self.serialize()
 
     @classmethod
-    def from_score(cls, score: 'Score', position: int) -> 'LeaderboardScore':
-        if isinstance(score, LazerScore):
-            mods = osuMods.NOMOD
+    def from_score(
+        cls, 
+        score: Score, 
+        position: int,
+        ingame_score: int,
+        from_difficulty_adjusted: bool = False
+    ) -> 'LeaderboardScore':
+        stable_mods, lazer_mods = score.enabled_mods.to_stable_mods()
 
-            for mod_str in score.enabled_mods:
-                try:
-                    mod_enum = osuMods.from_mod_string(mod_str)
-                    mods |= mod_enum
-                except (KeyError, ValueError):
-                    # Handle unknown mod strings gracefully
-                    print(f"Warning: Unknown mod '{mod_str}' in score {score.score_id}")
+        if isinstance(score, LazerScore):
+            title = f"[LAZER] {score.username}"
+
+            total_lazer_mods = len(lazer_mods)
+
+            if lazer_mods:
+                title += " ("
+                
+                for i, lazer_mod in enumerate(lazer_mods):
+                    if lazer_mod == "DA":
+                        continue
+
+                    if i == total_lazer_mods - 1:
+                        title += lazer_mod
+                    else:
+                        title += lazer_mod + ","
+                
+                title += ")"
         else:
-            mods = score.enabled_mods
-        
-        if isinstance(score, LegacyScore):
-            total_score = score.lazer_score()
-        else:
-            total_score = score.total_score
+            title = score.username
+
+        if from_difficulty_adjusted:
+            # either Rate 1.5x for DT or NC
+            # Rate 0.75x for HT
+            # Or Rate 1x for all else
+                if "DT" in score.enabled_mods or "NC" in score.enabled_mods:
+                    title += " (1.5x)"
+                elif "HT" in score.enabled_mods or "DC" in score.enabled_mods:
+                    title += " (0.75x)"
+                else:
+                    title += " (1x)"
         
         return cls(
             score_id=score.score_id,
-            username=score.title,
-            score=total_score,
-            max_combo=score.max_combo,
+            username=title,
+            score=ingame_score,
+            max_combo=score.combo.actual,
             count50=score.count50,
             count100=score.count100,
             count300=score.count300,
             count_miss=score.count_miss,
-            countkatu=0,  # TODO: Implement katu/geki counts, probably wont need to since stable works just fine without them
-            countgeki=0,  # TODO: Implement katu/geki counts, probably wont need to since stable works just fine without them
+            countkatu=0,
+            countgeki=0,
             perfect=score.perfect,
-            enabled_mods=mods,  # Handle lazer scores with list[str] mods
+            enabled_mods=stable_mods, 
             user_id=score.user_id,
             position=position,
             time_set=score.time_set,
@@ -183,6 +208,14 @@ class Leaderboard:
         self.scores = new_scores
 
     def serialize(self) -> bytes:
+        if isinstance(self.header.beatmap_status, bool):
+            error_message = (
+                f"Error: Beatmap status is a boolean value ({self.header.beatmap_status}). This is likely a bug.\n"
+                f"Beatmap ID: {self.header.beatmap_id}, Beatmap Set ID: {self.header.beatmap_set_id}\n"
+                f"Artist: {self.header.artist}, Title: {self.header.title}"
+            )
+            raise ValueError(error_message)
+
         if self.header.beatmap_status < 1:
             return f'{self.header.beatmap_status.value}|false'.encode()
         
@@ -207,7 +240,7 @@ class GraveyardLeaderboard(Leaderboard):
     """
     def __init__(self):
         super().__init__(LeaderboardHeader(
-            beatmap_status=osuMapStatus.NOTSUBMITTED,
+            beatmap_status=osuMapStatus.PENDING,
             beatmap_id=0,
             beatmap_set_id=0,
             num_of_scores=0,
@@ -215,166 +248,26 @@ class GraveyardLeaderboard(Leaderboard):
             title=""
         ), [])
 
-@dataclass
-class Score:
-    score_id: int
-    username: str
-    total_score: int
-    max_combo: int
-    count50: int
-    count100: int
-    count300: int
-    count_miss: int
-    perfect: bool
-    enabled_mods: osuMods
-    user_id: int
-    time_set: EpochTime
-    replay_available: bool
-    pp: int | None
-    beatmap_max_combo: int
-
-    @property
-    def title(self) -> str:
-        raise NotImplementedError("Subclasses must implement the title property")
-
-def seperate_lazer_and_stable_mods(mod_strings: list[str]) -> tuple[osuMods, list[str]]:
-    mods = osuMods.NOMOD
-    LAZER_MODS = []
-
-    for mod_str in mod_strings:
-        try:
-            mod_enum = osuMods.from_mod_string(mod_str)
-            mods |= mod_enum
-        except (KeyError, ValueError):
-            LAZER_MODS.append(mod_str)
-            print(f"Warning: Unknown mod '{mod_str}' in score. This mod will be ignored in the API v1-compatible legacy leaderboard, but should still work correctly in the lazer leaderboard if the client supports it.")
-
-    return mods, LAZER_MODS
-
-@dataclass
-class LazerScore(Score):
-    enabled_mods: list[str]
-
-    @property
-    def title(self) -> str:
-        if self.enabled_mods:
-            stable_mods, lazer_mods = seperate_lazer_and_stable_mods(self.enabled_mods)
-
-            if lazer_mods:
-                return f"[LAZER+{','.join(lazer_mods)}] {self.username}"
-
-        return f"[LAZER] {self.username}"
-
-@dataclass
-class LegacyScore(Score):
-    
-    @property
-    def title(self) -> str:
-        return self.username
-
-    def lazer_score(
-        self,
-        bonus_points: float = 0.0,
-        mod_multiplier: float = 1.0,
-        combo_weight: float = 0.7,
-        accuracy_weight: float = 0.3
-    ) -> int:
-
-        total_hits = self.count300 + self.count100 + self.count50 + self.count_miss
-
-        if total_hits == 0:
-            return 0
-
-        # Accuracy calculation (standard osu! weighting)
-        accuracy = (self.count300 + self.count100 / 3 + self.count50 / 5) / total_hits
-
-        # Hit score components (capped implicitly when max_combo/max_possible_combo ≤ 1 and accuracy ≤ 1)
-        combo_portion = (self.max_combo / self.beatmap_max_combo) * combo_weight * 1_000_000
-        accuracy_portion = accuracy * accuracy_weight * 1_000_000
-
-        hit_score = combo_portion + accuracy_portion
-
-        # The hit score should never exceed 1,000,000
-        hit_score = min(hit_score, 1_000_000)
-
-        # Add bonus (e.g., spinner spins, slider ticks) if known
-        base_score = hit_score + bonus_points
-
-        # Apply the 0.96× "Classic" multiplier (always present for imported scores)
-        # Then apply any mod multiplier from the original play (DT, HT, etc.)
-        final_score = base_score * 0.96 * mod_multiplier
-
-        return round(final_score)
+# class UpdatedBeatmapLeaderboard(Leaderboard):
+#     """
+#     Represents a leaderboard for beatmaps that have been updated.
+#     """
+#     def __init__(self, beatmap_id: int, beatmap_set_id: int, artist: str, title: str):
+#         super().__init__(LeaderboardHeader(
+#             beatmap_status=osuMapStatus.UPDATEAVALIABLE,
+#             beatmap_id=beatmap_id,
+#             beatmap_set_id=beatmap_set_id,
+#             num_of_scores=0,
+#             artist=artist,
+#             title=title
+#         ), [])
 
 class ScoringAlgorithm(IntEnum):
     LAZER = 0
     PP = 1
 
-class Scores(list[Score]):
-    def __init__(
-            self, 
-            scores: list[Score] | None = None
-        ):
-        self.scoring_algorithm: ScoringAlgorithm = ScoringAlgorithm.LAZER
-        super().__init__(scores or [])
-
-    def copy(self) -> 'Scores':
-        return Scores(scores=self[:])
-
-    def remove_duplicates(self):
-        new_scores = Scores()
-        temp_scores: dict[str, list[Score]] = {}
-
-        for score in self:
-            if score.username not in temp_scores:
-                temp_scores[score.username] = [score]
-            else:
-                temp_scores[score.username].append(score)
-        
-        for username, user_scores in temp_scores.items():
-            if len(user_scores) == 1:
-                new_scores += user_scores[0]
-            else:
-                # Keep whichever score ranks higher under the current sort metric.
-                # This means lazer-only players keep their LazerScore, while stable
-                # players whose LegacyScore outranks the v2 LazerScore representation
-                # of the same play (e.g. HT mod) are also handled correctly.
-                def _sort_key(s: Score) -> int:
-                    if isinstance(s, LegacyScore):
-                        return s.lazer_score()
-                    return s.total_score
-
-                new_scores += max(user_scores, key=_sort_key)
-
-        self.clear()
-        self.extend(new_scores)
-
-    def set_scoring_algorithm(self, algorithm: ScoringAlgorithm):
-        self.scoring_algorithm = algorithm
-
-    def __iadd__(self, value: Score) -> 'Scores':
-        super().append(value)
-        return self
-
-    def sort_by_algorithm(self):
-        if self.scoring_algorithm == ScoringAlgorithm.PP:
-            self.sort_by_pp()
-        else:
-            self.sort_by_score()
-
-    def sort_by_pp(self):
-        
-        def pp_key(score: Score):
-            return score.pp or 0
-
-        self.sort(key=pp_key, reverse=True)
-
-    def sort_by_score(self):
-
-        def score_key(score: Score):
-            if isinstance(score, LegacyScore):
-                return score.lazer_score()
-            
-            return score.total_score
-        
-        self.sort(key=score_key, reverse=True)
+    def to_api_v2(self) -> ossapi.enums.RankingType:
+        return {
+            ScoringAlgorithm.LAZER: ossapi.enums.RankingType.SCORE,
+            ScoringAlgorithm.PP: ossapi.enums.RankingType.PERFORMANCE
+        }[self]

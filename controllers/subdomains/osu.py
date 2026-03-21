@@ -1,5 +1,4 @@
 from fastapi import APIRouter, Response, Query
-from ossapi import UserCompact
 from fastapi.responses import RedirectResponse
 from constants import SEASONAL_BG_GIT_URL
 import json
@@ -8,11 +7,15 @@ from fastapi import status
 from osuProtocol.server_packets import osuGameMode, osuMods
 import usecases.sessions
 from osuProtocol.client_web import LeaderboardType, osuMapStatus
+from models.database.sessions import (
+    CurrentSessionBeatmapInfo as SessionBeatmapInfo
+)
 import usecases.scores
 import usecases.beatmaps
 from osuProtocol.server_packets import PlayerStats as ServerPlayerStats, Notification
 from osuProtocol.client_web import LeaderboardScore, LeaderboardHeader, Leaderboard
 from osuProtocol.client_web import GraveyardLeaderboard, ScoringAlgorithm
+import urllib.parse as urlparse
 
 osu = APIRouter(
     prefix="/osu",
@@ -47,6 +50,8 @@ async def get_leaderboard(
     map_package_hash: str = Query(..., alias="h"),
     aqn_files_found: bool = Query(..., alias="a"),
 ):
+    map_filename = urlparse.unquote(map_filename)
+
     session = usecases.sessions.get_current_session()
     if session is None:
         return NULL_RESPONSE
@@ -55,62 +60,68 @@ async def get_leaderboard(
     if profile is None:
         return NULL_RESPONSE
     
+    if session.songs_folder is None:
+        return NULL_RESPONSE # TODO: should never happen, so something is up with architecture if it does.
+    
     leaderboard_type = LeaderboardType(leaderboard_type)
     mode_arg = osuGameMode(mode_arg)
 
     if session.current_game_mode != mode_arg:
         session.current_game_mode = mode_arg
 
-        usecases.sessions.update_current_session(session)
-        usecases.sessions.update_in_game_stats()
+        usecases.sessions.update_current_session(
+            session,
+            update_client=True
+        )
 
-    beatmap = usecases.beatmaps.get_beatmap(beatmap_md5=map_md5, beatmap_id=map_set_id)
+    beatmap = await usecases.beatmaps.from_leaderboard_request(
+        beatmap_md5=map_md5, 
+        beatmap_set_id=map_set_id,
+        map_filename=map_filename,
+        songs_folder=session.songs_folder,
+        current_settings=profile.settings
+    )
     if beatmap is None:
+        session.latest_beatmap = None
+        usecases.sessions.update_current_session(session)
+
         return Response(
             GraveyardLeaderboard().serialize()
         )
 
-    beatmap_set = usecases.beatmaps.get_beatmap_set(
-        beatmap_set_id=beatmap.beatmapset_id
+    session.latest_beatmap = SessionBeatmapInfo(
+        id=beatmap.id,
+        md5=beatmap.md5,
+        set_id=beatmap.set_id,
     )
-
-    if beatmap_set is None:
-        usecases.sessions.enqueue_packets_to_current_session(
-            Notification("Beatmap found, but not set?, Notify Dev")
-        )
-        return Response(b'error: no')
 
     mods = osuMods(mods_arg)
 
     if profile.settings.leaderboard.show_lazer_scores_on_leaderboard:
-        legacy_leaderboard = False
+        stable_only = False
     else:
-        legacy_leaderboard = True
+        stable_only = True
 
-    scores = usecases.scores.get_scores_for_beatmap(
+    scores = await usecases.scores.get_scores_for(
+        beatmap=beatmap,
         leaderboard_type=leaderboard_type,
         game_mode=mode_arg,
         mods=mods,
         limit=profile.settings.leaderboard.leaderboard_score_limit,
-        legacy_leaderboard=legacy_leaderboard,
-        beatmap_md5=map_md5,
-        beatmap_id=map_set_id
+        stable_only=stable_only
     )
-
-    if scores is None:
-        total_scores = 0
-    else:
-        total_scores = len(scores)
 
     # TODO: handle map updates
 
+    total_scores = scores.total if scores else 0
+
     leaderboard_header = LeaderboardHeader(
-        beatmap_status=osuMapStatus.from_api_v2_ranked_status(beatmap.ranked),
+        beatmap_status=beatmap.status,
         beatmap_id=beatmap.id,
-        beatmap_set_id=beatmap.beatmapset_id,
+        beatmap_set_id=beatmap.set_id,
         num_of_scores=total_scores,
-        artist=beatmap_set.artist_unicode,
-        title=beatmap_set.title_unicode
+        artist=beatmap.artist,
+        title=beatmap.title
     )
 
     leaderboard = Leaderboard(
@@ -118,27 +129,27 @@ async def get_leaderboard(
         scores=[]
     )
 
-    leaderboard_scores = []
-
     if not scores:
         return Response(
             content=leaderboard.serialize()
         )
 
+    leaderboard_scores = []
+    scores.sort(profile.settings.scoring_algorithm)
+    scores.limit = profile.settings.leaderboard.leaderboard_score_limit
 
-    # removes potential stable / lazer crossovers
-    scores.remove_duplicates()
+    for index, score in enumerate(scores.scores):
+        if profile.settings.scoring_algorithm == ScoringAlgorithm.PP:
+            ingame_score = score.performance_points or 0
+        else:
+            ingame_score = score.total_score
 
-    scores.set_scoring_algorithm(
-        profile.settings.scoring_algorithm
-    )
-    scores.sort_by_algorithm()
-    
-    score_limit = profile.settings.leaderboard.leaderboard_score_limit
-    scores = scores[:score_limit]
-
-    for index, score in enumerate(scores):
-        leaderboard_score = LeaderboardScore.from_score(score, index + 1)
+        leaderboard_score = LeaderboardScore.from_score(
+            score=score, 
+            position=index + 1,
+            ingame_score=ingame_score,
+            from_difficulty_adjusted=beatmap.difficulty_adjusted
+        )
         leaderboard_scores.append(leaderboard_score)
 
     leaderboard.scores = leaderboard_scores

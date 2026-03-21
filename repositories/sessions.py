@@ -34,11 +34,9 @@ class SessionRepository:
             if not current_session.loaded:
                 raise ValueError("No session to delete.")
 
-            current_session = Session(
-                loaded=False
-            )
+            deleted_session = current_session.default()
 
-            self.session.set(current_session)
+            self.session.set(deleted_session)
 
     def update_current_session(self, updated_session: Session) -> None:
         with self.session as current_session:

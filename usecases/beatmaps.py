@@ -1,119 +1,340 @@
-from repositories.server_settings import ServerSettingsRepository
-from constants import SERVER_SETTINGS_FILE
-from ossapi import Beatmapset, Ossapi
-from ossapi import Beatmap
+from repositories.sessions import SessionRepository
+from constants import BEATMAPS_FILE, SESSIONS_FILE, PROFILES_FILE
+from repositories.beatmaps import BeatmapsRepository
+from models.database.beatmaps import (
+    CurrentBeatmap as Beatmap,
+    CurrentBeatmapSet as BeatmapSet,
+)
+from usecases.providers import get_ossapi_async
+import hashlib
+from pathlib import Path
+from repositories.profiles import ProfilesRepository
+from osuProtocol.client_web import osuMapStatus
+import asyncio
+import aiohttp
+import httpx
+import time
+from osupyparser import OsuFile
+from models.database.profiles import CurrentSettings
+from datetime import datetime
+from osuProtocol.server_packets import osuGameMode
+import re
+import ossapi
 
-class ApiV2CredentialsError(Exception):
-    pass
 
-def get_ossapi() -> Ossapi:
-    server_settings_repo = ServerSettingsRepository(SERVER_SETTINGS_FILE)
-    server_settings = server_settings_repo.get_server_settings()
+FILENAME_REGEX = re.compile(
+    r"(?P<artist>.*) - (?P<song_name>.*) ((?P<mapper>.*) \[)(?P<diff_name>.*)\]\.osu"
+)
+DIFFICULTY_ADJUSTED_REGEX = re.compile(
+    r"(?P<rate>[0-9]{1,2}(?:\.[0-9]{1,2})?x) \((?P<bpm>[0-9]+bpm)\)"
+)
+ATTRIBUTE_EDIT_REGEX = re.compile(
+    r'(.*) (HP|CS|AR|OD)([0-9]{1,2}(?:\.[0-9]{1,2})?)'
+)
 
-    if server_settings.osu_api_v2_client_id is None:
-        raise ApiV2CredentialsError("osu! API v2 client id not found in server settings. Please set it up in the server settings page.")
+class BeatmapResolver:
+    def __init__(
+            self,
+            songs_folder: Path,
+            beatmaps_repo: BeatmapsRepository,
+            current_settings: CurrentSettings,
+            http_session: aiohttp.ClientSession | None = None,
+        ) -> None:
+        self.beatmaps_repo = beatmaps_repo
+        self.current_settings = current_settings
+        self.songs_folder = songs_folder
+        self._http_session = http_session
+        self._owns_http_session = False
 
-    if server_settings.osu_api_v2_client_secret is None:
-        raise ApiV2CredentialsError("osu! API v2 client secret not found in server settings. Please set it up in the server settings page.")
+    def _get_http_session(self) -> aiohttp.ClientSession:
+        if self._http_session is None or self._http_session.closed:
+            self._http_session = aiohttp.ClientSession()
+            self._owns_http_session = True
 
-    if not server_settings.osu_api_v2_client_id.isdecimal():
-        raise ApiV2CredentialsError("osu! API v2 client id must be a number. Please check the server settings page.")
+        return self._http_session
 
-    osuApi = Ossapi(
-        int(server_settings.osu_api_v2_client_id), 
-        server_settings.osu_api_v2_client_secret
+    async def close(self) -> None:
+        if self._owns_http_session and self._http_session is not None and not self._http_session.closed:
+            await self._http_session.close()
+    
+    @staticmethod
+    def build_from_bmap_api(
+        api_beatmap: ossapi.Beatmap,
+        status: osuMapStatus,
+        osu_file_content: bytes
+    ) -> Beatmap:
+        beatmap_set = api_beatmap.beatmapset()
+        
+        assert beatmap_set is not None, "BeatmapSet not found for Beatmap with id {}".format(api_beatmap.id)
+        assert api_beatmap.checksum is not None, "Checksum not found for Beatmap with id {}".format(api_beatmap.id)
+        assert api_beatmap.max_combo is not None, "Max combo not found for Beatmap with id {}".format(api_beatmap.id)
+
+        return Beatmap(
+            time_inserted=datetime.now(),
+            id=api_beatmap.id,
+            set_id=api_beatmap.beatmapset_id,
+            md5=api_beatmap.checksum,
+            artist=beatmap_set.artist,
+            title=beatmap_set.title,
+            difficulty_name=api_beatmap.version,
+            max_combo=api_beatmap.max_combo,
+            status=status,
+            mode=osuGameMode.from_api_v2(api_beatmap.mode),
+            difficulty_adjusted=False,
+            osu_file_content=osu_file_content
+        )
+
+    def is_difficulty_adjusted_from_filename(self, file_name: str) -> bool:
+        # check modified_mp3_list.txt format first
+        
+        modified_mp3_list_txt = self.songs_folder / "modified_mp3_list.txt"
+        if not modified_mp3_list_txt.exists():
+            return False
+
+        for line in modified_mp3_list_txt.read_text().splitlines():
+            audio, map_path = line.split('.mp3 | ', maxsplit=1)
+            map_path = Path(map_path)
+
+            if map_path.parent / file_name == map_path:
+                return True
+
+        return False
+
+    @staticmethod
+    def valid_difficulty_adjusted_beatmap_filename(file_name: str) -> bool:
+        if not DIFFICULTY_ADJUSTED_REGEX.search(file_name):
+            return False
+        
+        file_name_data = FILENAME_REGEX.search(file_name)
+        if not file_name_data:
+            return False
+
+        difficulty_name = file_name_data["diff_name"]
+        if not difficulty_name:
+            return False
+
+        return bool(
+            ATTRIBUTE_EDIT_REGEX.search(difficulty_name)
+        )
+
+    async def get_file_content(self, beatmap_id: int) -> bytes | None:
+        url = f'https://osu.ppy.sh/osu/{beatmap_id}'
+        http_session = self._get_http_session()
+
+        async with http_session.get(url) as response:
+            if not response or response.status != 200:
+                return
+
+            content = await response.content.read()
+
+            if not content:
+                return
+            
+            return content
+
+    def from_db(self, beatmap_md5: str | None = None, beatmap_id: int | None = None) -> Beatmap | None:
+        if beatmap_md5 is not None:
+            return self.beatmaps_repo.get_by_md5(beatmap_md5)
+        
+        if beatmap_id is not None:
+            return self.beatmaps_repo.get_by_id(beatmap_id)
+        
+        return None
+    
+    async def from_api_md5(self, beatmap_md5: str) -> Beatmap | None:
+        osuApiAsync = await get_ossapi_async()
+
+        try:
+            api_beatmap = await osuApiAsync.beatmap(
+                checksum=beatmap_md5
+            )
+        except ValueError as e:
+            print(f"Error fetching beatmap with md5 {beatmap_md5} from osu api: {e}")
+            return None
+
+        if api_beatmap is None:
+            return None
+        
+        osu_file = await self.get_file_content(api_beatmap.id)
+        if osu_file is None:
+            return None
+        
+        beatmap_set = api_beatmap.beatmapset()
+
+        assert beatmap_set is not None, "BeatmapSet not found for Beatmap with id {}".format(api_beatmap.id)
+        assert api_beatmap.checksum is not None, "Checksum not found for Beatmap with id {}".format(api_beatmap.id)
+        assert api_beatmap.max_combo is not None, "Max combo not found for Beatmap with id {}".format(api_beatmap.id)
+
+        return self.build_from_bmap_api(
+            api_beatmap=api_beatmap,
+            status=osuMapStatus.from_api_v2(api_beatmap.status),
+            osu_file_content=osu_file
+        )
+
+    async def from_api_id(self, beatmap_id: int) -> Beatmap | None:
+        osuApiAsync = await get_ossapi_async()
+
+        api_beatmap = await osuApiAsync.beatmap(
+            beatmap_id=beatmap_id
+        )
+
+        if api_beatmap is None:
+            return None
+        
+        osu_file = await self.get_file_content(api_beatmap.id)
+        if osu_file is None:
+            return None
+        
+        beatmap_set = api_beatmap.beatmapset()
+
+        assert beatmap_set is not None, "BeatmapSet not found for Beatmap with id {}".format(api_beatmap.id)
+        assert api_beatmap.checksum is not None, "Checksum not found for Beatmap with id {}".format(api_beatmap.id)
+        assert api_beatmap.max_combo is not None, "Max combo not found for Beatmap with id {}".format(api_beatmap.id)
+
+        return self.build_from_bmap_api(
+            api_beatmap=api_beatmap,
+            status=osuMapStatus.from_api_v2(api_beatmap.status),
+            osu_file_content=osu_file
+        )
+    
+    # async def from_api_md5_and_set_id(self, beatmap_md5: str, beatmap_set_id: int) -> Beatmap | None:
+    #     osuApiAsync = await get_ossapi_async()
+
+    #     api_beatmap_set = await osuApiAsync.beatmapset(
+    #         beatmapset_id=beatmap_set_id
+    #     )
+
+    #     if api_beatmap_set is None or not api_beatmap_set.beatmaps:
+    #         return None
+        
+    #     api_beatmap = None
+    #     for bmap in api_beatmap_set.beatmaps:
+    #         if bmap.checksum == beatmap_md5:
+    #             api_beatmap = bmap
+    #             break
+
+    #     if api_beatmap is None:
+    #         return None
+        
+    #     osu_file = await self.get_file_content(api_beatmap.id)
+    #     if osu_file is None:
+    #         return None
+
+    #     beatmap_set = api_beatmap.beatmapset()
+
+    #     assert beatmap_set is not None, "BeatmapSet not found for Beatmap with id {}".format(api_beatmap.id)
+    #     assert api_beatmap.checksum is not None, "Checksum not found for Beatmap with id {}".format(api_beatmap.id)
+    #     assert api_beatmap.max_combo is not None, "Max combo not found for Beatmap with id {}".format(api_beatmap.id)
+
+    #     return self.build_from_bmap_api(
+    #         api_beatmap=api_beatmap,
+    #         status=osuMapStatus.from_api_v2(api_beatmap.status),
+    #         osu_file_content=osu_file
+    #     )
+
+    def get_osu_file_from_md5(self, beatmap_md5: str) -> Path | None:
+        for osu_file in self.songs_folder.glob("**/*.osu"):
+            if hashlib.md5(osu_file.read_bytes()).hexdigest() == beatmap_md5:
+                return osu_file
+        
+        return None
+    
+    def get_id_from_md5_in_songs_folder(self, beatmap_md5: str) -> int | None:
+        osu_file = self.get_osu_file_from_md5(beatmap_md5)
+        if osu_file is None:
+            return None
+
+        osu_file_parsed = OsuFile(str(osu_file))
+        return osu_file_parsed.beatmap_id
+    
+    def build_difficulty_adjusted_beatmap(self, original_beatmap: Beatmap, osu_file_path: Path) -> Beatmap:
+        return Beatmap(
+            time_inserted=datetime.now(),
+            id=original_beatmap.id,
+            set_id=original_beatmap.set_id,
+            md5=original_beatmap.md5,
+            artist=original_beatmap.artist,
+            title=original_beatmap.title,
+            difficulty_name=original_beatmap.difficulty_name,
+            max_combo=original_beatmap.max_combo,
+            status=original_beatmap.status,
+            mode=original_beatmap.mode,
+            difficulty_adjusted=True,
+            osu_file_content=osu_file_path.read_bytes()
+        )
+
+    async def from_leaderboard_request(
+        self,
+        beatmap_md5: str,
+        beatmap_set_id: int,
+        map_filename: str
+    ) -> Beatmap | None:
+        beatmap = self.from_db(beatmap_md5)
+        if beatmap:
+            return beatmap
+
+        try:
+            beatmap = await self.from_api_md5(beatmap_md5)
+        except ValueError as e:
+            if "osuMapStatus" in str(e):
+                print(f"Irrelevant Status for fetching leaderboards beatmap with md5 {beatmap_md5}")
+            else:
+                print(f"Error fetching beatmap with md5 {beatmap_md5} from osu api: {e}")
+
+            return None
+
+        if not beatmap:
+            return None
+
+        if not self.current_settings.difficulty_adjusted_beatmaps.sync_rank_status_with_bancho:
+            self.beatmaps_repo.insert_beatmap(beatmap)
+            return beatmap
+
+        if not self.valid_difficulty_adjusted_beatmap_filename(map_filename):
+            self.beatmaps_repo.insert_beatmap(beatmap)
+            return beatmap
+
+        if self.is_difficulty_adjusted_from_filename(map_filename):
+            self.beatmaps_repo.insert_beatmap(beatmap)
+            return beatmap
+
+        original_beatmap_id = self.get_id_from_md5_in_songs_folder(beatmap_md5)
+
+        if original_beatmap_id is None:
+            self.beatmaps_repo.insert_beatmap(beatmap)
+            return beatmap
+
+        original_beatmap = await self.from_api_id(beatmap_id=original_beatmap_id)
+        if original_beatmap is None:
+            self.beatmaps_repo.insert_beatmap(beatmap)
+            return beatmap
+
+        osu_file = self.get_osu_file_from_md5(beatmap_md5)
+        if not osu_file:
+            return None
+
+        difficulty_adjusted_beatmap = self.build_difficulty_adjusted_beatmap(original_beatmap, osu_file)
+        self.beatmaps_repo.insert_beatmap(difficulty_adjusted_beatmap)
+        return difficulty_adjusted_beatmap
+
+async def from_leaderboard_request(
+    beatmap_md5: str,
+    beatmap_set_id: int,
+    map_filename: str,
+    songs_folder: Path,
+    current_settings: CurrentSettings
+) -> Beatmap | None:
+    resolver = BeatmapResolver(
+        songs_folder=songs_folder,
+        beatmaps_repo=BeatmapsRepository(BEATMAPS_FILE),
+        current_settings=current_settings
     )
 
-    return osuApi
-
-def get_beatmap_from_md5(beatmap_md5: str) -> Beatmap | None:
-    osuApi = get_ossapi()
     try:
-        beatmap = osuApi.beatmap(checksum=beatmap_md5)
-    except ValueError:
-        return None
-    
-    if not beatmap:
-        return None
-    
-    return beatmap
-
-def get_beatmap_from_id(beatmap_id: int) -> Beatmap | None:
-    osuApi = get_ossapi()
-    try:
-        beatmap = osuApi.beatmap(beatmap_id=beatmap_id)
-    except ValueError:
-        return None
-
-    if not beatmap:
-        return None
-    
-    return beatmap
-
-def get_beatmap(
-    beatmap_md5: str | None = None,
-    beatmap_id: int | None = None,
-) -> Beatmap | None:
-    
-    if beatmap_md5 is not None:
-        beatmap = get_beatmap_from_md5(beatmap_md5)
-        if beatmap:
-            return beatmap
-    
-    if  beatmap_id is not None:
-        beatmap = get_beatmap_from_id(beatmap_id)
-        if beatmap:
-            return beatmap
-   
-    return None
-
-def get_beatmapset_from_id(beatmap_set_id: int) -> Beatmapset | None:
-    osuApi = get_ossapi()
-    try:
-        beatmap_set = osuApi.beatmapset(beatmapset_id=beatmap_set_id)
-    except ValueError:
-        return None
-    
-    if not beatmap_set:
-        return None
-    
-    return beatmap_set
-
-def get_beatmap_set_from_md5(beatmap_md5: str) -> Beatmapset | None:
-    beatmap = get_beatmap_from_md5(beatmap_md5)
-    if beatmap is None:
-        return None
-    
-    beatmap_set = get_beatmapset_from_id(beatmap.beatmapset_id)
-    return beatmap_set
-
-def get_beatmap_set_from_beatmap_id(beatmap_id: int) -> Beatmapset | None:
-    beatmap = get_beatmap_from_id(beatmap_id)
-    if beatmap is None:
-        return None
-    
-    beatmap_set = get_beatmapset_from_id(beatmap.beatmapset_id)
-    return beatmap_set
-
-def get_beatmap_set(
-    beatmap_md5: str | None = None,
-    beatmap_id: int | None = None,
-    beatmap_set_id: int | None = None
-) -> Beatmapset | None:
-    
-    if beatmap_set_id is not None:
-        beatmap_set = get_beatmapset_from_id(beatmap_set_id)
-        if beatmap_set:
-            return beatmap_set
-    
-    if beatmap_md5 is not None:
-        beatmap_set = get_beatmap_set_from_md5(beatmap_md5)
-        if beatmap_set:
-            return beatmap_set
-    
-    if  beatmap_id is not None:
-        beatmap_set = get_beatmap_set_from_beatmap_id(beatmap_id)
-        if beatmap_set:
-            return beatmap_set
-   
-    return None
+        return await resolver.from_leaderboard_request(
+            beatmap_md5=beatmap_md5,
+            beatmap_set_id=beatmap_set_id,
+            map_filename=map_filename
+        )
+    finally:
+        await resolver.close()

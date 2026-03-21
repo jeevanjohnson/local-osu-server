@@ -13,6 +13,7 @@ from osuProtocol.osuTypes import osuFriendList
 from osuProtocol.osuTypes import osuIntSigned32Bit, osuUTCOffset
 from osuProtocol.osuTypes import osuFloat32Bit, osuIntUnsigned64Bit, osuAccuracy
 import base64
+import ossapi
 
 def bytes_to_string(b: bytes) -> str:
     return base64.b64encode(b).decode('ascii')
@@ -255,6 +256,32 @@ class osuGameMode(IntEnum):
     CATCH_THE_BEAT = 2
     MANIA = 3
 
+    def to_api_v2(self) -> ossapi.GameMode:
+        return {
+            self.STANDARD: ossapi.GameMode.OSU,
+            self.TAIKO: ossapi.GameMode.TAIKO,
+            self.CATCH_THE_BEAT: ossapi.GameMode.CATCH,
+            self.MANIA: ossapi.GameMode.MANIA
+        }[self]
+
+    @classmethod
+    def from_osu_file(cls, mode: int) -> "osuGameMode":
+        return {
+            0: cls.STANDARD,
+            1: cls.TAIKO,
+            2: cls.CATCH_THE_BEAT,
+            3: cls.MANIA
+        }[mode]
+
+    @classmethod
+    def from_api_v2(cls, mode: ossapi.GameMode) -> "osuGameMode":
+        return {
+            ossapi.GameMode.OSU: cls.STANDARD,
+            ossapi.GameMode.TAIKO: cls.TAIKO,
+            ossapi.GameMode.CATCH: cls.CATCH_THE_BEAT,
+            ossapi.GameMode.MANIA: cls.MANIA
+        }[mode]
+
 @unique
 class osuAction(IntEnum):
     """The client's current status"""
@@ -273,6 +300,9 @@ class osuAction(IntEnum):
     Lobby = 11
     Multiplaying = 12
     OsuDirect = 13
+
+class LazerSpecificMod(Exception):
+    pass
 
 @unique
 class osuMods(IntFlag):
@@ -310,10 +340,7 @@ class osuMods(IntFlag):
     MIRROR = 1 << 30
 
     @classmethod
-    def from_mod_string(cls, mod_string: str) -> "osuMods":
-        if mod_string in ["CL"]: # Lazer specific mods
-            return cls.NOMOD
-    
+    def from_acronym(cls, acronym: str) -> "osuMods":
         try:
             return {
                 "DT": cls.DOUBLETIME,
@@ -347,22 +374,9 @@ class osuMods(IntFlag):
                 "2K": cls.KEY2,
                 "SV2": cls.SCOREV2,
                 "MR": cls.MIRROR,
-            }[mod_string.strip().upper()]
+            }[acronym.strip().upper()]
         except KeyError:
-            raise ValueError(f"Invalid mod string: {mod_string}")
-
-    @classmethod
-    def from_mod_strings(cls, mod_strings: list[str]) -> "osuMods":
-        mod_value = cls.NOMOD
-
-        for mod_str in mod_strings:
-            try:
-                mod = cls.from_mod_string(mod_str)
-                mod_value |= mod
-            except KeyError:
-                raise ValueError(f"Invalid mod string: {mod_str}")
-
-        return mod_value
+            raise ValueError(f"Invalid mod acronym: {acronym}")
 
 @unique
 class osuCountryCode(IntEnum):

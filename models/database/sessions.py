@@ -9,6 +9,7 @@ from jays_tools.json_database import MigratableModel
 from osuProtocol.server_packets import osuGameMode, osuAction, osuMods
 from pydantic import Field, field_serializer, field_validator
 from datetime import datetime
+from pathlib import Path
 
 class SessionOsuClientActivityV1(MigratableModel):
     opened: bool = Field(default=False)
@@ -20,6 +21,7 @@ class SessionOsuClientActivityV1(MigratableModel):
 
 CurrentSessionOsuClientActivity = SessionOsuClientActivityV1
 
+# TODO: make this beatmap model?
 class SessionBeatmapInfoV1(MigratableModel):
     md5: str = Field(default="")
     id: int = Field(default=0)
@@ -31,6 +33,8 @@ class SessionV1(MigratableModel):
     loaded: bool = Field(default=False)
     profile_name: str = Field(default="")
     packet_queue: bytes = Field(default=b"")
+    songs_folder: Path | None = Field(default=None)
+    replays_folder: Path | None = Field(default=None)
 
     latest_replay_id: int = Field(default=0)
     current_game_mode: osuGameMode  = Field(default=osuGameMode.STANDARD)

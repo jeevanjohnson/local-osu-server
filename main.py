@@ -13,27 +13,47 @@ import os
 from constants import LOS_PORT, LOS_GUI_PORT
 import sys
 import webview
+from typing import Callable
 
-def run_middleman_proxy():
-    print("Proxy server is running!")
+PROCESSES: dict[str, multiprocessing.Process] = {}
+
+def _run_with_graceful_shutdown(func: Callable) -> None:
     try:
-        os.system("mitmdump -s middleman.py -q")
+        func()
     except KeyboardInterrupt:
-        pass
+        print("Shutting down gracefully...")
 
-def run_local_server():
+def graceful_shutdown(
+    func: Callable, 
+    daemon: bool = True
+) -> Callable:
+    PROCESSES[func.__name__] = multiprocessing.Process(
+        target=_run_with_graceful_shutdown,
+        args=(func,),
+        daemon=daemon
+    )
+
+    return func
+
+@graceful_shutdown
+def middleman_proxy():
+    print("Proxy server is running!")
+
+    os.system("mitmdump -s middleman.py -q")
+
+@graceful_shutdown
+def local_server():
     uvicorn.run(
         "server:app", 
         host="127.0.0.1", 
         port=LOS_PORT
     )
 
-def run_gui_web():
-    try:
-        os.system(f"{sys.executable} gui.py")
-    except KeyboardInterrupt:
-        pass
+@graceful_shutdown
+def gui():
+    os.system(f"{sys.executable} gui.py")
 
+@graceful_shutdown
 def open_gui():
     import usecases.sessions
 
@@ -42,34 +62,45 @@ def open_gui():
     else:
         url = f"http://localhost:{LOS_GUI_PORT}/"
 
-    try:
-        webview.create_window(
-            title = 'Los!', 
-            url = url,
-            resizable = True,
-            frameless=True,
-            draggable=True,
-        )
-        webview.start()
-    except KeyboardInterrupt:
-        pass
+    webview.create_window(
+        title = 'Los!', 
+        url = url,
+        resizable = True,
+        frameless=True,
+        draggable=True,
+    )
+    webview.start()
 
-def run_application():
-    process = [
-        multiprocessing.Process(target=run_middleman_proxy, daemon=True),
-        multiprocessing.Process(target=run_local_server),
-        multiprocessing.Process(target=run_gui_web),
-        multiprocessing.Process(target=open_gui, daemon=True)
-    ]
-    for p in process:
-        p.start()
+def start_services():
+    for process_name, process in PROCESSES.items():
+            print(f"Starting {process_name}...")
+            process.start()
+
+def keep_alive():
+    for process_name, process in PROCESSES.items():
+            process.join() # Wait for the process to finish, overwritten with daemon=True,
+                                # so it will run until the main process is killed
+
+            print(f"{process_name} has stopped.")
+
+def shutdown_services():
+    print("Shutting down all services...")
+    for process_name, process in PROCESSES.items():
+        if process.is_alive():
+            print(f"Terminating {process_name}...")
+            process.terminate()
+            process.join()
+    print("All services have been shut down.")
+
+def main():
+    start_services()
 
     try:
-        for p in process:
-            p.join()
+         keep_alive()
     except KeyboardInterrupt:
-        for p in process:
-            p.terminate()
+        print("Shutting down all services...")
+        shutdown_services()
+        print("All services have been shut down.")    
 
 if __name__ == "__main__":
-    run_application()
+    main()

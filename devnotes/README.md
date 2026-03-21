@@ -4,6 +4,9 @@ This directory contains personal notes I have taken while working on this projec
 
 # 3.20.2026
 
+- async da requests BUDDY (beatmap cache, songs folder scan (funorage determiner), then fall on remote api)
+
+- check if proxy server is open before starting the app, if not, tell user to do so and gracefully exit
 - MODS STABLE -> LAZER CONVERSION (int -> list[str])
 - WORK ON LB REWORK
 - FIND THE DIFFERENCE BETWEEN SCOREV2 & LAZER SCORING TO ENSURE ACCURATE LEADERBOARD SYNCING

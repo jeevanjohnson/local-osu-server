@@ -5,7 +5,8 @@ Purpose/Domain/Concept:
 
 from fastapi import APIRouter, Response
 from fastapi import Request, Header
-from typing import Literal, TypeVar
+from typing import Literal, TypeVar, Callable, Any, Coroutine
+import inspect
 import usecases.gui
 import usecases.bancho
 import usecases.sessions
@@ -20,6 +21,7 @@ from models.database.sessions import (
     CurrentSessionBeatmapInfo as SessionBeatmapInfo,
 )
 from datetime import datetime
+from usecases.providers import ApiV2CredentialsError
 
 bancho = APIRouter()
 
@@ -70,14 +72,6 @@ async def client_request_handler(
                 headers={"cho-token": "profile-not-found"},
             )
 
-        # friend_ids = profile.friend_ids
-        # country_code = profile[session.profile_name]["country_code"]
-        # current_game_mode = session["current_game_mode"]
-        # if current_game_mode is None:
-        #     current_game_mode = "0"
-        # else:
-        #     current_game_mode = str(current_game_mode)
-
         rank = profile.performance[session.current_game_mode].rank
         ranked_score = profile.performance[session.current_game_mode].ranked_score
         accuracy = profile.performance[session.current_game_mode].accuracy
@@ -103,6 +97,9 @@ async def client_request_handler(
 
         session.osu_client.opened = True
         session.osu_client.logged_in_at = datetime.now()
+        session.songs_folder = usecases.sessions.retrieve_songs_folder()
+        session.replays_folder = usecases.sessions.retrieve_replays_folder()
+
         usecases.sessions.update_current_session(session)
 
         return Response(
@@ -124,7 +121,7 @@ async def client_request_handler(
             print(f"Received packet with ID {ClientPackets(packet._id).name} but no handler is registered for this packet type.")
             continue
 
-        emergency_response: ServerPackets | ServerPacket | None = PACKET_HANDLERS[ClientPackets(packet._id)](packet)
+        emergency_response: ServerPackets | ServerPacket | None = await PACKET_HANDLERS[ClientPackets(packet._id)](packet)
 
         if emergency_response is not None:
             return Response(
@@ -140,16 +137,17 @@ async def client_request_handler(
 
     return Response(content=response_packets)
 
-PACKET_HANDLERS: dict[ClientPackets, Callable[[Packet], ServerPackets | ServerPacket | None]] = {}
+PACKET_HANDLERS: dict[ClientPackets, Callable[[Packet], Coroutine[Any, Any, ServerPackets | ServerPacket | None]]] = {}
 PacketType = TypeVar("PacketType", bound=Packet)
+PACKET_HANDLER = Callable[[PacketType], Coroutine[Any, Any, ServerPackets | ServerPacket | None]]
 
 def register_packet_handler(packet_id: ClientPackets, packet_type: type[PacketType]):
-    def inner(func: Callable[[PacketType], ServerPackets | ServerPacket | None]):
-        def wrapper(packet: Packet) -> ServerPackets | ServerPacket | None:
+    def inner(func: PACKET_HANDLER) -> PACKET_HANDLER:
+        async def wrapper(packet: Packet) -> ServerPackets | ServerPacket | None:
             if not isinstance(packet, packet_type):
                 return None
 
-            return func(packet)
+            return await func(packet)
 
         PACKET_HANDLERS[packet_id] = wrapper
         return func
@@ -159,14 +157,14 @@ def register_packet_handler(packet_id: ClientPackets, packet_type: type[PacketTy
     ClientPackets.PING,
     packet_type=Ping
 )
-def handle_ping(packet: Ping) -> ServerPackets | ServerPacket | None:
+async def handle_ping(packet: Ping) -> ServerPackets | ServerPacket | None:
     return
 
 @register_packet_handler(
     ClientPackets.CHANGE_ACTION, 
     packet_type=ChangeAction
 )
-def on_action_change(packet: ChangeAction) -> ServerPackets | ServerPacket | None:
+async def on_action_change(packet: ChangeAction) -> ServerPackets | ServerPacket | None:
     session = usecases.sessions.get_current_session()
     if session is None:
         return osuProtocol.server_packets.client_relog_response()
@@ -189,34 +187,7 @@ def on_action_change(packet: ChangeAction) -> ServerPackets | ServerPacket | Non
         packet.current_mods.value
     )
 
-    # this sections should probably not exists cause of osu-web
-    beatmap_md5 = packet.beatmap_md5.value
-    if beatmap_md5 == "":
-        beatmap_md5 = None
-
-    beatmap_id = packet.beatmap_id.value
-    if beatmap_id == 0:
-        beatmap_id = None
-
-    try:
-        beatmap = usecases.beatmaps.get_beatmap(
-            beatmap_md5 = beatmap_md5,
-            beatmap_id = beatmap_id
-        )
-    except usecases.beatmaps.ApiV2CredentialsError:
-        return Notification(
-            message="osu! API v2 credentials error. Unexpected Behavior may occur. Please check the server logs for more details.",
-        )
-
-    if beatmap is None:
-        session.latest_beatmap = None
-    else:
-        session.latest_beatmap = SessionBeatmapInfo(
-            id=beatmap.id,
-            md5=beatmap.checksum, # type: ignore
-            set_id=beatmap.beatmapset_id
-        )
-    # this sections should probably not exists cause of osu-web ^
+    # Update beatmap info via lb req
 
     # will have to update readme cause of api key grabbing
     # also import score button would be epic
@@ -256,7 +227,7 @@ def on_action_change(packet: ChangeAction) -> ServerPackets | ServerPacket | Non
     ClientPackets.LOGOUT,
     packet_type=LogOut
 )
-def on_logout(packet: LogOut):
+async def on_logout(packet: LogOut):
     session = usecases.sessions.get_current_session()
     if session is None:
         return

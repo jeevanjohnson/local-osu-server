@@ -8,11 +8,11 @@ from osuProtocol.client_web import ScoringAlgorithm
 from pydantic import Field
 from pathlib import Path
 
-class osuTrainerBeatmapConfigV1(MigratableModel):
+class difficultyAdjustedBeatmapConfigV1(MigratableModel):
     allow_submission: bool = Field(default=True)
     sync_rank_status_with_bancho: bool = Field(default=True)
 
-CurrentOsuTrainerBeatmapConfig = osuTrainerBeatmapConfigV1
+CurrentDifficultyAdjustedBeatmapConfig = difficultyAdjustedBeatmapConfigV1
 
 class LeaderboardConfigV1(MigratableModel):
     leaderboard_score_limit: int = Field(default=50)
@@ -26,8 +26,8 @@ class SettingsV1(MigratableModel):
     score_v2_submission: bool = Field(default=False)
     force_scorev2: bool = Field(default=False)
     force_nf: bool = Field(default=False)
-    osu_trainer_beatmaps: CurrentOsuTrainerBeatmapConfig = Field(
-        default_factory=CurrentOsuTrainerBeatmapConfig
+    difficulty_adjusted_beatmaps: CurrentDifficultyAdjustedBeatmapConfig = Field(
+        default_factory=CurrentDifficultyAdjustedBeatmapConfig
     )
     self_rank: bool = Field(default=False)
     leaderboard: CurrentLeaderboardConfig = Field(
