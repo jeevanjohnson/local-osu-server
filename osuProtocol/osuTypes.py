@@ -1,26 +1,32 @@
-from dataclasses import dataclass, field
 import struct
+from dataclasses import dataclass, field
 from typing import Literal
+
 
 class osuBaseType:
     def osu_protocol_serialize(self) -> bytes:
         """Serialize this type into bytes for osu! protocol."""
-        raise NotImplementedError("osu_protocol_serialize must be implemented by subclasses.")
-    
+        raise NotImplementedError(
+            "osu_protocol_serialize must be implemented by subclasses."
+        )
+
     @classmethod
-    def osu_protocol_deserialize(cls, buffer: bytes) -> tuple['osuBaseType', int]:
+    def osu_protocol_deserialize(cls, buffer: bytes) -> tuple["osuBaseType", int]:
         """Deserialize bytes from osu! protocol into an instance of this type."""
-        raise NotImplementedError("osu_protocol_deserialize must be implemented by subclasses.")
+        raise NotImplementedError(
+            "osu_protocol_deserialize must be implemented by subclasses."
+        )
+
 
 class osuByteArray(bytearray):
-
-    def __iadd__(self, other: bytes | bytearray | osuBaseType) -> 'osuByteArray':
+    def __iadd__(self, other: bytes | bytearray | osuBaseType) -> "osuByteArray":
         if isinstance(other, osuBaseType):
             self.extend(other.osu_protocol_serialize())
         else:
             self.extend(other)
-        
+
         return self
+
 
 @dataclass
 class osuUnsignedChar(osuBaseType):
@@ -30,9 +36,10 @@ class osuUnsignedChar(osuBaseType):
         return self.value.to_bytes(1, "little", signed=False)
 
     @classmethod
-    def osu_protocol_deserialize(cls, buffer: bytes) -> tuple['osuUnsignedChar', int]:
+    def osu_protocol_deserialize(cls, buffer: bytes) -> tuple["osuUnsignedChar", int]:
         value = int.from_bytes(buffer[:1], "little", signed=False)
         return cls(value=value), 1
+
 
 @dataclass
 class osuUTCOffset(osuUnsignedChar):
@@ -42,8 +49,9 @@ class osuUTCOffset(osuUnsignedChar):
     def __post_init__(self):
         # if self.offset_hours < -12 or self.offset_hours > 14:
         #     raise ValueError("UTC offset must be between -12 and +14 hours.")
-        
+
         self.value = self.offset_hours + 24
+
 
 @dataclass
 class osuShort(osuBaseType):
@@ -51,6 +59,7 @@ class osuShort(osuBaseType):
 
     def osu_protocol_serialize(self) -> bytes:
         return self.value.to_bytes(2, "little", signed=False)
+
 
 @dataclass
 class osuInteger(osuBaseType):
@@ -61,14 +70,11 @@ class osuInteger(osuBaseType):
     def osu_protocol_serialize(self) -> bytes:
         if self.bit_width == 32:
             length_of_int = 4
-        else: # self.bit_width == 64
+        else:  # self.bit_width == 64
             length_of_int = 8
 
-        return self.value.to_bytes(
-            length_of_int, 
-            "little", 
-            signed=self.signed
-        )
+        return self.value.to_bytes(length_of_int, "little", signed=self.signed)
+
 
 @dataclass
 class osuIntSigned32Bit(osuInteger):
@@ -77,9 +83,10 @@ class osuIntSigned32Bit(osuInteger):
     bit_width: Literal[32, 64] = 32
 
     @classmethod
-    def osu_protocol_deserialize(cls, buffer: bytes) -> tuple['osuIntSigned32Bit', int]:
+    def osu_protocol_deserialize(cls, buffer: bytes) -> tuple["osuIntSigned32Bit", int]:
         value = int.from_bytes(buffer[:4], "little", signed=True)
         return cls(value=value), 4
+
 
 @dataclass
 class osuIntUnsigned32Bit(osuInteger):
@@ -88,9 +95,12 @@ class osuIntUnsigned32Bit(osuInteger):
     bit_width: Literal[32, 64] = 32
 
     @classmethod
-    def osu_protocol_deserialize(cls, buffer: bytes) -> tuple['osuIntUnsigned32Bit', int]:
+    def osu_protocol_deserialize(
+        cls, buffer: bytes
+    ) -> tuple["osuIntUnsigned32Bit", int]:
         value = int.from_bytes(buffer[:4], "little", signed=False)
         return cls(value=value), 4
+
 
 @dataclass
 class osuIntUnsigned64Bit(osuInteger):
@@ -99,9 +109,12 @@ class osuIntUnsigned64Bit(osuInteger):
     bit_width: Literal[32, 64] = 64
 
     @classmethod
-    def osu_protocol_deserialize(cls, buffer: bytes) -> tuple['osuIntUnsigned64Bit', int]:
+    def osu_protocol_deserialize(
+        cls, buffer: bytes
+    ) -> tuple["osuIntUnsigned64Bit", int]:
         value = int.from_bytes(buffer[:8], "little", signed=False)
         return cls(value=value), 8
+
 
 @dataclass
 class osuFloat32Bit(osuBaseType):
@@ -109,6 +122,7 @@ class osuFloat32Bit(osuBaseType):
 
     def osu_protocol_serialize(self) -> bytes:
         return struct.pack("<f", self.value)
+
 
 @dataclass
 class osuAccuracy(osuFloat32Bit):
@@ -121,12 +135,14 @@ class osuAccuracy(osuFloat32Bit):
         else:
             self.value = self.acc
 
+
 @dataclass
 class osuFloat64Bit(osuBaseType):
     value: float
 
     def osu_protocol_serialize(self) -> bytes:
         return struct.pack("<d", self.value)
+
 
 @dataclass
 class osuString(osuBaseType):
@@ -137,34 +153,32 @@ class osuString(osuBaseType):
 
         if string_length == 0:
             return b"\x00"
-        
+
         # ULEB128 encoding for string length
         length_bytes = osuByteArray()
 
         while string_length > 0:
             # 127 is 0x7F in hex, which is equivalent to 0111 1111 in binary.
             # 7 least signifcant bits = 0111 1111
-            length_bytes.append(
-                string_length & 0b0111_1111
-            )
+            length_bytes.append(string_length & 0b0111_1111)
 
             # shift string_length right by 7 bits to process the next 7 bits in the next iteration
             string_length = string_length >> 7
 
             if string_length != 0:
-                # This means there are more bytes to encode, so we set the 
+                # This means there are more bytes to encode, so we set the
                 # most significant bit (the top bit) to 1
                 length_bytes[-1] |= 0b1000_0000
-        
+
         return bytes(length_bytes)
 
     @classmethod
-    def osu_protocol_deserialize(cls, buffer: bytes) -> tuple['osuString', int]:
+    def osu_protocol_deserialize(cls, buffer: bytes) -> tuple["osuString", int]:
         # 0x00 means empty string; 0x0b means string is present and length-prefixed.
         if buffer[0] == 0x00:
             return cls(value=""), 1
 
-        if buffer[0] != 0x0b:
+        if buffer[0] != 0x0B:
             raise ValueError(f"Invalid osuString marker byte: {buffer[0]:#x}")
 
         # Skip the 0x0B prefix
@@ -182,8 +196,8 @@ class osuString(osuBaseType):
                 break
 
             shift += 7
-        
-        string_bytes = buffer[current_offset:current_offset + length]
+
+        string_bytes = buffer[current_offset : current_offset + length]
         string_value = string_bytes.decode("utf-8")
 
         return cls(value=string_value), current_offset + length
@@ -194,7 +208,8 @@ class osuString(osuBaseType):
 
         length_of_string = self.osu_protocol_length()
 
-        return b'\x0b' + length_of_string + self.value.encode()
+        return b"\x0b" + length_of_string + self.value.encode()
+
 
 @dataclass
 class osuMainMenuIcon(osuString):
@@ -204,6 +219,7 @@ class osuMainMenuIcon(osuString):
 
     def __post_init__(self):
         self.value = f"{self.icon_url}|{self.on_click_url}"
+
 
 @dataclass
 class osuInt32List(osuBaseType):
@@ -218,5 +234,6 @@ class osuInt32List(osuBaseType):
             result += osuIntSigned32Bit(val)
 
         return bytes(result)
+
 
 osuFriendList = osuInt32List

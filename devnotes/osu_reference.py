@@ -7,41 +7,18 @@ import hashlib
 import random
 import secrets
 from collections import defaultdict
-from collections.abc import Awaitable
-from collections.abc import Callable
-from collections.abc import Mapping
-from enum import IntEnum
-from enum import unique
+from collections.abc import Awaitable, Callable, Mapping
+from enum import IntEnum, unique
 from functools import cache
 from pathlib import Path as SystemPath
-from typing import Any
-from typing import Literal
-from urllib.parse import unquote
-from urllib.parse import unquote_plus
-
-import bcrypt
-from fastapi import status
-from fastapi.datastructures import FormData
-from fastapi.datastructures import UploadFile
-from fastapi.exceptions import HTTPException
-from fastapi.param_functions import Depends
-from fastapi.param_functions import File
-from fastapi.param_functions import Form
-from fastapi.param_functions import Header
-from fastapi.param_functions import Path
-from fastapi.param_functions import Query
-from fastapi.requests import Request
-from fastapi.responses import FileResponse
-from fastapi.responses import ORJSONResponse
-from fastapi.responses import RedirectResponse
-from fastapi.responses import Response
-from fastapi.routing import APIRouter
-from starlette.datastructures import UploadFile as StarletteUploadFile
+from typing import Any, Literal
+from urllib.parse import unquote, unquote_plus
 
 import app.packets
 import app.settings
 import app.state
 import app.utils
+import bcrypt
 from app import encryption
 from app._typing import UNSET
 from app.constants import regexes
@@ -49,16 +26,11 @@ from app.constants.clientflags import LastFMFlags
 from app.constants.gamemodes import GameMode
 from app.constants.mods import Mods
 from app.constants.privileges import Privileges
-from app.logging import Ansi
-from app.logging import log
+from app.logging import Ansi, log
 from app.objects import models
-from app.objects.beatmap import Beatmap
-from app.objects.beatmap import RankedStatus
-from app.objects.beatmap import ensure_osu_file_is_available
+from app.objects.beatmap import Beatmap, RankedStatus, ensure_osu_file_is_available
 from app.objects.player import Player
-from app.objects.score import Grade
-from app.objects.score import Score
-from app.objects.score import SubmissionStatus
+from app.objects.score import Grade, Score, SubmissionStatus
 from app.repositories import clans as clans_repo
 from app.repositories import comments as comments_repo
 from app.repositories import favourites as favourites_repo
@@ -71,8 +43,15 @@ from app.repositories import users as users_repo
 from app.repositories.achievements import Achievement
 from app.usecases import achievements as achievements_usecases
 from app.usecases import user_achievements as user_achievements_usecases
-from app.utils import escape_enum
-from app.utils import pymysql_encode
+from app.utils import escape_enum, pymysql_encode
+from fastapi import status
+from fastapi.datastructures import FormData, UploadFile
+from fastapi.exceptions import HTTPException
+from fastapi.param_functions import Depends, File, Form, Header, Path, Query
+from fastapi.requests import Request
+from fastapi.responses import FileResponse, ORJSONResponse, RedirectResponse, Response
+from fastapi.routing import APIRouter
+from starlette.datastructures import UploadFile as StarletteUploadFile
 
 BEATMAPS_PATH = SystemPath.cwd() / ".data/osu"
 REPLAYS_PATH = SystemPath.cwd() / ".data/osr"
@@ -1455,7 +1434,7 @@ async def osuComment(
                 fmt = ""
 
             if cmt["colour"]:
-                fmt += f'|{cmt["colour"]}'
+                fmt += f"|{cmt['colour']}"
 
             ret.append(
                 "{time}\t{target_type}\t{fmt}\t{comment}".format(fmt=fmt, **cmt),

@@ -19,6 +19,7 @@ from typing import TypedDict
 }
 """
 
+
 class MenuContentImage(TypedDict):
     image: str
     url: str
@@ -26,7 +27,9 @@ class MenuContentImage(TypedDict):
     begins: str | None
     expires: str | None
 
+
 class MenuContentResponse(TypedDict):
     images: list[MenuContentImage]
+
 
 MenuIconResponse = MenuContentResponse

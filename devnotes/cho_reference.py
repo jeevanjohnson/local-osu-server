@@ -7,66 +7,60 @@ import hashlib
 import re
 import struct
 import time
-from collections.abc import Callable
-from collections.abc import Mapping
-from datetime import date
-from datetime import datetime
+from collections.abc import Callable, Mapping
+from datetime import date, datetime
 from pathlib import Path
-from typing import Literal
-from typing import TypedDict
+from typing import Literal, TypedDict
 from zoneinfo import ZoneInfo
-
-import bcrypt
-from fastapi import APIRouter
-from fastapi import Response
-from fastapi.param_functions import Header
-from fastapi.requests import Request
-from fastapi.responses import HTMLResponse
 
 import app.packets
 import app.settings
 import app.state
 import app.usecases.performance
 import app.utils
+import bcrypt
 from app import commands
 from app._typing import IPAddress
 from app.constants import regexes
 from app.constants.gamemodes import GameMode
-from app.constants.mods import SPEED_CHANGING_MODS
-from app.constants.mods import Mods
-from app.constants.privileges import ClanPrivileges
-from app.constants.privileges import ClientPrivileges
-from app.constants.privileges import Privileges
-from app.logging import Ansi
-from app.logging import get_timestamp
-from app.logging import log
-from app.logging import magnitude_fmt_time
-from app.objects.beatmap import Beatmap
-from app.objects.beatmap import ensure_osu_file_is_available
+from app.constants.mods import SPEED_CHANGING_MODS, Mods
+from app.constants.privileges import ClanPrivileges, ClientPrivileges, Privileges
+from app.logging import Ansi, get_timestamp, log, magnitude_fmt_time
+from app.objects.beatmap import Beatmap, ensure_osu_file_is_available
 from app.objects.channel import Channel
-from app.objects.match import MAX_MATCH_NAME_LENGTH
-from app.objects.match import Match
-from app.objects.match import MatchTeams
-from app.objects.match import MatchTeamTypes
-from app.objects.match import MatchWinConditions
-from app.objects.match import Slot
-from app.objects.match import SlotStatus
-from app.objects.player import Action
-from app.objects.player import ClientDetails
-from app.objects.player import OsuStream
-from app.objects.player import OsuVersion
-from app.objects.player import Player
-from app.objects.player import PresenceFilter
-from app.packets import BanchoPacketReader
-from app.packets import BasePacket
-from app.packets import ClientPackets
-from app.packets import LoginFailureReason
+from app.objects.match import (
+    MAX_MATCH_NAME_LENGTH,
+    Match,
+    MatchTeams,
+    MatchTeamTypes,
+    MatchWinConditions,
+    Slot,
+    SlotStatus,
+)
+from app.objects.player import (
+    Action,
+    ClientDetails,
+    OsuStream,
+    OsuVersion,
+    Player,
+    PresenceFilter,
+)
+from app.packets import (
+    BanchoPacketReader,
+    BasePacket,
+    ClientPackets,
+    LoginFailureReason,
+)
 from app.repositories import client_hashes as client_hashes_repo
 from app.repositories import ingame_logins as logins_repo
 from app.repositories import mail as mail_repo
 from app.repositories import users as users_repo
 from app.state import services
 from app.usecases.performance import ScoreParams
+from fastapi import APIRouter, Response
+from fastapi.param_functions import Header
+from fastapi.requests import Request
+from fastapi.responses import HTMLResponse
 
 OSU_API_V2_CHANGELOG_URL = "https://osu.ppy.sh/api/v2/changelog"
 
@@ -166,14 +160,19 @@ async def bancho_view_matches() -> Response:
 <!DOCTYPE html>
 <body style="font-family: monospace;  white-space: pre-wrap;"><a href="/">back</a>
 matches:
-{new_line.join(
-    f'''{(ON_GOING if m.in_progress else IDLE):<{max_status_length}} ({m.id:>{match_id_max_length}}): {m.name}
+{
+            new_line.join(
+                f'''{(ON_GOING if m.in_progress else IDLE):<{max_status_length}} ({m.id:>{match_id_max_length}}): {m.name}
 -- '''
-    + f"{new_line}-- ".join([
-        f'{BEATMAP:<{max_properties_length}}: {m.map_name}',
-        f'{HOST:<{max_properties_length}}: <{m.host.id}> {m.host.safe_name}'
-    ]) for m in matches
-)}
+                + f"{new_line}-- ".join(
+                    [
+                        f"{BEATMAP:<{max_properties_length}}: {m.map_name}",
+                        f"{HOST:<{max_properties_length}}: <{m.host.id}> {m.host.safe_name}",
+                    ]
+                )
+                for m in matches
+            )
+        }
 </body>
 </html>""",
     )
@@ -966,7 +965,7 @@ async def handle_osu_login_request(
             msg_time = datetime.fromtimestamp(msg["time"])
             data += app.packets.send_message(
                 sender=msg["from_name"],
-                msg=f'[{msg_time:%a %b %d @ %H:%M%p}] {msg["msg"]}',
+                msg=f"[{msg_time:%a %b %d @ %H:%M%p}] {msg['msg']}",
                 recipient=msg["to_name"],
                 sender_id=msg["from_id"],
             )

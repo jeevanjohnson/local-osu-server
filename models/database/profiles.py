@@ -2,23 +2,31 @@
 Purpose/Domain/Concept:
 - This file contains the database models/architecture for the project regarding user profiles. (profiles.json)
 """
-from jays_tools.json_database import MigratableModel
-from osuProtocol.server_packets import osuCountryCode, osuGameMode
-from osuProtocol.client_web import ScoringAlgorithm
-from pydantic import Field
+
 from pathlib import Path
+
+from jays_tools.json_database import MigratableModel
+from pydantic import Field
+
+from osuProtocol.client_web import ScoringAlgorithm
+from osuProtocol.server_packets import osuCountryCode, osuGameMode
+
 
 class difficultyAdjustedBeatmapConfigV1(MigratableModel):
     allow_submission: bool = Field(default=True)
     sync_rank_status_with_bancho: bool = Field(default=True)
 
+
 CurrentDifficultyAdjustedBeatmapConfig = difficultyAdjustedBeatmapConfigV1
+
 
 class LeaderboardConfigV1(MigratableModel):
     leaderboard_score_limit: int = Field(default=50)
     show_lazer_scores_on_leaderboard: bool = Field(default=True)
 
+
 CurrentLeaderboardConfig = LeaderboardConfigV1
+
 
 class SettingsV1(MigratableModel):
     relax_submission: bool = Field(default=False)
@@ -33,11 +41,11 @@ class SettingsV1(MigratableModel):
     leaderboard: CurrentLeaderboardConfig = Field(
         default_factory=CurrentLeaderboardConfig
     )
-    scoring_algorithm: ScoringAlgorithm = Field(
-        default=ScoringAlgorithm.LAZER
-    )
+    scoring_algorithm: ScoringAlgorithm = Field(default=ScoringAlgorithm.LAZER)
+
 
 CurrentSettings = SettingsV1
+
 
 class PerformanceV1(MigratableModel):
     rank: int = Field(default=0)
@@ -47,7 +55,9 @@ class PerformanceV1(MigratableModel):
     ranked_score: int = Field(default=0)
     performance_points: int = Field(default=0)
 
+
 CurrentPerformance = PerformanceV1
+
 
 def performace_factory() -> dict[osuGameMode, CurrentPerformance]:
     return {
@@ -57,30 +67,34 @@ def performace_factory() -> dict[osuGameMode, CurrentPerformance]:
         osuGameMode.MANIA: CurrentPerformance(),
     }
 
+
 URL = str
 
+
 class ProfileV1(MigratableModel):
-    profile_picture: Path | URL  | None = Field(default=None)
+    profile_picture: Path | URL | None = Field(default=None)
     friend_ids: list[int] = Field(default=[])
     country_code: osuCountryCode = Field(default=osuCountryCode.XX)
     performance: dict[osuGameMode, CurrentPerformance] = Field(
         default_factory=performace_factory
     )
     notes: str | None = Field(default=None)
-    settings: CurrentSettings = Field(
-        default_factory=CurrentSettings
-    )
+    settings: CurrentSettings = Field(default_factory=CurrentSettings)
+
 
 CurrentProfile = ProfileV1
 
 ProfileName = str
 
+
 def profiles_factory() -> dict[ProfileName, CurrentProfile]:
     return {}
+
 
 class ProfilesV1(MigratableModel):
     all: dict[ProfileName, CurrentProfile] = Field(
         default_factory=profiles_factory
-    ) # Use factory to avoid default instanece from being shared and changed/mutated across profiles
+    )  # Use factory to avoid default instanece from being shared and changed/mutated across profiles
+
 
 CurrentProfiles = ProfilesV1

@@ -2,27 +2,18 @@ from __future__ import annotations
 
 import random
 import struct
-from abc import ABC
-from abc import abstractmethod
-from collections.abc import Callable
-from collections.abc import Collection
-from collections.abc import Iterator
-from dataclasses import dataclass
-from dataclasses import field
-from enum import IntEnum
-from enum import unique
-from functools import cache
-from functools import lru_cache
-from typing import TYPE_CHECKING
-from typing import Any
-from typing import NamedTuple
-from typing import cast
+from abc import ABC, abstractmethod
+from collections.abc import Callable, Collection, Iterator
+from dataclasses import dataclass, field
+from enum import IntEnum, unique
+from functools import cache, lru_cache
+from typing import TYPE_CHECKING, Any, NamedTuple, cast
 
 # from app.objects.beatmap import BeatmapInfo
 
 if TYPE_CHECKING:
-    from app.objects.match import Match # type: ignore
-    from app.objects.player import Player # type: ignore
+    from app.objects.match import Match  # type: ignore
+    from app.objects.player import Player  # type: ignore
 
 # packets are comprised of 3 parts:
 # - a unique identifier (the packet id), representing the type of request
@@ -440,7 +431,7 @@ class BanchoPacketReader:
         length = int.from_bytes(self.body_view[:2], "little")
         self.body_view = self.body_view[2:]
 
-        val = struct.unpack(f'<{"I" * length}', self.body_view[: length * 4])
+        val = struct.unpack(f"<{'I' * length}", self.body_view[: length * 4])
         self.body_view = self.body_view[length * 4 :]
         return val
 
@@ -448,7 +439,7 @@ class BanchoPacketReader:
         length = int.from_bytes(self.body_view[:4], "little")
         self.body_view = self.body_view[4:]
 
-        val = struct.unpack(f'<{"I" * length}', self.body_view[: length * 4])
+        val = struct.unpack(f"<{'I' * length}", self.body_view[: length * 4])
         self.body_view = self.body_view[length * 4 :]
         return val
 

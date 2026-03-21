@@ -1,18 +1,18 @@
-from enum import IntEnum
-from enum import unique
 from dataclasses import dataclass
+from enum import IntEnum, unique
 
 import ossapi.enums
 
+from models.bancho.scores import LazerScore, Score
 from osuProtocol.server_packets import osuMods
-import ossapi.enums
-from models.bancho.scores import Score, LazerScore, StableScore
+
 
 @unique
 class osuMapStatus(IntEnum):
     """
     Represents the ranked status of a beatmap.
     """
+
     NOTSUBMITTED = -1
     PENDING = 0
     UPDATEAVALIABLE = 1
@@ -22,7 +22,7 @@ class osuMapStatus(IntEnum):
     LOVED = 5
 
     @classmethod
-    def from_api_v2(cls, ranked_status: ossapi.enums.RankStatus) -> 'osuMapStatus':
+    def from_api_v2(cls, ranked_status: ossapi.enums.RankStatus) -> "osuMapStatus":
         return {
             ossapi.enums.RankStatus.GRAVEYARD: cls.PENDING,
             ossapi.enums.RankStatus.WIP: cls.PENDING,
@@ -32,17 +32,20 @@ class osuMapStatus(IntEnum):
             ossapi.enums.RankStatus.QUALIFIED: cls.QUALIFIED,
             ossapi.enums.RankStatus.LOVED: cls.LOVED,
         }[ranked_status]
-        
+
+
 @unique
 class LeaderboardType(IntEnum):
     """
     Types of leaderboards that can be requested.
     """
-    LOCAL   = 0
-    TOP     = 1
-    MODS    = 2
+
+    LOCAL = 0
+    TOP = 1
+    MODS = 2
     FRIENDS = 3
     COUNTRY = 4
+
 
 LEADERBOARD_SCORE_FMT = (
     "{id}|{name}|{score}|{max_combo}|"
@@ -52,11 +55,13 @@ LEADERBOARD_SCORE_FMT = (
 
 EpochTime = int
 
+
 @dataclass
 class LeaderboardScore:
     """
     Represents a single score on the leaderboard.
     """
+
     score_id: int
     username: str
     score: int
@@ -91,7 +96,7 @@ class LeaderboardScore:
             userid=self.user_id,
             rank=self.position,
             time=self.time_set,
-            has_replay=int(self.replay_available)
+            has_replay=int(self.replay_available),
         )
 
     def __repr__(self) -> str:
@@ -99,12 +104,12 @@ class LeaderboardScore:
 
     @classmethod
     def from_score(
-        cls, 
-        score: Score, 
+        cls,
+        score: Score,
         position: int,
         ingame_score: int,
-        from_difficulty_adjusted: bool = False
-    ) -> 'LeaderboardScore':
+        from_difficulty_adjusted: bool = False,
+    ) -> "LeaderboardScore":
         stable_mods, lazer_mods = score.enabled_mods.to_stable_mods()
 
         if isinstance(score, LazerScore):
@@ -114,7 +119,7 @@ class LeaderboardScore:
 
             if lazer_mods:
                 title += " ("
-                
+
                 for i, lazer_mod in enumerate(lazer_mods):
                     if lazer_mod == "DA":
                         continue
@@ -123,7 +128,7 @@ class LeaderboardScore:
                         title += lazer_mod
                     else:
                         title += lazer_mod + ","
-                
+
                 title += ")"
         else:
             title = score.username
@@ -131,7 +136,7 @@ class LeaderboardScore:
         if from_difficulty_adjusted:
             # https://capitalizemytitle.com/small-text-converter/
             title = f"[ᵒᵍ ᵈⁱᶠᶠ] {title}"
-            
+
             if "DT" in score.enabled_mods or "NC" in score.enabled_mods:
                 title += " (1.5x)"
             elif "HT" in score.enabled_mods or "DC" in score.enabled_mods:
@@ -141,7 +146,7 @@ class LeaderboardScore:
 
             # if not score.lazer or "DA" not in score.enabled_mods:
             #     title += " (base diff)"
-        
+
         return cls(
             score_id=score.score_id,
             username=title,
@@ -154,23 +159,26 @@ class LeaderboardScore:
             countkatu=0,
             countgeki=0,
             perfect=score.perfect,
-            enabled_mods=stable_mods, 
+            enabled_mods=stable_mods,
             user_id=score.user_id,
             position=position,
             time_set=score.time_set,
-            replay_available=score.replay_available
+            replay_available=score.replay_available,
         )
+
 
 STARTING_LB_FORMAT = (
     "{beatmap_status}|false|{beatmap_id}|{beatmap_set_id}|{num_of_scores}\n0\n"
     "[bold:0,size:20]{artist_unicode}|{title_unicode}\n10.0\n"
 )
 
+
 @dataclass
 class LeaderboardHeader:
     """
     Represents the header of a leaderboard, containing metadata about the leaderboard.
     """
+
     beatmap_status: osuMapStatus
     beatmap_id: int
     beatmap_set_id: int
@@ -185,28 +193,30 @@ class LeaderboardHeader:
             beatmap_set_id=self.beatmap_set_id,
             num_of_scores=self.num_of_scores,
             artist_unicode=self.artist,
-            title_unicode=self.title
+            title_unicode=self.title,
         )
-    
+
+
 class Leaderboard:
     """
     Represents a full leaderboard, including the header and the list of scores.
     """
+
     def __init__(
-            self, 
-            header: LeaderboardHeader, 
-            scores: list[LeaderboardScore] | None = None,
-            personal_best: LeaderboardScore | None = None
-        ):
+        self,
+        header: LeaderboardHeader,
+        scores: list[LeaderboardScore] | None = None,
+        personal_best: LeaderboardScore | None = None,
+    ):
         self.header = header
 
         if scores is None:
             self.scores = []
         else:
             self.scores = scores
-        
+
         self.personal_best = personal_best
-    
+
     def update_scores(self, new_scores: list[LeaderboardScore]):
         self.scores = new_scores
 
@@ -220,36 +230,42 @@ class Leaderboard:
             raise ValueError(error_message)
 
         if self.header.beatmap_status < 1:
-            return f'{self.header.beatmap_status.value}|false'.encode()
-        
+            return f"{self.header.beatmap_status.value}|false".encode()
+
         buffer = bytearray()
 
         buffer += self.header.serialize().encode()
 
-        raw_personal_best = b'\n'
+        raw_personal_best = b"\n"
         if self.personal_best:
-            raw_personal_best = self.personal_best.serialize().encode() + b'\n'
-        
+            raw_personal_best = self.personal_best.serialize().encode() + b"\n"
+
         buffer += raw_personal_best
 
         for score in self.scores:
-            buffer += score.serialize().encode() + b'\n'
+            buffer += score.serialize().encode() + b"\n"
 
         return bytes(buffer)
-    
+
+
 class GraveyardLeaderboard(Leaderboard):
     """
     Represents a leaderboard for beatmaps that are in the graveyard.
     """
+
     def __init__(self):
-        super().__init__(LeaderboardHeader(
-            beatmap_status=osuMapStatus.PENDING,
-            beatmap_id=0,
-            beatmap_set_id=0,
-            num_of_scores=0,
-            artist="",
-            title=""
-        ), [])
+        super().__init__(
+            LeaderboardHeader(
+                beatmap_status=osuMapStatus.PENDING,
+                beatmap_id=0,
+                beatmap_set_id=0,
+                num_of_scores=0,
+                artist="",
+                title="",
+            ),
+            [],
+        )
+
 
 # class UpdatedBeatmapLeaderboard(Leaderboard):
 #     """
@@ -265,6 +281,7 @@ class GraveyardLeaderboard(Leaderboard):
 #             title=title
 #         ), [])
 
+
 class ScoringAlgorithm(IntEnum):
     LAZER = 0
     PP = 1
@@ -272,5 +289,5 @@ class ScoringAlgorithm(IntEnum):
     def to_api_v2(self) -> ossapi.enums.RankingType:
         return {
             ScoringAlgorithm.LAZER: ossapi.enums.RankingType.SCORE,
-            ScoringAlgorithm.PP: ossapi.enums.RankingType.PERFORMANCE
+            ScoringAlgorithm.PP: ossapi.enums.RankingType.PERFORMANCE,
         }[self]

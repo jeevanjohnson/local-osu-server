@@ -10,7 +10,7 @@ import struct
 from dataclasses import dataclass, field
 from typing import Any
 
-from AIosuProtocolReference.types import Message, osuString
+from AIosuProtocolReference.types import Message
 
 
 @dataclass
@@ -121,7 +121,9 @@ class BanchoPacketWriter:
     # Packet Building
     # ===================
 
-    def write_packet(self, packet_id: int, *args: tuple[Any, ...]) -> "BanchoPacketWriter":
+    def write_packet(
+        self, packet_id: int, *args: tuple[Any, ...]
+    ) -> "BanchoPacketWriter":
         """
         Write a complete packet with header.
 
@@ -132,7 +134,7 @@ class BanchoPacketWriter:
         *args : tuple
             Values to write with their types.
             Format: (value, type_string) or just value (defaults to i32)
-        
+
         Example
         -------
         writer.write_packet(ServerPackets.USER_ID, (1, "i32"))
@@ -140,7 +142,9 @@ class BanchoPacketWriter:
         """
         # Start writing packet header placeholder
         header_start = len(self.data)
-        self.data.extend(struct.pack("<Hx", packet_id))  # 6 bytes: 2 (id) + 4 (length placeholder)
+        self.data.extend(
+            struct.pack("<Hx", packet_id)
+        )  # 6 bytes: 2 (id) + 4 (length placeholder)
 
         # Write the data
         for arg in args:
@@ -154,7 +158,7 @@ class BanchoPacketWriter:
         # Calculate and write actual length
         packet_length = len(self.data) - header_start - 6
         length_bytes = struct.pack("<I", packet_length)
-        self.data[header_start + 2:header_start + 6] = length_bytes
+        self.data[header_start + 2 : header_start + 6] = length_bytes
 
         return self
 

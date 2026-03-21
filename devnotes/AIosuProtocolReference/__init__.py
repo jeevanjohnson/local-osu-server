@@ -12,33 +12,11 @@ Module Structure:
 """
 
 # Type classes
-from AIosuProtocolReference.types import (
-    Channel,
-    Message,
-    OsuType,
-    ScoreFrame,
-    osuFloat32,
-    osuFloat64,
-    osuInt8,
-    osuInt16,
-    osuInt32,
-    osuInt64,
-    osuString,
-    osuUInt8,
-    osuUInt16,
-    osuUInt32,
-    osuUInt64,
-    OSU_TYPES,
-)
+# Client packets
+from AIosuProtocolReference.client_packets import CLIENT_PACKET_FORMATS, ClientPackets
 
 # Reader
 from AIosuProtocolReference.reader import BanchoPacketReader
-
-# Writer
-from AIosuProtocolReference.writer import BanchoPacketWriter, write_packet
-
-# Client packets
-from AIosuProtocolReference.client_packets import ClientPackets, CLIENT_PACKET_FORMATS
 
 # Server packets
 from AIosuProtocolReference.server_packets import (
@@ -57,6 +35,27 @@ from AIosuProtocolReference.server_packets import (
     build_user_logout,
     build_user_stats,
 )
+from AIosuProtocolReference.types import (
+    OSU_TYPES,
+    Channel,
+    Message,
+    OsuType,
+    ScoreFrame,
+    osuFloat32,
+    osuFloat64,
+    osuInt8,
+    osuInt16,
+    osuInt32,
+    osuInt64,
+    osuString,
+    osuUInt8,
+    osuUInt16,
+    osuUInt32,
+    osuUInt64,
+)
+
+# Writer
+from AIosuProtocolReference.writer import BanchoPacketWriter, write_packet
 
 __all__ = [
     # Types

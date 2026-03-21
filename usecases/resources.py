@@ -1,5 +1,7 @@
-from constants import RESOURCES_FOLDER
 from pathlib import Path
+
+from constants import RESOURCES_FOLDER
+
 
 def retrive(resource_path: str) -> Path | None:
     path = RESOURCES_FOLDER / resource_path

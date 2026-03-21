@@ -2,19 +2,23 @@
 Purpose/Domain/Concept:
 - This file contains the logic related to sessions.
 """
-import os
 
-from repositories.sessions import SessionRepository
-from models.database.sessions import CurrentSession as Session
-from constants import SESSIONS_FILE, SERVER_SETTINGS_FILE
-from osuProtocol.server_packets import Notification, Packets, Packet, bytes_to_string, osuAction, osuGameMode, osuGameMode, osuMods, string_to_bytes, PlayerStats
-import usecases.profiles
-from repositories.server_settings import ServerSettingsRepository
-from models.database.server_settings import (
-    CurrentServerSettings as ServerSettings
-)
-import psutil
+import os
 from pathlib import Path
+
+import psutil
+
+import usecases.profiles
+from constants import SERVER_SETTINGS_FILE, SESSIONS_FILE
+from models.database.sessions import CurrentSession as Session
+from osuProtocol.server_packets import (
+    Packet,
+    Packets,
+    PlayerStats,
+)
+from repositories.server_settings import ServerSettingsRepository
+from repositories.sessions import SessionRepository
+
 
 def delete_current_session() -> None:
     sessions_repo = SessionRepository(SESSIONS_FILE)
@@ -22,11 +26,13 @@ def delete_current_session() -> None:
 
     return
 
+
 def create_session(profile_name: str) -> None:
     sessions_repo = SessionRepository(SESSIONS_FILE)
     sessions_repo.create_session(profile_name)
 
-    return 
+    return
+
 
 def session_exists() -> bool:
     sessions_repo = SessionRepository(SESSIONS_FILE)
@@ -34,8 +40,9 @@ def session_exists() -> bool:
 
     if session is None:
         return False
-    
+
     return True
+
 
 def get_current_session() -> Session | None:
     sessions_repo = SessionRepository(SESSIONS_FILE)
@@ -47,16 +54,16 @@ def get_current_session() -> Session | None:
 
     return session
 
-def update_current_session(
-    session: Session, 
-    update_client: bool = False
-) -> None:
+
+def update_current_session(session: Session, update_client: bool = False) -> None:
     sessions_repo = SessionRepository(SESSIONS_FILE)
 
     if update_client:
         profile = usecases.profiles.get_profile(session.profile_name)
         if profile is None:
-            print("Attempted to update current session but the associated profile was not found.")
+            print(
+                "Attempted to update current session but the associated profile was not found."
+            )
             return
 
         ranked_score = profile.performance[session.current_game_mode].ranked_score
@@ -64,7 +71,9 @@ def update_current_session(
         play_count = profile.performance[session.current_game_mode].playcount
         total_score = profile.performance[session.current_game_mode].total_score
         rank = profile.performance[session.current_game_mode].rank
-        performance_points = profile.performance[session.current_game_mode].performance_points
+        performance_points = profile.performance[
+            session.current_game_mode
+        ].performance_points
 
         session.packet_queue += PlayerStats(
             user_id=2,
@@ -79,32 +88,34 @@ def update_current_session(
             play_count=play_count,
             total_score=total_score,
             rank=rank,
-            performance_points=performance_points
+            performance_points=performance_points,
         ).build()
-    
+
     # Catch error when no session exists
     sessions_repo.update_current_session(session)
 
     return
 
+
 # TODO: Log decorator that catches and logs errors and neatly formats them with json so when dev ask
 # for logs its easily readable and replicatable.
-# TODO: log parameter being "handled_errors" that is a list of error types that are expected and handled so they dont get logged as errors 
-#             but rather warnings or info depending on the severity of the error. 
+# TODO: log parameter being "handled_errors" that is a list of error types that are expected and handled so they dont get logged as errors
+#             but rather warnings or info depending on the severity of the error.
 # (for example, if a session is not found when trying to update it, that is an expected error that can happen when the server receives a request from the client before the user has logged in through the GUI, so it should be handled and logged as a warning rather than an error.)
 # TODO: idk if i need this anymore
 def enqueue_packets_to_current_session(packets: Packets | Packet) -> Session | None:
     session = get_current_session()
-    
+
     if session is None:
         print("Attempted to enqueue packets but no active session was found.")
         return
-    
+
     session.packet_queue += packets.build()
 
     update_current_session(session)
 
     return session
+
 
 def clear_packet_queue() -> Session | None:
     session = get_current_session()
@@ -117,12 +128,13 @@ def clear_packet_queue() -> Session | None:
 
     return session
 
+
 # def update_in_game_stats() -> None:
 #     session = get_current_session()
 #     if session is None:
 #         print("Attempted to update stats but no active session was found.")
 #         return # TODO: Raise Error
-    
+
 #     profile = usecases.profiles.get_profile(session.profile_name)
 #     if profile is None:
 #         print("Attempted to update stats but the associated profile was not found.")
@@ -162,51 +174,54 @@ def clear_packet_queue() -> Session | None:
 
 #     return
 
+
 def retrieve_songs_folder() -> Path | None:
     server_settings_repo = ServerSettingsRepository(SERVER_SETTINGS_FILE)
     settings = server_settings_repo.get_server_settings()
 
     if settings.osu_songs_folder_override:
         return settings.osu_songs_folder_override
-    
+
     processes = [
-        process for process in psutil.process_iter()
-        if process.name() == 'osu!.exe'
+        process for process in psutil.process_iter() if process.name() == "osu!.exe"
     ]
 
     if not processes:
         print("Attempted to retrieve songs folder but osu! process was not found.")
-        return None # raise error that osu! process was not found, cannot retrieve songs folder
-    
+        return None  # raise error that osu! process was not found, cannot retrieve songs folder
+
     osu_path = Path(processes[0].exe())
 
     cfg_path: Path | None = None
-    for cfg_file in osu_path.parent.glob('osu!.*.cfg'):
+    for cfg_file in osu_path.parent.glob("osu!.*.cfg"):
         if cfg_file.is_file():
             cfg_path = cfg_file
             break
 
     if cfg_path is None:
         print("Attempted to retrieve songs folder but osu! cfg file was not found.")
-        return None # raise error that osu! cfg file was not found, cannot retrieve songs folder
+        return None  # raise error that osu! cfg file was not found, cannot retrieve songs folder
 
-    raw_cfg = cfg_path.read_text(errors='ignore')
+    raw_cfg = cfg_path.read_text(errors="ignore")
     songs_folder: str | None = None
     for line in raw_cfg.splitlines():
         line = line.strip()
 
-        if line.startswith('BeatmapDirectory'):
-            songs_folder = line.split('=')[1].strip()
+        if line.startswith("BeatmapDirectory"):
+            songs_folder = line.split("=")[1].strip()
             break
-    
+
     if songs_folder is None:
-        print("Attempted to retrieve songs folder but songs folder path was not found in osu! cfg file.")
-        return None # raise error that songs folder path was not found in cfg file, cannot retrieve songs folder
+        print(
+            "Attempted to retrieve songs folder but songs folder path was not found in osu! cfg file."
+        )
+        return None  # raise error that songs folder path was not found in cfg file, cannot retrieve songs folder
 
     if os.path.isabs(songs_folder):
         return Path(songs_folder)
     else:
         return osu_path.parent / songs_folder
+
 
 def retrieve_replays_folder() -> Path | None:
     server_settings_repo = ServerSettingsRepository(SERVER_SETTINGS_FILE)
@@ -214,15 +229,14 @@ def retrieve_replays_folder() -> Path | None:
 
     if settings.osu_replay_folder_override:
         return settings.osu_replay_folder_override
-    
+
     processes = [
-        process for process in psutil.process_iter()
-        if process.name() == 'osu!.exe'
+        process for process in psutil.process_iter() if process.name() == "osu!.exe"
     ]
 
     if not processes:
         print("Attempted to retrieve replays folder but osu! process was not found.")
-        return None # raise error that osu! process was not found, cannot retrieve replays folder
-    
+        return None  # raise error that osu! process was not found, cannot retrieve replays folder
+
     osu_path = Path(processes[0].exe())
-    return osu_path.parent / 'Replays'
+    return osu_path.parent / "Replays"

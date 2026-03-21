@@ -8,11 +8,9 @@ Purpose/Domain/Concept:
 from __future__ import annotations
 
 import struct
-from abc import ABC
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import NamedTuple
-
 
 # ===================
 # Abstract Base Type
@@ -42,6 +40,7 @@ class OsuType(ABC):
 @dataclass
 class osuInt8(OsuType):
     """Signed 8-bit integer (-128 to 127)."""
+
     value: int = 0
 
     @staticmethod
@@ -56,6 +55,7 @@ class osuInt8(OsuType):
 @dataclass
 class osuUInt8(OsuType):
     """Unsigned 8-bit integer (0 to 255)."""
+
     value: int = 0
 
     @staticmethod
@@ -69,6 +69,7 @@ class osuUInt8(OsuType):
 @dataclass
 class osuInt16(OsuType):
     """Signed 16-bit integer."""
+
     value: int = 0
 
     @staticmethod
@@ -83,6 +84,7 @@ class osuInt16(OsuType):
 @dataclass
 class osuUInt16(OsuType):
     """Unsigned 16-bit integer."""
+
     value: int = 0
 
     @staticmethod
@@ -97,6 +99,7 @@ class osuUInt16(OsuType):
 @dataclass
 class osuInt32(OsuType):
     """Signed 32-bit integer."""
+
     value: int = 0
 
     @staticmethod
@@ -111,6 +114,7 @@ class osuInt32(OsuType):
 @dataclass
 class osuUInt32(OsuType):
     """Unsigned 32-bit integer."""
+
     value: int = 0
 
     @staticmethod
@@ -125,6 +129,7 @@ class osuUInt32(OsuType):
 @dataclass
 class osuInt64(OsuType):
     """Signed 64-bit integer."""
+
     value: int = 0
 
     @staticmethod
@@ -139,6 +144,7 @@ class osuInt64(OsuType):
 @dataclass
 class osuUInt64(OsuType):
     """Unsigned 64-bit integer."""
+
     value: int = 0
 
     @staticmethod
@@ -158,6 +164,7 @@ class osuUInt64(OsuType):
 @dataclass
 class osuFloat32(OsuType):
     """32-bit floating point number."""
+
     value: float = 0.0
 
     @staticmethod
@@ -172,6 +179,7 @@ class osuFloat32(OsuType):
 @dataclass
 class osuFloat64(OsuType):
     """64-bit floating point number (double)."""
+
     value: float = 0.0
 
     @staticmethod
@@ -195,6 +203,7 @@ class osuString(OsuType):
     - 0x0B (1 byte) + ULEB128 length + UTF-8 bytes if non-empty
     - 0x00 if empty string
     """
+
     value: str = ""
 
     @staticmethod
@@ -256,6 +265,7 @@ class osuString(OsuType):
 
 class Message(NamedTuple):
     """osu! chat message structure."""
+
     sender: str
     text: str
     recipient: str
@@ -264,6 +274,7 @@ class Message(NamedTuple):
 
 class Channel(NamedTuple):
     """osu! channel structure."""
+
     name: str
     topic: str
     players: int
@@ -272,6 +283,7 @@ class Channel(NamedTuple):
 @dataclass
 class ScoreFrame:
     """osu! score frame for replay data."""
+
     time: int
     id: int
     num300: int

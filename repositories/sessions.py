@@ -3,8 +3,10 @@ Purpose/Domain/Concept:
 - This file contains the repository (database interactions) related sessions.json file.
 """
 
-from models.database.sessions import CurrentSession as Session
 from jays_tools.json_database import JsonDatabase
+
+from models.database.sessions import CurrentSession as Session
+
 
 class SessionRepository:
     def __init__(self, path):
@@ -14,7 +16,7 @@ class SessionRepository:
         with self.session as current_session:
             if not current_session.loaded:
                 return None
-            
+
             return current_session
 
     def create_session(self, profile_name: str) -> None:
@@ -22,10 +24,7 @@ class SessionRepository:
             if current_session.loaded:
                 raise ValueError("Session already exists.")
 
-            current_session = Session(
-                loaded=True,
-                profile_name=profile_name
-            )
+            current_session = Session(loaded=True, profile_name=profile_name)
 
             self.session.set(current_session)
 

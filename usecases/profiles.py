@@ -4,16 +4,20 @@ Purpose/Domain/Concept:
 """
 
 from constants import PROFILES_FILE
-from repositories.profiles import ProfilesRepository
 from models.database.profiles import (
-    CurrentProfiles as Profiles,
     CurrentProfile as Profile,
 )
+from models.database.profiles import (
+    CurrentProfiles as Profiles,
+)
+from repositories.profiles import ProfilesRepository
+
 
 def get_profiles() -> Profiles | None:
     profiles_repo = ProfilesRepository(PROFILES_FILE)
 
     return profiles_repo.get_profiles()
+
 
 def get_profile(profile_name: str) -> Profile | None:
     profiles_repo = ProfilesRepository(PROFILES_FILE)
@@ -22,8 +26,9 @@ def get_profile(profile_name: str) -> Profile | None:
 
     if profile is None:
         return None
-    
+
     return profile
+
 
 def create_profile(profile_name: str) -> None:
     profiles_repo = ProfilesRepository(PROFILES_FILE)
@@ -32,12 +37,14 @@ def create_profile(profile_name: str) -> None:
 
     return
 
+
 def delete_profile(profile_name: str) -> None:
     profiles_repo = ProfilesRepository(PROFILES_FILE)
 
     profiles_repo.delete_profile(profile_name)
 
     return
+
 
 def update_profile(profile_name: str, updated_profile: Profile) -> None:
     profiles_repo = ProfilesRepository(PROFILES_FILE)

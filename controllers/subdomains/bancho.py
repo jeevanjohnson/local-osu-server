@@ -3,27 +3,36 @@ Purpose/Domain/Concept:
 - This file builds the routes related to c*.ppy.sh
 """
 
-from fastapi import APIRouter, Response
-from fastapi import Request, Header
-from typing import Literal, TypeVar, Callable, Any, Coroutine
-import inspect
-import usecases.gui
-import usecases.bancho
-import usecases.sessions
-import usecases.profiles
-import usecases.beatmaps
-import osuProtocol.server_packets
-from osuProtocol.server_packets import bytes_to_string, osuGameMode, osuCountryCode, string_to_bytes, ClientRelog
-from osuProtocol.server_packets import PlayerStats, Packets as ServerPackets, osuAction, osuMods, osuGameMode, Packet as ServerPacket, Notification
-from osuProtocol.client_packets import Packets, ClientPackets, ChangeAction, Packet, Ping, LogOut
-from typing import Callable
-from models.database.sessions import (
-    CurrentSessionBeatmapInfo as SessionBeatmapInfo,
-)
 from datetime import datetime
-from usecases.providers import ApiV2CredentialsError
+from typing import Any, Callable, Coroutine, Literal, TypeVar
+
+from fastapi import APIRouter, Header, Request, Response
+
+import osuProtocol.server_packets
+import usecases.bancho
+import usecases.beatmaps
+import usecases.gui
+import usecases.profiles
+import usecases.sessions
+from osuProtocol.client_packets import (
+    ChangeAction,
+    ClientPackets,
+    LogOut,
+    Packet,
+    Packets,
+    Ping,
+)
+from osuProtocol.server_packets import (
+    PlayerStats,
+    osuAction,
+    osuGameMode,
+    osuMods,
+)
+from osuProtocol.server_packets import Packet as ServerPacket
+from osuProtocol.server_packets import Packets as ServerPackets
 
 bancho = APIRouter()
+
 
 @bancho.post("/")
 async def client_request_handler(
@@ -34,7 +43,6 @@ async def client_request_handler(
     wants_login = osu_token is None
 
     if wants_login:
-
         if not usecases.gui.logged_in():
             failed_login_response = osuProtocol.server_packets.failed_login_response(
                 "You must be logged in through the GUI to use the osu! client."
@@ -45,9 +53,7 @@ async def client_request_handler(
                 headers={"cho-token": "not-logged-in-gui"},
             )
 
-        login_data = usecases.bancho.parse_login_data(
-            await request.body()
-        )
+        login_data = usecases.bancho.parse_login_data(await request.body())
 
         session = usecases.sessions.get_current_session()
         if session is None:
@@ -77,22 +83,26 @@ async def client_request_handler(
         accuracy = profile.performance[session.current_game_mode].accuracy
         play_count = profile.performance[session.current_game_mode].playcount
         total_score = profile.performance[session.current_game_mode].total_score
-        performance_points = profile.performance[session.current_game_mode].performance_points
+        performance_points = profile.performance[
+            session.current_game_mode
+        ].performance_points
 
-        successful_login_response = osuProtocol.server_packets.successful_login_response(
-            username=session.profile_name,
-            friend_ids=profile.friend_ids,
-            utc_offset=login_data["utc_offset"],
-            country_code=profile.country_code,
-            game_mode=session.current_game_mode,
-            longitude=0.0,
-            latitude=0.0,
-            rank=rank,
-            ranked_score=ranked_score,
-            accuracy=accuracy,
-            play_count=play_count,
-            total_score=total_score,
-            performance_points=performance_points,
+        successful_login_response = (
+            osuProtocol.server_packets.successful_login_response(
+                username=session.profile_name,
+                friend_ids=profile.friend_ids,
+                utc_offset=login_data["utc_offset"],
+                country_code=profile.country_code,
+                game_mode=session.current_game_mode,
+                longitude=0.0,
+                latitude=0.0,
+                rank=rank,
+                ranked_score=ranked_score,
+                accuracy=accuracy,
+                play_count=play_count,
+                total_score=total_score,
+                performance_points=performance_points,
+            )
         )
 
         session.osu_client.opened = True
@@ -106,7 +116,7 @@ async def client_request_handler(
             content=successful_login_response.build(),
             headers={"cho-token": f"login-successful-for-{session.profile_name}"},
         )
-    
+
     session = usecases.sessions.get_current_session()
     if session is None:
         return Response(
@@ -118,10 +128,14 @@ async def client_request_handler(
 
     for packet in incoming_packets:
         if packet._id not in PACKET_HANDLERS:
-            print(f"Received packet with ID {ClientPackets(packet._id).name} but no handler is registered for this packet type.")
+            print(
+                f"Received packet with ID {ClientPackets(packet._id).name} but no handler is registered for this packet type."
+            )
             continue
 
-        emergency_response: ServerPackets | ServerPacket | None = await PACKET_HANDLERS[ClientPackets(packet._id)](packet)
+        emergency_response: ServerPackets | ServerPacket | None = await PACKET_HANDLERS[
+            ClientPackets(packet._id)
+        ](packet)
 
         if emergency_response is not None:
             return Response(
@@ -137,9 +151,16 @@ async def client_request_handler(
 
     return Response(content=response_packets)
 
-PACKET_HANDLERS: dict[ClientPackets, Callable[[Packet], Coroutine[Any, Any, ServerPackets | ServerPacket | None]]] = {}
+
+PACKET_HANDLERS: dict[
+    ClientPackets,
+    Callable[[Packet], Coroutine[Any, Any, ServerPackets | ServerPacket | None]],
+] = {}
 PacketType = TypeVar("PacketType", bound=Packet)
-PACKET_HANDLER = Callable[[PacketType], Coroutine[Any, Any, ServerPackets | ServerPacket | None]]
+PACKET_HANDLER = Callable[
+    [PacketType], Coroutine[Any, Any, ServerPackets | ServerPacket | None]
+]
+
 
 def register_packet_handler(packet_id: ClientPackets, packet_type: type[PacketType]):
     def inner(func: PACKET_HANDLER) -> PACKET_HANDLER:
@@ -151,19 +172,16 @@ def register_packet_handler(packet_id: ClientPackets, packet_type: type[PacketTy
 
         PACKET_HANDLERS[packet_id] = wrapper
         return func
+
     return inner
 
-@register_packet_handler(
-    ClientPackets.PING,
-    packet_type=Ping
-)
+
+@register_packet_handler(ClientPackets.PING, packet_type=Ping)
 async def handle_ping(packet: Ping) -> ServerPackets | ServerPacket | None:
     return
 
-@register_packet_handler(
-    ClientPackets.CHANGE_ACTION, 
-    packet_type=ChangeAction
-)
+
+@register_packet_handler(ClientPackets.CHANGE_ACTION, packet_type=ChangeAction)
 async def on_action_change(packet: ChangeAction) -> ServerPackets | ServerPacket | None:
     session = usecases.sessions.get_current_session()
     if session is None:
@@ -173,19 +191,13 @@ async def on_action_change(packet: ChangeAction) -> ServerPackets | ServerPacket
     if profile is None:
         return osuProtocol.server_packets.client_relog_response()
 
-    session.osu_client.status = osuAction(
-        packet.action.value
-    )
+    session.osu_client.status = osuAction(packet.action.value)
     session.osu_client.status_message = packet.info_text.value
     session.osu_client.opened = True
-    
-    session.current_game_mode = osuGameMode(
-        packet.current_game_mode.value
-    )
 
-    session.latest_enabled_mods = osuMods(
-        packet.current_mods.value
-    )
+    session.current_game_mode = osuGameMode(packet.current_game_mode.value)
+
+    session.latest_enabled_mods = osuMods(packet.current_mods.value)
 
     # Update beatmap info via lb req
 
@@ -197,12 +209,14 @@ async def on_action_change(packet: ChangeAction) -> ServerPackets | ServerPacket
     play_count = profile.performance[session.current_game_mode].playcount
     total_score = profile.performance[session.current_game_mode].total_score
     rank = profile.performance[session.current_game_mode].rank
-    performance_points = profile.performance[session.current_game_mode].performance_points
+    performance_points = profile.performance[
+        session.current_game_mode
+    ].performance_points
 
     packet_enqueue = ServerPackets()
     packet_enqueue += PlayerStats(
         user_id=2,
-        action= osuAction(packet.action.value),
+        action=osuAction(packet.action.value),
         info_text=packet.info_text.value,
         beatmap_md5=packet.beatmap_md5.value,
         mods=osuMods(packet.current_mods.value),
@@ -213,7 +227,7 @@ async def on_action_change(packet: ChangeAction) -> ServerPackets | ServerPacket
         play_count=play_count,
         total_score=total_score,
         rank=rank,
-        performance_points=performance_points
+        performance_points=performance_points,
     )
 
     session.packet_queue += packet_enqueue.build()
@@ -222,16 +236,14 @@ async def on_action_change(packet: ChangeAction) -> ServerPackets | ServerPacket
     # TODO: Handle this error case?
     # if updated_session is None:
     #     return osuProtocol.server_packets.client_relog_response()
-    
-@register_packet_handler(
-    ClientPackets.LOGOUT,
-    packet_type=LogOut
-)
+
+
+@register_packet_handler(ClientPackets.LOGOUT, packet_type=LogOut)
 async def on_logout(packet: LogOut):
     session = usecases.sessions.get_current_session()
     if session is None:
         return
-    
+
     # osu! client logs out as soon as the user logs in
     # just ensure that this packet is a valid logout
     # 1+ s after login

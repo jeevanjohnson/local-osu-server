@@ -10,7 +10,6 @@ import struct
 from dataclasses import dataclass
 from typing import NamedTuple
 
-
 # Packet header format: u16 (packet id) + u32 (packet length)
 PACKET_HEADER_FORMAT = struct.Struct("<HxI")
 PACKET_HEADER_SIZE = 7  # 2 + 4 bytes
@@ -18,6 +17,7 @@ PACKET_HEADER_SIZE = 7  # 2 + 4 bytes
 
 class Message(NamedTuple):
     """osu! chat message structure."""
+
     sender: str
     text: str
     recipient: str
@@ -26,6 +26,7 @@ class Message(NamedTuple):
 
 class Channel(NamedTuple):
     """osu! channel structure."""
+
     name: str
     topic: str
     players: int
@@ -84,11 +85,7 @@ class BanchoPacketReader:
         if self._current_offset + PACKET_HEADER_SIZE > len(self.buffer):
             raise StopIteration
 
-        data = struct.unpack_from(
-            "<HxI", 
-            self.buffer, 
-            self._current_offset
-        )
+        data = struct.unpack_from("<HxI", self.buffer, self._current_offset)
         self._current_offset += PACKET_HEADER_SIZE
         return data[0], data[1]
 
@@ -111,9 +108,9 @@ class BanchoPacketReader:
     def read_int16(self) -> int:
         """Read a signed 16-bit integer."""
         val = int.from_bytes(
-            self.buffer[self._current_offset:self._current_offset + 2],
+            self.buffer[self._current_offset : self._current_offset + 2],
             "little",
-            signed=True
+            signed=True,
         )
         self._current_offset += 2
         return val
@@ -121,9 +118,9 @@ class BanchoPacketReader:
     def read_uint16(self) -> int:
         """Read an unsigned 16-bit integer."""
         val = int.from_bytes(
-            self.buffer[self._current_offset:self._current_offset + 2],
+            self.buffer[self._current_offset : self._current_offset + 2],
             "little",
-            signed=False
+            signed=False,
         )
         self._current_offset += 2
         return val
@@ -131,9 +128,9 @@ class BanchoPacketReader:
     def read_int32(self) -> int:
         """Read a signed 32-bit integer."""
         val = int.from_bytes(
-            self.buffer[self._current_offset:self._current_offset + 4],
+            self.buffer[self._current_offset : self._current_offset + 4],
             "little",
-            signed=True
+            signed=True,
         )
         self._current_offset += 4
         return val
@@ -141,9 +138,9 @@ class BanchoPacketReader:
     def read_uint32(self) -> int:
         """Read an unsigned 32-bit integer."""
         val = int.from_bytes(
-            self.buffer[self._current_offset:self._current_offset + 4],
+            self.buffer[self._current_offset : self._current_offset + 4],
             "little",
-            signed=False
+            signed=False,
         )
         self._current_offset += 4
         return val
@@ -151,9 +148,9 @@ class BanchoPacketReader:
     def read_int64(self) -> int:
         """Read a signed 64-bit integer."""
         val = int.from_bytes(
-            self.buffer[self._current_offset:self._current_offset + 8],
+            self.buffer[self._current_offset : self._current_offset + 8],
             "little",
-            signed=True
+            signed=True,
         )
         self._current_offset += 8
         return val
@@ -161,30 +158,22 @@ class BanchoPacketReader:
     def read_uint64(self) -> int:
         """Read an unsigned 64-bit integer."""
         val = int.from_bytes(
-            self.buffer[self._current_offset:self._current_offset + 8],
+            self.buffer[self._current_offset : self._current_offset + 8],
             "little",
-            signed=False
+            signed=False,
         )
         self._current_offset += 8
         return val
 
     def read_float32(self) -> float:
         """Read a 32-bit float."""
-        (val,) = struct.unpack_from(
-            "<f",
-            self.buffer,
-            self._current_offset
-        )
+        (val,) = struct.unpack_from("<f", self.buffer, self._current_offset)
         self._current_offset += 4
         return val
 
     def read_float64(self) -> float:
         """Read a 64-bit float (double)."""
-        (val,) = struct.unpack_from(
-            "<d",
-            self.buffer,
-            self._current_offset
-        )
+        (val,) = struct.unpack_from("<d", self.buffer, self._current_offset)
         self._current_offset += 8
         return val
 
@@ -209,9 +198,11 @@ class BanchoPacketReader:
             shift += 1
 
         # Read the string
-        val = self.buffer[
-            self._current_offset:self._current_offset + length
-        ].tobytes().decode()
+        val = (
+            self.buffer[self._current_offset : self._current_offset + length]
+            .tobytes()
+            .decode()
+        )
         self._current_offset += length
         return val
 
@@ -234,7 +225,9 @@ class BanchoPacketReader:
 
     def read_raw(self, length: int) -> bytes:
         """Read raw bytes."""
-        val = self.buffer[self._current_offset:self._current_offset + length].tobytes()
+        val = self.buffer[
+            self._current_offset : self._current_offset + length
+        ].tobytes()
         self._current_offset += length
         return val
 

@@ -2,7 +2,9 @@
 Purpose/Domain/Concept:
 - This file contains the logic related to handling requests between the osu! client and server.
 """
+
 from typing import TypedDict
+
 
 class LoginData(TypedDict):
     username: str
@@ -16,7 +18,8 @@ class LoginData(TypedDict):
     adapters_md5: str
     uninstall_md5: str
     disk_signature_md5: str
-    
+
+
 def parse_login_data(raw_login_data: bytes) -> LoginData:
     (
         username,

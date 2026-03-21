@@ -3,29 +3,42 @@ Purpose/Domain/Concept:
 - This module defines the packet IDs for packets sent BY the server TO the osu! client.
 - It also provides convenient packet builder functions.
 """
-from enum import IntEnum, IntFlag
-from enum import unique
-from osuProtocol.osuTypes import osuBaseType, osuByteArray, osuShort, osuUnsignedChar
-from osuProtocol.osuTypes import osuIntUnsigned32Bit
-from osuProtocol.osuTypes import osuString
-from osuProtocol.osuTypes import osuMainMenuIcon
-from osuProtocol.osuTypes import osuFriendList
-from osuProtocol.osuTypes import osuIntSigned32Bit, osuUTCOffset
-from osuProtocol.osuTypes import osuFloat32Bit, osuIntUnsigned64Bit, osuAccuracy
+
 import base64
+from enum import IntEnum, IntFlag, unique
+
 import ossapi
 
+from osuProtocol.osuTypes import (
+    osuAccuracy,
+    osuBaseType,
+    osuByteArray,
+    osuFloat32Bit,
+    osuFriendList,
+    osuIntSigned32Bit,
+    osuIntUnsigned32Bit,
+    osuIntUnsigned64Bit,
+    osuMainMenuIcon,
+    osuShort,
+    osuString,
+    osuUnsignedChar,
+    osuUTCOffset,
+)
+
+
 def bytes_to_string(b: bytes) -> str:
-    return base64.b64encode(b).decode('ascii')
+    return base64.b64encode(b).decode("ascii")
+
 
 def string_to_bytes(s: str) -> bytes:
-    return base64.b64decode(s.encode('ascii'))
+    return base64.b64decode(s.encode("ascii"))
+
 
 @unique
 class ServerPackets(IntEnum):
     """
     Packet IDs that the server sends to the osu! client.
-    
+
     These are organized by functionality:
     - 5-12: User and login
     - 13-15: Spectating
@@ -45,189 +58,191 @@ class ServerPackets(IntEnum):
     # ===================
     # Login & User
     # ===================
-    
-    USER_ID = 5                # Login response (user ID or negative for error)
-    USER_LOGOUT = 12           # Player logout notification
+
+    USER_ID = 5  # Login response (user ID or negative for error)
+    USER_LOGOUT = 12  # Player logout notification
 
     # ===================
     # Messaging
     # ===================
-    
-    SEND_MESSAGE = 7           # Send a message (chat)
-    PONG = 8                   # Pong response to ping
+
+    SEND_MESSAGE = 7  # Send a message (chat)
+    PONG = 8  # Pong response to ping
 
     # ===================
     # Spectating
     # ===================
-    
-    SPECTATOR_JOINED = 13       # Spectator joined
-    SPECTATOR_LEFT = 14         # Spectator left
-    SPECTATE_FRAMES = 15        # Spectator frame data
-    SPECTATOR_CANT_SPECTATE = 22 # Cannot spectate
+
+    SPECTATOR_JOINED = 13  # Spectator joined
+    SPECTATOR_LEFT = 14  # Spectator left
+    SPECTATE_FRAMES = 15  # Spectator frame data
+    SPECTATOR_CANT_SPECTATE = 22  # Cannot spectate
 
     # ===================
     # Notifications
     # ===================
-    
-    VERSION_UPDATE = 19         # Client version update required
-    GET_ATTENTION = 23          # Get user's attention
-    NOTIFICATION = 24           # Show notification
+
+    VERSION_UPDATE = 19  # Client version update required
+    GET_ATTENTION = 23  # Get user's attention
+    NOTIFICATION = 24  # Show notification
 
     # ===================
     # Match Updates
     # ===================
-    
-    UPDATE_MATCH = 26           # Update match state
-    NEW_MATCH = 27              # New match created
-    DISPOSE_MATCH = 28          # Match disposed/removed
+
+    UPDATE_MATCH = 26  # Update match state
+    NEW_MATCH = 27  # New match created
+    DISPOSE_MATCH = 28  # Match disposed/removed
 
     # ===================
     # Match Join
     # ===================
-    
-    MATCH_JOIN_SUCCESS = 36     # Successfully joined match
-    MATCH_JOIN_FAIL = 37         # Failed to join match
+
+    MATCH_JOIN_SUCCESS = 36  # Successfully joined match
+    MATCH_JOIN_FAIL = 37  # Failed to join match
 
     # ===================
     # Spectator Updates
     # ===================
-    
-    FELLOW_SPECTATOR_JOINED = 42 # Fellow spectator joined
-    FELLOW_SPECTATOR_LEFT = 43   # Fellow spectator left
+
+    FELLOW_SPECTATOR_JOINED = 42  # Fellow spectator joined
+    FELLOW_SPECTATOR_LEFT = 43  # Fellow spectator left
 
     # ===================
     # Match Gameplay
     # ===================
-    
-    ALL_PLAYERS_LOADED = 45     # All players loaded
-    MATCH_START = 46            # Match started
-    MATCH_SCORE_UPDATE = 48     # Score update
-    MATCH_TRANSFER_HOST = 50    # Host transferred
+
+    ALL_PLAYERS_LOADED = 45  # All players loaded
+    MATCH_START = 46  # Match started
+    MATCH_SCORE_UPDATE = 48  # Score update
+    MATCH_TRANSFER_HOST = 50  # Host transferred
 
     # ===================
     # Match State
     # ===================
-    
-    MATCH_ALL_PLAYERS_LOADED = 53   # All players loaded
-    MATCH_PLAYER_FAILED = 57       # Player failed
-    MATCH_COMPLETE = 58            # Match complete
-    MATCH_SKIP = 61                # Skip to next section
-    MATCH_PLAYER_SKIPPED = 81      # Player skipped
+
+    MATCH_ALL_PLAYERS_LOADED = 53  # All players loaded
+    MATCH_PLAYER_FAILED = 57  # Player failed
+    MATCH_COMPLETE = 58  # Match complete
+    MATCH_SKIP = 61  # Skip to next section
+    MATCH_PLAYER_SKIPPED = 81  # Player skipped
 
     # ===================
     # Channels
     # ===================
-    
-    CHANNEL_JOIN_SUCCESS = 64   # Successfully joined channel
-    CHANNEL_INFO = 65           # Channel info
-    CHANNEL_KICK = 66          # Kicked from channel
-    CHANNEL_AUTO_JOIN = 67     # Auto-join channel
-    CHANNEL_INFO_END = 89      # End of channel list
+
+    CHANNEL_JOIN_SUCCESS = 64  # Successfully joined channel
+    CHANNEL_INFO = 65  # Channel info
+    CHANNEL_KICK = 66  # Kicked from channel
+    CHANNEL_AUTO_JOIN = 67  # Auto-join channel
+    CHANNEL_INFO_END = 89  # End of channel list
 
     # ===================
     # Beatmaps & Stats
     # ===================
-    
-    BEATMAP_INFO_REPLY = 69     # Beatmap info response
-    USER_STATS = 11             # User statistics
+
+    BEATMAP_INFO_REPLY = 69  # Beatmap info response
+    USER_STATS = 11  # User statistics
 
     # ===================
     # Friends
     # ===================
-    
-    FRIENDS_LIST = 72           # Friends list
+
+    FRIENDS_LIST = 72  # Friends list
 
     # ===================
     # Protocol & Menu
     # ===================
-    
-    PROTOCOL_VERSION = 75       # Protocol version
-    MAIN_MENU_ICON = 76         # Main menu icon
-    MONITOR = 80                # (unused)
+
+    PROTOCOL_VERSION = 75  # Protocol version
+    MAIN_MENU_ICON = 76  # Main menu icon
+    MONITOR = 80  # (unused)
 
     # ===================
     # Presence
     # ===================
-    
-    USER_PRESENCE = 83          # User presence data
+
+    USER_PRESENCE = 83  # User presence data
     USER_PRESENCE_SINGLE = 95  # Single user presence
-    USER_PRESENCE_BUNDLE = 96   # Bundle of user presences
+    USER_PRESENCE_BUNDLE = 96  # Bundle of user presences
 
     # ===================
     # User Status
     # ===================
-    
-    USER_SILENCED = 94          # User was silenced
+
+    USER_SILENCED = 94  # User was silenced
 
     # ===================
     # Server Commands
     # ===================
-    
-    RESTART = 86                # Restart the game
-    HANDLE_IRC_CHANGE_USERNAME = 9   # (deprecated)
-    HANDLE_IRC_QUIT = 10         # IRC quit
+
+    RESTART = 86  # Restart the game
+    HANDLE_IRC_CHANGE_USERNAME = 9  # (deprecated)
+    HANDLE_IRC_QUIT = 10  # IRC quit
 
     # ===================
     # Match Features
     # ===================
-    
+
     MATCH_CHANGE_PASSWORD = 91  # Match password changed
-    MATCH_ABORT = 106           # Match aborted
+    MATCH_ABORT = 106  # Match aborted
 
     # ===================
     # Friends & DM
     # ===================
-    
+
     TOGGLE_BLOCK_NON_FRIEND_DMS = 34  # Toggle blocking DMs
-    PRIVILEGES = 71             # User privileges
-    USER_DM_BLOCKED = 100      # DM blocked
-    TARGET_IS_SILENCED = 101    # Target is silenced
+    PRIVILEGES = 71  # User privileges
+    USER_DM_BLOCKED = 100  # DM blocked
+    TARGET_IS_SILENCED = 101  # Target is silenced
 
     # ===================
     # Version
     # ===================
-    
-    VERSION_UPDATE_FORCED = 102 # Forced version update
+
+    VERSION_UPDATE_FORCED = 102  # Forced version update
 
     # ===================
     # Server Switch
     # ===================
-    
-    SWITCH_SERVER = 103         # Switch to another server
-    ACCOUNT_RESTRICTED = 104   # Account restricted
-    RTX = 105                  # (unused)
-    SWITCH_TOURNAMENT_SERVER = 107 # Switch tournament server
+
+    SWITCH_SERVER = 103  # Switch to another server
+    ACCOUNT_RESTRICTED = 104  # Account restricted
+    RTX = 105  # (unused)
+    SWITCH_TOURNAMENT_SERVER = 107  # Switch tournament server
 
     # ===================
     # Silence
     # ===================
-    
-    SILENCE_END = 92           # Silence period ended
+
+    SILENCE_END = 92  # Silence period ended
 
     # ===================
     # Tournament
     # ===================
-    
-    UNAUTHORIZED = 62           # (unused)
+
+    UNAUTHORIZED = 62  # (unused)
 
     def to_osu_protocol(self) -> bytes:
         return self.value.to_bytes(2, "little", signed=False)
+
 
 class PlayerPrivileges(IntFlag):
     # << shift bits to the left
     # PLAYER = 1 << 0
     NORMAL = 1 << 0
-    
+
     MODERATOR = 1 << 1
     """
     0000 0001  (1)
     0000 0010  (2)
     """
-    
+
     SUPPORTER = 1 << 2
     OWNER = 1 << 3
     DEVELOPER = 1 << 4
     TOURNAMENT = 1 << 5
+
 
 ALL_PRIVILEGES = (
     PlayerPrivileges.NORMAL
@@ -238,9 +253,11 @@ ALL_PRIVILEGES = (
     | PlayerPrivileges.TOURNAMENT
 )
 
+
 @unique
 class LoginFailureReason(IntEnum):
     """Reasons for login failure (negative user IDs)."""
+
     AUTHENTICATION_FAILED = -1
     OLD_CLIENT = -2
     BANNED = -3
@@ -248,6 +265,7 @@ class LoginFailureReason(IntEnum):
     NEEDS_SUPPORTER = -6
     PASSWORD_RESET = -7
     REQUIRES_VERIFICATION = -8
+
 
 @unique
 class osuGameMode(IntEnum):
@@ -261,17 +279,14 @@ class osuGameMode(IntEnum):
             self.STANDARD: ossapi.GameMode.OSU,
             self.TAIKO: ossapi.GameMode.TAIKO,
             self.CATCH_THE_BEAT: ossapi.GameMode.CATCH,
-            self.MANIA: ossapi.GameMode.MANIA
+            self.MANIA: ossapi.GameMode.MANIA,
         }[self]
 
     @classmethod
     def from_osu_file(cls, mode: int) -> "osuGameMode":
-        return {
-            0: cls.STANDARD,
-            1: cls.TAIKO,
-            2: cls.CATCH_THE_BEAT,
-            3: cls.MANIA
-        }[mode]
+        return {0: cls.STANDARD, 1: cls.TAIKO, 2: cls.CATCH_THE_BEAT, 3: cls.MANIA}[
+            mode
+        ]
 
     @classmethod
     def from_api_v2(cls, mode: ossapi.GameMode) -> "osuGameMode":
@@ -279,8 +294,9 @@ class osuGameMode(IntEnum):
             ossapi.GameMode.OSU: cls.STANDARD,
             ossapi.GameMode.TAIKO: cls.TAIKO,
             ossapi.GameMode.CATCH: cls.CATCH_THE_BEAT,
-            ossapi.GameMode.MANIA: cls.MANIA
+            ossapi.GameMode.MANIA: cls.MANIA,
         }[mode]
+
 
 @unique
 class osuAction(IntEnum):
@@ -301,8 +317,10 @@ class osuAction(IntEnum):
     Multiplaying = 12
     OsuDirect = 13
 
+
 class LazerSpecificMod(Exception):
     pass
+
 
 @unique
 class osuMods(IntFlag):
@@ -377,6 +395,7 @@ class osuMods(IntFlag):
             }[acronym.strip().upper()]
         except KeyError:
             raise ValueError(f"Invalid mod acronym: {acronym}")
+
 
 @unique
 class osuCountryCode(IntEnum):
@@ -641,12 +660,9 @@ class osuCountryCode(IntEnum):
         except KeyError:
             raise ValueError(f"Invalid country code: {country_code_str}")
 
+
 class Packet:
-    def __init__(
-            self,
-            _id: ServerPackets,
-            data: dict[str, osuBaseType]
-        ) -> None:
+    def __init__(self, _id: ServerPackets, data: dict[str, osuBaseType]) -> None:
 
         self._id: ServerPackets = _id
         self.data: dict[str, osuBaseType] = data
@@ -675,12 +691,12 @@ class Packet:
         raw_packet += self.raw_data()
 
         return bytes(raw_packet)
-    
+
     def build_str(self) -> str:
         return bytes_to_string(self.build())
 
-class Packets(list[Packet]):
 
+class Packets(list[Packet]):
     def build_str(self) -> str:
         return bytes_to_string(self.build())
 
@@ -691,50 +707,45 @@ class Packets(list[Packet]):
             raw_data += packet.build()
 
         return bytes(raw_data)
-    
+
     def __iadd__(self, other: "Packet | Packets") -> "Packets":
         if isinstance(other, Packets):
             self.extend(other)
         else:
             self.append(other)
-        
+
         return self
+
 
 class UserID(Packet):
     def __init__(self, user_id: int) -> None:
         super().__init__(
-            _id=ServerPackets.USER_ID,
-            data={
-                "user_id": osuIntSigned32Bit(user_id)
-            }
+            _id=ServerPackets.USER_ID, data={"user_id": osuIntSigned32Bit(user_id)}
         )
+
 
 class Notification(Packet):
     def __init__(self, message: str) -> None:
         super().__init__(
-            _id=ServerPackets.NOTIFICATION,
-            data={
-                "message": osuString(message)
-            }
+            _id=ServerPackets.NOTIFICATION, data={"message": osuString(message)}
         )
+
 
 class ProtocolVersion(Packet):
     def __init__(self, version: int) -> None:
         super().__init__(
             _id=ServerPackets.PROTOCOL_VERSION,
-            data={
-                "version": osuIntUnsigned32Bit(version)
-            }
+            data={"version": osuIntUnsigned32Bit(version)},
         )
+
 
 class UserPrivileges(Packet):
     def __init__(self, privileges: int) -> None:
         super().__init__(
             _id=ServerPackets.PRIVILEGES,
-            data={
-                "privileges": osuIntUnsigned32Bit(privileges)
-            }
+            data={"privileges": osuIntUnsigned32Bit(privileges)},
         )
+
 
 class ChannelInfo(Packet):
     def __init__(self, name: str, topic: str, player_count: int) -> None:
@@ -743,51 +754,47 @@ class ChannelInfo(Packet):
             data={
                 "name": osuString(name),
                 "topic": osuString(topic),
-                "player_count": osuShort(player_count)
-            }
+                "player_count": osuShort(player_count),
+            },
         )
+
 
 class ReOrderChannels(Packet):
     def __init__(self) -> None:
-        super().__init__(
-            _id=ServerPackets.CHANNEL_INFO_END,
-            data={}
-        )
+        super().__init__(_id=ServerPackets.CHANNEL_INFO_END, data={})
+
 
 class MainMenuIcon(Packet):
     def __init__(self, icon_url: str, on_click_url: str) -> None:
         super().__init__(
             _id=ServerPackets.MAIN_MENU_ICON,
             data={
-                "icon": osuMainMenuIcon(
-                    icon_url=icon_url, 
-                    on_click_url=on_click_url
-                )
-            }
+                "icon": osuMainMenuIcon(icon_url=icon_url, on_click_url=on_click_url)
+            },
         )
+
 
 class UserFriendList(Packet):
     def __init__(self, friend_ids: list[int]) -> None:
         super().__init__(
             _id=ServerPackets.FRIENDS_LIST,
-            data={
-                "friend_ids": osuFriendList(friend_ids)
-            }
+            data={"friend_ids": osuFriendList(friend_ids)},
         )
+
 
 class PlayerPresence(Packet):
     def __init__(
-            self, 
-            user_id: int,
-            username: str,
-            utc_offset: int, 
-            country_code: osuCountryCode,
-            user_privileges: int,
-            game_mode: osuGameMode,
-            longitude: float,
-            latitude: float,
-            rank: int
-        ) -> None:
+        self,
+        user_id: int,
+        username: str,
+        utc_offset: int,
+        country_code: osuCountryCode,
+        user_privileges: int,
+        game_mode: osuGameMode,
+        longitude: float,
+        latitude: float,
+        rank: int,
+    ) -> None:
         super().__init__(
             _id=ServerPackets.USER_PRESENCE,
             data={
@@ -800,27 +807,28 @@ class PlayerPresence(Packet):
                 ),
                 "longitude": osuFloat32Bit(longitude),
                 "latitude": osuFloat32Bit(latitude),
-                "rank": osuIntUnsigned32Bit(rank)
-            }
+                "rank": osuIntUnsigned32Bit(rank),
+            },
         )
+
 
 class PlayerStats(Packet):
     def __init__(
-            self,
-            user_id: int,
-            action: osuAction,
-            info_text: str,
-            beatmap_md5: str,
-            mods: osuMods,
-            game_mode: osuGameMode,
-            beatmap_id: int,
-            ranked_score: int,
-            accuracy: float,
-            play_count: int,
-            total_score: int,
-            rank: int,
-            performance_points: int
-    ) ->None:
+        self,
+        user_id: int,
+        action: osuAction,
+        info_text: str,
+        beatmap_md5: str,
+        mods: osuMods,
+        game_mode: osuGameMode,
+        beatmap_id: int,
+        ranked_score: int,
+        accuracy: float,
+        play_count: int,
+        total_score: int,
+        rank: int,
+        performance_points: int,
+    ) -> None:
         super().__init__(
             _id=ServerPackets.USER_STATS,
             data={
@@ -836,18 +844,18 @@ class PlayerStats(Packet):
                 "play_count": osuIntUnsigned32Bit(play_count),
                 "total_score": osuIntUnsigned64Bit(total_score),
                 "rank": osuIntSigned32Bit(rank),
-                "performance_points": osuShort(performance_points)
-            }
+                "performance_points": osuShort(performance_points),
+            },
         )
+
 
 class ClientRelog(Packet):
     def __init__(self, millisecond_delay: int) -> None:
         super().__init__(
             _id=ServerPackets.RESTART,
-            data={
-                "millisecond_delay": osuIntSigned32Bit(millisecond_delay)
-            }
+            data={"millisecond_delay": osuIntSigned32Bit(millisecond_delay)},
         )
+
 
 def failed_login_response(message: str) -> Packets:
     packets = Packets()
@@ -856,6 +864,7 @@ def failed_login_response(message: str) -> Packets:
     packets += Notification(message)
 
     return packets
+
 
 def bancho_bot() -> Packets:
     packets = Packets()
@@ -869,7 +878,7 @@ def bancho_bot() -> Packets:
         game_mode=osuGameMode.STANDARD,
         longitude=0.0,
         latitude=0.0,
-        rank=0
+        rank=0,
     )
 
     packets += PlayerStats(
@@ -885,25 +894,26 @@ def bancho_bot() -> Packets:
         play_count=0,
         total_score=0,
         rank=0,
-        performance_points=0
+        performance_points=0,
     )
 
     return packets
 
+
 def successful_login_response(
-        username: str,
-        friend_ids: list[int],
-        utc_offset: int,
-        country_code: osuCountryCode,
-        game_mode: osuGameMode,
-        longitude: float,
-        latitude: float,
-        rank: int,
-        ranked_score: int,
-        accuracy: float,
-        play_count: int,
-        total_score: int,
-        performance_points: int
+    username: str,
+    friend_ids: list[int],
+    utc_offset: int,
+    country_code: osuCountryCode,
+    game_mode: osuGameMode,
+    longitude: float,
+    latitude: float,
+    rank: int,
+    ranked_score: int,
+    accuracy: float,
+    play_count: int,
+    total_score: int,
+    performance_points: int,
 ) -> Packets:
     packets = Packets()
 
@@ -916,16 +926,14 @@ def successful_login_response(
 
     for channel in ["#osu", "#nothing"]:
         packets += ChannelInfo(
-            name=channel, 
-            topic=f"Welcome to {channel}!", 
-            player_count=1
+            name=channel, topic=f"Welcome to {channel}!", player_count=1
         )
-    
+
     packets += ReOrderChannels()
 
     packets += MainMenuIcon(
         icon_url="https://a.ppy.sh/13028687",
-        on_click_url="https://github.com/jeevanjohnson/local-osu-server"
+        on_click_url="https://github.com/jeevanjohnson/local-osu-server",
     )
 
     packets += UserFriendList(friend_ids)
@@ -939,7 +947,7 @@ def successful_login_response(
         game_mode=game_mode,
         longitude=longitude,
         latitude=latitude,
-        rank=rank
+        rank=rank,
     )
 
     packets += PlayerStats(
@@ -955,22 +963,22 @@ def successful_login_response(
         play_count=play_count,
         total_score=total_score,
         rank=rank,
-        performance_points=performance_points
+        performance_points=performance_points,
     )
 
     packets += bancho_bot()
 
     return packets
 
+
 def client_relog_response(
-        millisecond_delay: int = 0, 
-        message: str | None = None
-    ) -> Packets:
+    millisecond_delay: int = 0, message: str | None = None
+) -> Packets:
     packets = Packets()
 
     if message is not None:
         packets += Notification(message)
-    
+
     packets += ClientRelog(millisecond_delay)
 
     return packets

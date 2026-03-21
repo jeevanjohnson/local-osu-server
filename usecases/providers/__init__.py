@@ -1,10 +1,13 @@
-from wrappers import OssapiAsync
 from ossapi import OssapiV1
-from repositories.server_settings import ServerSettingsRepository
+
 from constants import SERVER_SETTINGS_FILE
+from repositories.server_settings import ServerSettingsRepository
+from wrappers import OssapiAsync
+
 
 class ApiV2CredentialsError(Exception):
     pass
+
 
 async def get_ossapi_async() -> OssapiAsync:
     """
@@ -17,20 +20,27 @@ async def get_ossapi_async() -> OssapiAsync:
     server_settings = server_settings_repo.get_server_settings()
 
     if server_settings.osu_api_v2_client_id is None:
-        raise ApiV2CredentialsError("osu! API v2 client id not found in server settings. Please set it up in the server settings page.")
-    
+        raise ApiV2CredentialsError(
+            "osu! API v2 client id not found in server settings. Please set it up in the server settings page."
+        )
+
     if server_settings.osu_api_v2_client_secret is None:
-        raise ApiV2CredentialsError("osu! API v2 client secret not found in server settings. Please set it up in the server settings page.")
-    
+        raise ApiV2CredentialsError(
+            "osu! API v2 client secret not found in server settings. Please set it up in the server settings page."
+        )
+
     if not server_settings.osu_api_v2_client_id.isdecimal():
-        raise ApiV2CredentialsError("osu! API v2 client id must be a number. Please check the server settings page.")
-    
+        raise ApiV2CredentialsError(
+            "osu! API v2 client id must be a number. Please check the server settings page."
+        )
+
     osuApiAsync = OssapiAsync(
         int(server_settings.osu_api_v2_client_id),
-        server_settings.osu_api_v2_client_secret
+        server_settings.osu_api_v2_client_secret,
     )
 
     return osuApiAsync
+
 
 def get_ossapi_v1() -> OssapiV1:
     """
@@ -41,7 +51,9 @@ def get_ossapi_v1() -> OssapiV1:
     server_settings = server_settings_repo.get_server_settings()
 
     if server_settings.osu_api_key_v1 is None:
-        raise ApiV2CredentialsError("osu! API v1 token not found in server settings. Please set it up in the server settings page.")
+        raise ApiV2CredentialsError(
+            "osu! API v1 token not found in server settings. Please set it up in the server settings page."
+        )
 
     osuApiV1 = OssapiV1(server_settings.osu_api_key_v1)
 

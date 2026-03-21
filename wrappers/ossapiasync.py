@@ -4,7 +4,7 @@ from typing import Any
 
 from ossapi import OssapiAsync as BaseOssapiAsync
 from ossapi.mod import Mod
-from osuProtocol.client_web import osuMods
+
 
 # https://osu.ppy.sh/community/forums/topics/1257747?n=5
 class OssapiAsync(BaseOssapiAsync):
@@ -42,7 +42,11 @@ class OssapiAsync(BaseOssapiAsync):
         params = self._normalize_query_values(params)
         data = self._normalize_query_values(data)
 
-        if isinstance(params, dict) and "mods" in params and isinstance(params["mods"], int):
+        if (
+            isinstance(params, dict)
+            and "mods" in params
+            and isinstance(params["mods"], int)
+        ):
             params = params.copy()
             params["mods"] = self._mods_int_to_array(params["mods"])
 

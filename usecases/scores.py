@@ -1,25 +1,22 @@
+from pprint import pprint
+from typing import Any
+
+import ossapi.enums
 from ossapi import UserCompact
 
-from models.bancho.scores import (
-    Combo, Scores, Score, Mods,
-    StableScore, LazerScore
-)
-from osuProtocol.client_web import LeaderboardType, osuMods
-from osuProtocol.server_packets import osuGameMode
-from usecases.providers import get_ossapi_async
+from constants import PROFILES_FILE, SESSIONS_FILE
+from models.bancho.scores import Combo, LazerScore, Mods, Scores, StableScore
 from models.database.beatmaps import (
     CurrentBeatmap as Beatmap,
 )
-import ossapi.enums
-
+from osuProtocol.client_web import LeaderboardType, osuMods
+from osuProtocol.server_packets import osuGameMode
 from repositories.profiles import ProfilesRepository
-from constants import PROFILES_FILE, SESSIONS_FILE
 from repositories.sessions import SessionRepository
-from pprint import pprint
-from typing import TypedDict, Any
+from usecases.providers import get_ossapi_async
 
-class ScoresResolver:
-    ...
+
+class ScoresResolver: ...
 
 
 def parse_difficulty_adjustment_settings(mod_settings: dict[str, Any]) -> list[str]:
@@ -43,6 +40,7 @@ def parse_difficulty_adjustment_settings(mod_settings: dict[str, Any]) -> list[s
             settings.append(f"{setting_prefix}{setting_value}")
 
     return settings
+
 
 async def get_scores_for(
     beatmap: Beatmap,
@@ -70,7 +68,7 @@ async def get_scores_for(
     # TODO: Implement self scores and friends scores leaderboards
 
     # if score v2, show only lazer scores to kinda match the slider acc lbs.
-    # TODO MAKE THIS A CONFIG OPTION. 
+    # TODO MAKE THIS A CONFIG OPTION.
     # Some users might want to see score v2 scores on the all mods lb, even if they have score v1 scores.
     if mods and mods & osuMods.SCOREV2:
         mods &= ~osuMods.SCOREV2
@@ -94,7 +92,7 @@ async def get_scores_for(
             mods=req_mods,
             limit=req_limit,
             legacy_only=stable_only,
-            type=ranking_type
+            type=ranking_type,
         )
     except ValueError as e:
         print(f"Error fetching scores for beatmap {beatmap.id}: {e}")
@@ -102,10 +100,8 @@ async def get_scores_for(
 
     if not requested_scores:
         return None
-    
-    scores = Scores(
-        all_scores=[]
-    )
+
+    scores = Scores(all_scores=[])
 
     for score in requested_scores.scores:
         user: UserCompact = score._ossapi_data["_user"]
@@ -118,7 +114,7 @@ async def get_scores_for(
         else:
             score_model = LazerScore
 
-        score_mods = [] # https://github.com/ppy/osu-web/blob/master/database/mods.json
+        score_mods = []  # https://github.com/ppy/osu-web/blob/master/database/mods.json
         for mod in score.mods:
             mod_settings: dict[str, Any] = mod.settings
 
@@ -137,7 +133,9 @@ async def get_scores_for(
                         )
 
                 except Exception as e:
-                    pprint(f"Error processing mod settings for mod {mod.acronym}: {e}\nMod settings: {mod.settings}")
+                    pprint(
+                        f"Error processing mod settings for mod {mod.acronym}: {e}\nMod settings: {mod.settings}"
+                    )
             else:
                 score_mods.append(mod.acronym)
 
@@ -152,10 +150,7 @@ async def get_scores_for(
             score_id=score.id or 0,
             username=user.username,
             total_score_value=score.total_score,
-            combo=Combo(
-                actual=score.max_combo,
-                max=beatmap.max_combo
-            ),
+            combo=Combo(actual=score.max_combo, max=beatmap.max_combo),
             count50=score.statistics.meh or 0,
             count100=score.statistics.ok or 0,
             count300=score.statistics.great or 0,

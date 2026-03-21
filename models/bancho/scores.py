@@ -1,18 +1,21 @@
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Annotated, Literal
 
-from pydantic import BaseModel
-from pydantic import ConfigDict
-from pydantic import Field
-from pydantic import AliasChoices
-from typing import Annotated
-from osuProtocol.server_packets import osuMods
-from pydantic import field_serializer, field_validator
-from osuProtocol.server_packets import osuGameMode
+from pydantic import (
+    AliasChoices,
+    BaseModel,
+    ConfigDict,
+    Field,
+    field_serializer,
+    field_validator,
+)
+
+from osuProtocol.server_packets import osuGameMode, osuMods
 
 if TYPE_CHECKING:
     from osuProtocol.client_web import ScoringAlgorithm
 
 LAZER_MODS = list[str]
+
 
 class Mods(list[str]):
     """A list of mods, represented as their short names. For example: ["HD", "HR", "DT"]"""
@@ -60,11 +63,7 @@ class Mods(list[str]):
             1.1333...
         """
         # Known (rate, multiplier) points
-        points = [
-            (0.75, 0.30), 
-            (1.00, 1.00), 
-            (1.50, 1.10)
-        ]
+        points = [(0.75, 0.30), (1.00, 1.00), (1.50, 1.10)]
         # HT → 0.75x speed → 0.30x score
         # No speed change → 1.00x speed → 1.00x score
         # DT/NC → 1.50x speed → 1.10x score
@@ -95,7 +94,7 @@ class Mods(list[str]):
             return y1
         t = (rate - x1) / (x2 - x1)
         return y1 + t * (y2 - y1)
-    
+
     def to_stable_mods(self) -> tuple[osuMods, LAZER_MODS]:
         stable_mods = osuMods.NOMOD
         lazer_mods = []
@@ -107,91 +106,86 @@ class Mods(list[str]):
                 lazer_mods.append(mod)
 
         return stable_mods, lazer_mods
-    
-    def mod_multipler(
-        self, 
-        game_mode: osuGameMode
-    ) -> float:
+
+    def mod_multipler(self, game_mode: osuGameMode) -> float:
         if game_mode == osuGameMode.STANDARD:
             return self.mod_multiplier_standard()
         else:
-            print(f"Warning: mod multiplier for game mode {game_mode} not implemented, returning 1.0")
+            print(
+                f"Warning: mod multiplier for game mode {game_mode} not implemented, returning 1.0"
+            )
             return 1.0
-        
+
     def mod_multiplier_standard(self) -> float:
         multiplier = 1.0
-        
+
         # Score multiplier mods in lazer
         mod_multipliers = {
             # Difficulty Reduction
-            "EZ": 0.50,      # Easy
-            "NF": 0.50,      # No Fail
-            "HT": 0.30,      # Half Time
-            "DC": 0.30,      # Daycore
+            "EZ": 0.50,  # Easy
+            "NF": 0.50,  # No Fail
+            "HT": 0.30,  # Half Time
+            "DC": 0.30,  # Daycore
             # "NR": 0.90,      # No Release (mania only, but multiplier applies)
-
             # Difficulty Increase
-            "HR": 1.06,      # Hard Rock
-            "SD": 1.00,      # Sudden Death
-            "PF": 1.00,      # Perfect
-            "DT": 1.10,      # Double Time
-            "NC": 1.10,      # Nightcore (same as DT)
-            "FI": 1.00,      # Fade In (mania)
-            "HD": 1.06,      # Hidden
-            "CO": 1.00,      # Cover (mania)
-            "FL": 1.12,      # Flashlight
-            "BL": 1.12,      # Blinds
-            "ST": 1.00,      # Strict Tracking
-            "AC": 1.00,      # Accuracy Challenge
-
+            "HR": 1.06,  # Hard Rock
+            "SD": 1.00,  # Sudden Death
+            "PF": 1.00,  # Perfect
+            "DT": 1.10,  # Double Time
+            "NC": 1.10,  # Nightcore (same as DT)
+            "FI": 1.00,  # Fade In (mania)
+            "HD": 1.06,  # Hidden
+            "CO": 1.00,  # Cover (mania)
+            "FL": 1.12,  # Flashlight
+            "BL": 1.12,  # Blinds
+            "ST": 1.00,  # Strict Tracking
+            "AC": 1.00,  # Accuracy Challenge
             # Automation
-            "AT": 1.00,      # Autoplay
-            "CN": 1.00,      # Cinema
+            "AT": 1.00,  # Autoplay
+            "CN": 1.00,  # Cinema
             # "RX": 0.10,      # Relax
             # "AP": 0.10,      # Autopilot
-            "SO": 0.90,      # Spun Out
-
+            "SO": 0.90,  # Spun Out
             # Conversion
-            "TP": 0.10,      # Target Practice
-            "DA": 0.50,      # Difficulty Adjust
-            "CL": 0.96,      # Classic
-            "RD": 1.00,      # Random
-            "MR": 1.00,      # Mirror
-            "AL": 1.00,      # Alternate
-            "SW": 1.00,      # Swap
-            "SG": 1.00,      # Single Tap
-            "IN": 1.00,      # Invert (mania)
-            "CS": 0.90,      # Constant Speed (mania)
-            "HO": 0.90,      # Hold Off (mania)
+            "TP": 0.10,  # Target Practice
+            "DA": 0.50,  # Difficulty Adjust
+            "CL": 0.96,  # Classic
+            "RD": 1.00,  # Random
+            "MR": 1.00,  # Mirror
+            "AL": 1.00,  # Alternate
+            "SW": 1.00,  # Swap
+            "SG": 1.00,  # Single Tap
+            "IN": 1.00,  # Invert (mania)
+            "CS": 0.90,  # Constant Speed (mania)
+            "HO": 0.90,  # Hold Off (mania)
             # xK mods (1K, 2K, etc.) have a 1.00x multiplier
-
             # Fun
-            "TR": 1.00,      # Transform
-            "WG": 1.00,      # Wiggle
-            "SI": 1.00,      # Spin In
-            "GR": 1.00,      # Grow
-            "DF": 1.00,      # Deflate
-            "WU": 0.50,      # Wind Up
-            "WD": 0.50,      # Wind Down
-            "TC": 1.00,      # Traceable
-            "BR": 1.00,      # Barrel Roll
-            "AD": 1.00,      # Approach Different
-            "FF": 1.00,      # Floating Fruits (catch)
-            "MU": 1.00,      # Muted
-            "NS": 1.00,      # No Scope
-            "MG": 0.50,      # Magnetised
-            "RP": 1.00,      # Repel
-            "AS": 0.50,      # Adaptive Speed
-            "FR": 1.00,      # Freeze Frame
-            "BU": 1.00,      # Bubbles
-            "SY": 0.80,      # Synesthesia
-            "DP": 1.00,      # Depth
+            "TR": 1.00,  # Transform
+            "WG": 1.00,  # Wiggle
+            "SI": 1.00,  # Spin In
+            "GR": 1.00,  # Grow
+            "DF": 1.00,  # Deflate
+            "WU": 0.50,  # Wind Up
+            "WD": 0.50,  # Wind Down
+            "TC": 1.00,  # Traceable
+            "BR": 1.00,  # Barrel Roll
+            "AD": 1.00,  # Approach Different
+            "FF": 1.00,  # Floating Fruits (catch)
+            "MU": 1.00,  # Muted
+            "NS": 1.00,  # No Scope
+            "MG": 0.50,  # Magnetised
+            "RP": 1.00,  # Repel
+            "AS": 0.50,  # Adaptive Speed
+            "FR": 1.00,  # Freeze Frame
+            "BU": 1.00,  # Bubbles
+            "SY": 0.80,  # Synesthesia
+            "DP": 1.00,  # Depth
         }
 
         # if DT is 1.10x and adjustes speed by 1.5x
         # & if HT is 0.30x and adjusts speed by 0.75x
         # & no speec changes is 1.00x
-        
+
         for mod in self:
             if mod in mod_multipliers:
                 if mod in ["DT", "NC", "HT", "DC"]:
@@ -199,22 +193,27 @@ class Mods(list[str]):
                     rate_change = [m for m in self if m.endswith("x")]
                     if rate_change:
                         continue
-                
+
                 multiplier *= mod_multipliers[mod]
             elif mod.endswith("x"):
                 rate = float(mod[:-1])
                 multiplier *= self.approximate_score_multiplier(rate)
             else:
-                print(f"Warning: unknown mod {mod} with no defined multiplier, ignoring in score calculation")
+                print(
+                    f"Warning: unknown mod {mod} with no defined multiplier, ignoring in score calculation"
+                )
                 continue
-        
+
         return multiplier
 
+
 EpochTime = int
+
 
 class Combo(BaseModel):
     actual: int
     max: int
+
 
 class BaseScore(BaseModel):
     model_config = ConfigDict(
@@ -246,7 +245,7 @@ class BaseScore(BaseModel):
     @field_serializer("enabled_mods")
     def serialize_mods(self, value: Mods) -> list[str]:
         return list(value)
-    
+
     @field_validator("enabled_mods", mode="before")
     @classmethod
     def deserialize_mods(cls, value: list[str]) -> Mods:
@@ -275,8 +274,8 @@ class BaseScore(BaseModel):
 
         # Correct lazer scoring formula (two 500k terms)
         hit_score = (
-            500_000 * accuracy * combo_progress +
-            500_000 * (accuracy ** 5) * accuracy_progress
+            500_000 * accuracy * combo_progress
+            + 500_000 * (accuracy**5) * accuracy_progress
         )
 
         # Add bonus points (spinner overspins)
@@ -284,12 +283,16 @@ class BaseScore(BaseModel):
 
         # Apply the 0.96× "Classic" multiplier (always present for imported scores)
         # Then apply any mod multiplier from the original play (DT, HT, etc.)
-        final_score = base_score * 0.96 * self.enabled_mods.mod_multipler(self.game_mode)
+        final_score = (
+            base_score * 0.96 * self.enabled_mods.mod_multipler(self.game_mode)
+        )
 
         return round(final_score)
 
+
 class StableScore(BaseScore):
     lazer: Literal[False] = False
+
 
 class LazerScore(BaseScore):
     lazer: Literal[True] = True
@@ -297,13 +300,14 @@ class LazerScore(BaseScore):
 
 Score = Annotated[StableScore | LazerScore, Field(discriminator="lazer")]
 
+
 class Scores(BaseModel):
     limit: int = Field(default=50)
     all_scores: list[Score]
 
     @property
     def scores(self) -> list[Score]:
-        return self.all_scores[:self.limit]
+        return self.all_scores[: self.limit]
 
     @property
     def total(self) -> int:
@@ -311,16 +315,12 @@ class Scores(BaseModel):
 
     def sort_by_pp(self) -> None:
         self.all_scores.sort(
-            key=lambda s: (s.performance_points or 0, -s.time_set), 
-            reverse=True
+            key=lambda s: (s.performance_points or 0, -s.time_set), reverse=True
         )
 
     def sort_by_score(self):
-        self.all_scores.sort(
-            key=lambda s: (s.total_score, -s.time_set), 
-            reverse=True
-        )
-    
+        self.all_scores.sort(key=lambda s: (s.total_score, -s.time_set), reverse=True)
+
     def sort(self, algorithm: "ScoringAlgorithm") -> None:
         # Lazy import prevents circular import at module load time.
         from osuProtocol.client_web import ScoringAlgorithm

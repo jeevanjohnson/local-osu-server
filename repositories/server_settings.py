@@ -1,7 +1,7 @@
-from models.database.server_settings import (
-    CurrentServerSettings as Settings
-)
 from jays_tools.json_database import JsonDatabase
+
+from models.database.server_settings import CurrentServerSettings as Settings
+
 
 class ServerSettingsRepository:
     def __init__(self, path):

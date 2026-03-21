@@ -206,3 +206,45 @@ CurrentUser = UserV2
 For more detail on how migrations work, see the [jays-tools migration docs](https://github.com/jeevanjohnson/jays-tools/tree/main?tab=readme-ov-file#migrations).
 
 ---
+
+### Code Formatting & Cleanup
+
+This project uses **Ruff** to maintain consistent code style, import organization, and code quality across the entire codebase.
+
+#### Setup
+
+Ruff is included in `requirements.txt` and will be installed automatically when you run `install_dependencies.py`.
+
+#### Running Formatting Tools
+
+After making code changes, run these commands to format and clean up your code:
+
+**1. Remove unused imports:**
+```bash
+ruff check --select F401 --fix .
+```
+
+**2. Sort imports consistently:**
+```bash
+ruff check --select I --fix .
+```
+
+**3. Format code to project standards:**
+```bash
+ruff format .
+```
+
+**Or, run all at once:**
+```bash
+ruff check --select F401 --fix . && ruff check --select I --fix . && ruff format .
+```
+
+#### What These Tools Do
+
+- **F401 (Unused imports)**: Removes `import` and `from ... import` statements that aren't used in the file. Keeps your code clean and dependencies clear.
+- **Import sorting (I)**: Organizes imports into three groups (stdlib → third-party → local) in alphabetical order. Makes code reviews easier and prevents merge conflicts from sorting differences.
+- **Code formatting**: Applies consistent line length, indentation, spacing, and style across all Python files. Matches the entire team on code appearance.
+
+> **Tip:** Run these before committing or opening a PR to ensure your code meets project standards.
+
+---

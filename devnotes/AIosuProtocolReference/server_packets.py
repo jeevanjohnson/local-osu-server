@@ -6,19 +6,16 @@ Purpose/Domain/Concept:
 
 from __future__ import annotations
 
-from enum import IntEnum
-from enum import unique
-from functools import lru_cache
+from enum import IntEnum, unique
 
 from AIosuProtocolReference.writer import BanchoPacketWriter
-from AIosuProtocolReference.types import Message
 
 
 @unique
 class ServerPackets(IntEnum):
     """
     Packet IDs that the server sends to the osu! client.
-    
+
     These are organized by functionality:
     - 5-12: User and login
     - 13-15: Spectating
@@ -38,170 +35,170 @@ class ServerPackets(IntEnum):
     # ===================
     # Login & User
     # ===================
-    
-    USER_ID = 5                # Login response (user ID or negative for error)
-    USER_LOGOUT = 12           # Player logout notification
+
+    USER_ID = 5  # Login response (user ID or negative for error)
+    USER_LOGOUT = 12  # Player logout notification
 
     # ===================
     # Messaging
     # ===================
-    
-    SEND_MESSAGE = 7           # Send a message (chat)
-    PONG = 8                   # Pong response to ping
+
+    SEND_MESSAGE = 7  # Send a message (chat)
+    PONG = 8  # Pong response to ping
 
     # ===================
     # Spectating
     # ===================
-    
-    SPECTATOR_JOINED = 13       # Spectator joined
-    SPECTATOR_LEFT = 14         # Spectator left
-    SPECTATE_FRAMES = 15        # Spectator frame data
-    SPECTATOR_CANT_SPECTATE = 22 # Cannot spectate
+
+    SPECTATOR_JOINED = 13  # Spectator joined
+    SPECTATOR_LEFT = 14  # Spectator left
+    SPECTATE_FRAMES = 15  # Spectator frame data
+    SPECTATOR_CANT_SPECTATE = 22  # Cannot spectate
 
     # ===================
     # Notifications
     # ===================
-    
-    VERSION_UPDATE = 19         # Client version update required
-    GET_ATTENTION = 23          # Get user's attention
-    NOTIFICATION = 24           # Show notification
+
+    VERSION_UPDATE = 19  # Client version update required
+    GET_ATTENTION = 23  # Get user's attention
+    NOTIFICATION = 24  # Show notification
 
     # ===================
     # Match Updates
     # ===================
-    
-    UPDATE_MATCH = 26           # Update match state
-    NEW_MATCH = 27              # New match created
-    DISPOSE_MATCH = 28          # Match disposed/removed
+
+    UPDATE_MATCH = 26  # Update match state
+    NEW_MATCH = 27  # New match created
+    DISPOSE_MATCH = 28  # Match disposed/removed
 
     # ===================
     # Match Join
     # ===================
-    
-    MATCH_JOIN_SUCCESS = 36     # Successfully joined match
-    MATCH_JOIN_FAIL = 37         # Failed to join match
+
+    MATCH_JOIN_SUCCESS = 36  # Successfully joined match
+    MATCH_JOIN_FAIL = 37  # Failed to join match
 
     # ===================
     # Spectator Updates
     # ===================
-    
-    FELLOW_SPECTATOR_JOINED = 42 # Fellow spectator joined
-    FELLOW_SPECTATOR_LEFT = 43   # Fellow spectator left
+
+    FELLOW_SPECTATOR_JOINED = 42  # Fellow spectator joined
+    FELLOW_SPECTATOR_LEFT = 43  # Fellow spectator left
 
     # ===================
     # Match Gameplay
     # ===================
-    
-    ALL_PLAYERS_LOADED = 45     # All players loaded
-    MATCH_START = 46            # Match started
-    MATCH_SCORE_UPDATE = 48     # Score update
-    MATCH_TRANSFER_HOST = 50    # Host transferred
+
+    ALL_PLAYERS_LOADED = 45  # All players loaded
+    MATCH_START = 46  # Match started
+    MATCH_SCORE_UPDATE = 48  # Score update
+    MATCH_TRANSFER_HOST = 50  # Host transferred
 
     # ===================
     # Match State
     # ===================
-    
-    MATCH_ALL_PLAYERS_LOADED = 53   # All players loaded
-    MATCH_PLAYER_FAILED = 57       # Player failed
-    MATCH_COMPLETE = 58            # Match complete
-    MATCH_SKIP = 61                # Skip to next section
-    MATCH_PLAYER_SKIPPED = 81      # Player skipped
+
+    MATCH_ALL_PLAYERS_LOADED = 53  # All players loaded
+    MATCH_PLAYER_FAILED = 57  # Player failed
+    MATCH_COMPLETE = 58  # Match complete
+    MATCH_SKIP = 61  # Skip to next section
+    MATCH_PLAYER_SKIPPED = 81  # Player skipped
 
     # ===================
     # Channels
     # ===================
-    
-    CHANNEL_JOIN_SUCCESS = 64   # Successfully joined channel
-    CHANNEL_INFO = 65           # Channel info
-    CHANNEL_KICK = 66          # Kicked from channel
-    CHANNEL_AUTO_JOIN = 67     # Auto-join channel
-    CHANNEL_INFO_END = 89      # End of channel list
+
+    CHANNEL_JOIN_SUCCESS = 64  # Successfully joined channel
+    CHANNEL_INFO = 65  # Channel info
+    CHANNEL_KICK = 66  # Kicked from channel
+    CHANNEL_AUTO_JOIN = 67  # Auto-join channel
+    CHANNEL_INFO_END = 89  # End of channel list
 
     # ===================
     # Beatmaps & Stats
     # ===================
-    
-    BEATMAP_INFO_REPLY = 69     # Beatmap info response
-    USER_STATS = 11             # User statistics
+
+    BEATMAP_INFO_REPLY = 69  # Beatmap info response
+    USER_STATS = 11  # User statistics
 
     # ===================
     # Friends
     # ===================
-    
-    FRIENDS_LIST = 72           # Friends list
+
+    FRIENDS_LIST = 72  # Friends list
 
     # ===================
     # Protocol & Menu
     # ===================
-    
-    PROTOCOL_VERSION = 75       # Protocol version
-    MAIN_MENU_ICON = 76         # Main menu icon
-    MONITOR = 80                # (unused)
+
+    PROTOCOL_VERSION = 75  # Protocol version
+    MAIN_MENU_ICON = 76  # Main menu icon
+    MONITOR = 80  # (unused)
 
     # ===================
     # Presence
     # ===================
-    
-    USER_PRESENCE = 83          # User presence data
+
+    USER_PRESENCE = 83  # User presence data
     USER_PRESENCE_SINGLE = 95  # Single user presence
-    USER_PRESENCE_BUNDLE = 96   # Bundle of user presences
+    USER_PRESENCE_BUNDLE = 96  # Bundle of user presences
 
     # ===================
     # User Status
     # ===================
-    
-    USER_SILENCED = 94          # User was silenced
+
+    USER_SILENCED = 94  # User was silenced
 
     # ===================
     # Server Commands
     # ===================
-    
-    RESTART = 86                # Restart the game
-    HANDLE_IRC_CHANGE_USERNAME = 9   # (deprecated)
-    HANDLE_IRC_QUIT = 10         # IRC quit
+
+    RESTART = 86  # Restart the game
+    HANDLE_IRC_CHANGE_USERNAME = 9  # (deprecated)
+    HANDLE_IRC_QUIT = 10  # IRC quit
 
     # ===================
     # Match Features
     # ===================
-    
+
     MATCH_CHANGE_PASSWORD = 91  # Match password changed
-    MATCH_ABORT = 106           # Match aborted
+    MATCH_ABORT = 106  # Match aborted
 
     # ===================
     # Friends & DM
     # ===================
-    
+
     TOGGLE_BLOCK_NON_FRIEND_DMS = 34  # Toggle blocking DMs
-    PRIVILEGES = 71             # User privileges
-    USER_DM_BLOCKED = 100      # DM blocked
-    TARGET_IS_SILENCED = 101    # Target is silenced
+    PRIVILEGES = 71  # User privileges
+    USER_DM_BLOCKED = 100  # DM blocked
+    TARGET_IS_SILENCED = 101  # Target is silenced
 
     # ===================
     # Version
     # ===================
-    
-    VERSION_UPDATE_FORCED = 102 # Forced version update
+
+    VERSION_UPDATE_FORCED = 102  # Forced version update
 
     # ===================
     # Server Switch
     # ===================
-    
-    SWITCH_SERVER = 103         # Switch to another server
-    ACCOUNT_RESTRICTED = 104   # Account restricted
-    RTX = 105                  # (unused)
-    SWITCH_TOURNAMENT_SERVER = 107 # Switch tournament server
+
+    SWITCH_SERVER = 103  # Switch to another server
+    ACCOUNT_RESTRICTED = 104  # Account restricted
+    RTX = 105  # (unused)
+    SWITCH_TOURNAMENT_SERVER = 107  # Switch tournament server
 
     # ===================
     # Silence
     # ===================
-    
-    SILENCE_END = 92           # Silence period ended
+
+    SILENCE_END = 92  # Silence period ended
 
     # ===================
     # Tournament
     # ===================
-    
-    UNAUTHORIZED = 62           # (unused)
+
+    UNAUTHORIZED = 62  # (unused)
 
     def __repr__(self) -> str:
         return f"<{self.name} ({self.value})>"
@@ -211,8 +208,10 @@ class ServerPackets(IntEnum):
 # Login Failure Reasons
 # ===================
 
+
 class LoginFailureReason(IntEnum):
     """Reasons for login failure (negative user IDs)."""
+
     AUTHENTICATION_FAILED = -1
     OLD_CLIENT = -2
     BANNED = -3
@@ -226,10 +225,11 @@ class LoginFailureReason(IntEnum):
 # Packet Builder Functions
 # ===================
 
+
 def build_user_id(user_id: int) -> bytes:
     """
     Build a USER_ID packet.
-    
+
     Positive ID = successful login with that user ID
     Negative ID = login failure (see LoginFailureReason)
     """
@@ -248,6 +248,7 @@ def build_pong() -> bytes:
 def build_send_message(sender: str, text: str, recipient: str, sender_id: int) -> bytes:
     """Build a SEND_MESSAGE packet (chat message)."""
     from AIosuProtocolReference.types import Message
+
     writer = BanchoPacketWriter()
     message = Message(sender, text, recipient, sender_id)
     writer.write_packet(ServerPackets.SEND_MESSAGE, message)

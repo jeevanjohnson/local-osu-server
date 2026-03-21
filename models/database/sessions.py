@@ -4,22 +4,24 @@ Purpose/Domain/Concept:
 """
 
 import base64
-
-from jays_tools.json_database import MigratableModel
-from osuProtocol.server_packets import osuGameMode, osuAction, osuMods
-from pydantic import Field, field_serializer, field_validator
 from datetime import datetime
 from pathlib import Path
 
+from jays_tools.json_database import MigratableModel
+from pydantic import Field, field_serializer, field_validator
+
+from osuProtocol.server_packets import osuAction, osuGameMode, osuMods
+
+
 class SessionOsuClientActivityV1(MigratableModel):
     opened: bool = Field(default=False)
-    logged_in_at: datetime = Field(
-        default_factory=datetime.now
-    )
+    logged_in_at: datetime = Field(default_factory=datetime.now)
     status: osuAction = Field(default=osuAction.Idle)
     status_message: str = Field(default="")
 
+
 CurrentSessionOsuClientActivity = SessionOsuClientActivityV1
+
 
 # TODO: make this beatmap model?
 class SessionBeatmapInfoV1(MigratableModel):
@@ -27,7 +29,9 @@ class SessionBeatmapInfoV1(MigratableModel):
     id: int = Field(default=0)
     set_id: int = Field(default=0)
 
+
 CurrentSessionBeatmapInfo = SessionBeatmapInfoV1
+
 
 class SessionV1(MigratableModel):
     loaded: bool = Field(default=False)
@@ -37,21 +41,22 @@ class SessionV1(MigratableModel):
     replays_folder: Path | None = Field(default=None)
 
     latest_replay_id: int = Field(default=0)
-    current_game_mode: osuGameMode  = Field(default=osuGameMode.STANDARD)
+    current_game_mode: osuGameMode = Field(default=osuGameMode.STANDARD)
     # TODO: List of str mods to be compatible with lazer?
     latest_enabled_mods: osuMods = Field(default=osuMods.NOMOD)
     latest_beatmap: CurrentSessionBeatmapInfo | None = Field(default=None)
     osu_client: CurrentSessionOsuClientActivity = Field(
         default_factory=CurrentSessionOsuClientActivity
     )
-    
+
     @field_serializer("packet_queue")
     def serialize_packet_queue(self, value: bytes) -> str:
-        return base64.b64encode(value).decode('ascii')
-    
+        return base64.b64encode(value).decode("ascii")
+
     @field_validator("packet_queue", mode="before")
     @classmethod
     def deserialize_packet_queue(cls, value: str) -> bytes:
-        return base64.b64decode(value.encode('ascii'))
+        return base64.b64decode(value.encode("ascii"))
+
 
 CurrentSession = SessionV1
