@@ -6,6 +6,7 @@ from pathlib import Path
 class OsuFile(BaseOsuFile):
     def __init__(self, file_path: str):
         self.raw_audio_file: bytes | None = None
+        self.raw_file: bytes | None = None
         super().__init__(file_path)
     
     def parse_file(self) -> 'OsuFile':
@@ -39,7 +40,17 @@ class OsuFile(BaseOsuFile):
         self.calculate_minor_things()
         self.calculate_max_combo()
         self.get_audio_file()
+        self.get_raw_file()
         return self # Return self as some people would want to make one line parsing.
+
+    def get_raw_file(self) -> bytes:
+        if self.raw_file is not None:
+            return self.raw_file
+        
+        with open(self.__file_path, "rb") as stream:
+            self.raw_file = stream.read()
+        
+        return self.raw_file
 
     def get_audio_file(self) -> bytes | None:
         set_path = Path(self.__file_path).parent

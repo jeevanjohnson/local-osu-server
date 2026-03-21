@@ -21,6 +21,7 @@ from typing import TypedDict, Any
 class ScoresResolver:
     ...
 
+
 def parse_difficulty_adjustment_settings(mod_settings: dict[str, Any]) -> list[str]:
     settings = []
 
@@ -51,6 +52,8 @@ async def get_scores_for(
     stable_only: bool,
     mods: osuMods | None = None,
 ) -> Scores | None:
+    lazer_only = False
+
     profile_repo = ProfilesRepository(PROFILES_FILE)
     session_repo = SessionRepository(SESSIONS_FILE)
 
@@ -66,15 +69,30 @@ async def get_scores_for(
 
     # TODO: Implement self scores and friends scores leaderboards
 
-    if leaderboard_type != LeaderboardType.MODS:
-        mods = None
+    # if score v2, show only lazer scores to kinda match the slider acc lbs.
+    # TODO MAKE THIS A CONFIG OPTION. 
+    # Some users might want to see score v2 scores on the all mods lb, even if they have score v1 scores.
+    if mods and mods & osuMods.SCOREV2:
+        mods &= ~osuMods.SCOREV2
+        lazer_only = True
+        # Override limit to fetch more scores in case there is more lazer
+        limit = 100
+
+    if leaderboard_type == LeaderboardType.MODS and mods is not None:
+        req_mods = int(mods)
+        req_limit = limit
+    else:
+        req_mods = None
+        req_limit = limit
+
+    # print(f"Fetching scores for beatmap {beatmap.id} with mods {mods} and leaderboard type {leaderboard_type.name}...")
 
     try:
         requested_scores = await osuApi.beatmap_scores(
             beatmap_id=beatmap.id,
             mode=game_mode.to_api_v2(),
-            mods=mods,
-            limit=limit,
+            mods=req_mods,
+            limit=req_limit,
             legacy_only=stable_only,
             type=ranking_type
         )
@@ -91,6 +109,9 @@ async def get_scores_for(
 
     for score in requested_scores.scores:
         user: UserCompact = score._ossapi_data["_user"]
+
+        if score.legacy_score_id and lazer_only:
+            continue
 
         if score.legacy_score_id:
             score_model = StableScore
@@ -127,27 +148,27 @@ async def get_scores_for(
         else:
             pp = int(score.pp)
 
-        scores.all_scores.append(
-            score_model(
-                score_id=score.id or 0,
-                username=user.username,
-                total_score_value=score.total_score,
-                combo=Combo(
-                    actual=score.max_combo,
-                    max=beatmap.max_combo
-                ),
-                count50=score.statistics.meh or 0,
-                count100=score.statistics.ok or 0,
-                count300=score.statistics.great or 0,
-                count_miss=score.statistics.miss or 0,
-                perfect=perfect,
-                enabled_mods=Mods(score_mods),
-                user_id=user.id,
-                time_set=int(score.ended_at.timestamp()),
-                replay_available=score.has_replay,
-                performance_points=pp,
-                game_mode=game_mode,
-            )
+        parsed_score = score_model(
+            score_id=score.id or 0,
+            username=user.username,
+            total_score_value=score.total_score,
+            combo=Combo(
+                actual=score.max_combo,
+                max=beatmap.max_combo
+            ),
+            count50=score.statistics.meh or 0,
+            count100=score.statistics.ok or 0,
+            count300=score.statistics.great or 0,
+            count_miss=score.statistics.miss or 0,
+            perfect=perfect,
+            enabled_mods=Mods(score_mods),
+            user_id=user.id,
+            time_set=int(score.ended_at.timestamp()),
+            replay_available=score.has_replay,
+            performance_points=pp,
+            game_mode=game_mode,
         )
+
+        scores.all_scores.append(parsed_score)
 
     return scores

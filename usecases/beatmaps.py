@@ -14,7 +14,7 @@ import asyncio
 import aiohttp
 import httpx
 import time
-from osu_file import OsuFile
+from wrappers import OsuFile
 from models.database.profiles import CurrentSettings
 from datetime import datetime
 from osuProtocol.server_packets import osuGameMode

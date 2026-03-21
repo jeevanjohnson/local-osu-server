@@ -1,4 +1,5 @@
-from ossapi import OssapiAsync, OssapiV1
+from wrappers import OssapiAsync
+from ossapi import OssapiV1
 from repositories.server_settings import ServerSettingsRepository
 from constants import SERVER_SETTINGS_FILE
 

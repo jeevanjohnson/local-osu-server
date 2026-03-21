@@ -95,6 +95,8 @@ async def get_leaderboard(
         set_id=beatmap.set_id,
     )
 
+    usecases.sessions.update_current_session(session)
+
     mods = osuMods(mods_arg)
 
     if profile.settings.leaderboard.show_lazer_scores_on_leaderboard:
