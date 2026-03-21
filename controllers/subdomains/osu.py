@@ -10,6 +10,7 @@ import usecases.scores
 import usecases.sessions
 from constants import SEASONAL_BG_GIT_URL
 from models.database.sessions import CurrentSessionBeatmapInfo as SessionBeatmapInfo
+from models.domain.gameplay import osuGameMode, osuMods
 from osuProtocol.client_web import (
     GraveyardLeaderboard,
     Leaderboard,
@@ -18,7 +19,6 @@ from osuProtocol.client_web import (
     LeaderboardType,
     ScoringAlgorithm,
 )
-from osuProtocol.server_packets import osuGameMode, osuMods
 
 osu = APIRouter(
     prefix="/osu",

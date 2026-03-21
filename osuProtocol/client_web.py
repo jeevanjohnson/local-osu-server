@@ -4,7 +4,7 @@ from enum import IntEnum, unique
 import ossapi.enums
 
 from models.bancho.scores import LazerScore, Score
-from osuProtocol.server_packets import osuMods
+from models.domain.gameplay import osuMods
 
 
 @unique

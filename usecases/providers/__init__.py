@@ -1,8 +1,8 @@
 from ossapi import OssapiV1
 
+from adapters import OssapiAsync
 from constants import SERVER_SETTINGS_FILE
 from repositories.server_settings import ServerSettingsRepository
-from wrappers import OssapiAsync
 
 
 class ApiV2CredentialsError(Exception):

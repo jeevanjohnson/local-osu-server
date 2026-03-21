@@ -1,7 +1,7 @@
 import functools
 import hashlib
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import aiohttp
@@ -10,13 +10,14 @@ import ossapi
 from constants import BEATMAPS_FILE
 from models.database.beatmaps import (
     CurrentBeatmap as Beatmap,
+    CurrentBeatmapSet as BeatmapSet,
 )
 from models.database.profiles import CurrentSettings
+from models.domain.gameplay import osuGameMode
 from osuProtocol.client_web import osuMapStatus
-from osuProtocol.server_packets import osuGameMode
 from repositories.beatmaps import BeatmapsRepository
 from usecases.providers import get_ossapi_async
-from wrappers import OsuFile
+from adapters import OsuFile
 
 FILENAME_REGEX = re.compile(
     r"(?P<artist>.*) - (?P<song_name>.*) ((?P<mapper>.*) \[)(?P<diff_name>.*)\]\.osu"
@@ -28,10 +29,20 @@ ATTRIBUTE_EDIT_REGEX = re.compile(r"(.*) (HP|CS|AR|OD)([0-9]{1,2}(?:\.[0-9]{1,2}
 
 _BEATMAP_HOT_CACHE_MAX_SIZE = 512
 _beatmap_hot_cache_by_md5: dict[str, Beatmap] = {}
+_NON_EXPIRING_STATUSES = {
+    osuMapStatus.RANKED,
+    osuMapStatus.APPROVED,
+    osuMapStatus.LOVED,
+}
+_UNSTABLE_MAP_TTL = timedelta(minutes=30)
 
 
 def _get_cached_beatmap_by_md5(beatmap_md5: str) -> Beatmap | None:
     return _beatmap_hot_cache_by_md5.get(beatmap_md5)
+
+
+def _remove_cached_beatmap_by_md5(beatmap_md5: str) -> None:
+    _beatmap_hot_cache_by_md5.pop(beatmap_md5, None)
 
 
 def _cache_beatmap(beatmap: Beatmap) -> None:
@@ -78,9 +89,13 @@ class BeatmapResolver:
 
     @staticmethod
     def build_from_bmap_api(
-        api_beatmap: ossapi.Beatmap, status: osuMapStatus, osu_file_content: bytes
+        api_beatmap: ossapi.Beatmap,
+        status: osuMapStatus,
+        osu_file_content: bytes | None,
+        beatmap_set: ossapi.Beatmapset | ossapi.BeatmapsetCompact | None = None,
     ) -> Beatmap:
-        beatmap_set = api_beatmap.beatmapset()
+        if beatmap_set is None:
+            beatmap_set = api_beatmap.beatmapset()
 
         assert beatmap_set is not None, (
             "BeatmapSet not found for Beatmap with id {}".format(api_beatmap.id)
@@ -106,6 +121,54 @@ class BeatmapResolver:
             difficulty_adjusted=False,
             osu_file_content=osu_file_content,
         )
+
+    @staticmethod
+    def _should_refresh_stale_unstable_map(beatmap: Beatmap) -> bool:
+        if beatmap.status in _NON_EXPIRING_STATUSES:
+            return False
+
+        return datetime.now() - beatmap.time_inserted > _UNSTABLE_MAP_TTL
+
+    def _store_full_set_if_eligible(
+        self,
+        requested_api_beatmap: ossapi.Beatmap,
+        requested_osu_file_content: bytes | None,
+    ) -> None:
+        beatmap_set = requested_api_beatmap.beatmapset()
+        if beatmap_set is None or not beatmap_set.beatmaps:
+            return
+
+        set_maps: list[Beatmap] = []
+        for api_set_map in beatmap_set.beatmaps:
+            if api_set_map.checksum is None or api_set_map.max_combo is None:
+                continue
+
+            set_map_status = osuMapStatus.from_api_v2(api_set_map.status)
+
+            # Only the requested beatmap has guaranteed .osu bytes on this path.
+            set_map_osu_content = (
+                requested_osu_file_content
+                if api_set_map.id == requested_api_beatmap.id
+                else None
+            )
+
+            parsed_set_map = self.build_from_bmap_api(
+                api_beatmap=api_set_map,
+                status=set_map_status,
+                osu_file_content=set_map_osu_content,
+                beatmap_set=beatmap_set,
+            )
+            set_maps.append(parsed_set_map)
+
+        if not set_maps:
+            return
+
+        self.beatmaps_repo.insert_beatmap_set(
+            BeatmapSet(id=requested_api_beatmap.beatmapset_id, maps=set_maps)
+        )
+
+        for parsed_set_map in set_maps:
+            _cache_beatmap(parsed_set_map)
 
     def is_difficulty_adjusted_from_filename(self, file_name: str) -> bool:
         # check modified_mp3_list.txt format first
@@ -198,10 +261,16 @@ class BeatmapResolver:
             "Raw file content not found for Beatmap with id {}".format(api_beatmap.id)
         )
 
+        self._store_full_set_if_eligible(
+            requested_api_beatmap=api_beatmap,
+            requested_osu_file_content=osu_file.raw_file,
+        )
+
         return self.build_from_bmap_api(
             api_beatmap=api_beatmap,
             status=osuMapStatus.from_api_v2(api_beatmap.status),
             osu_file_content=osu_file.raw_file,
+            beatmap_set=beatmap_set,
         )
 
     async def from_api_id(self, beatmap_id: int) -> Beatmap | None:
@@ -231,10 +300,16 @@ class BeatmapResolver:
             "Raw file content not found for Beatmap with id {}".format(api_beatmap.id)
         )
 
+        self._store_full_set_if_eligible(
+            requested_api_beatmap=api_beatmap,
+            requested_osu_file_content=osu_file.raw_file,
+        )
+
         return self.build_from_bmap_api(
             api_beatmap=api_beatmap,
             status=osuMapStatus.from_api_v2(api_beatmap.status),
             osu_file_content=osu_file.raw_file,
+            beatmap_set=beatmap_set,
         )
 
     def get_osu_file_from_md5(self, beatmap_md5: str) -> OsuFile | None:
@@ -302,13 +377,20 @@ class BeatmapResolver:
         # Hot cache check
         beatmap = _get_cached_beatmap_by_md5(beatmap_md5)
         if beatmap:
-            return beatmap
+            if self._should_refresh_stale_unstable_map(beatmap):
+                _remove_cached_beatmap_by_md5(beatmap_md5)
+            else:
+                return beatmap
 
         # DB Check
         beatmap = self.from_db(beatmap_md5)
         if beatmap:
-            _cache_beatmap(beatmap)
-            return beatmap
+            if self._should_refresh_stale_unstable_map(beatmap):
+                self.beatmaps_repo.delete_beatmap(beatmap)
+                _remove_cached_beatmap_by_md5(beatmap_md5)
+            else:
+                _cache_beatmap(beatmap)
+                return beatmap
 
         # API Check
         beatmap = await self.from_api_md5(beatmap_md5)

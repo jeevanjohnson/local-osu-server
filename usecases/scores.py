@@ -1,4 +1,5 @@
 from pprint import pprint
+import time
 from typing import Any
 
 import ossapi.enums
@@ -9,13 +10,61 @@ from models.bancho.scores import Combo, LazerScore, Mods, Scores, StableScore
 from models.database.beatmaps import (
     CurrentBeatmap as Beatmap,
 )
-from osuProtocol.client_web import LeaderboardType, osuMods
-from osuProtocol.server_packets import osuGameMode
+from models.domain.gameplay import osuGameMode, osuMods
+from osuProtocol.client_web import LeaderboardType
 from repositories.profiles import ProfilesRepository
 from repositories.sessions import SessionRepository
 from usecases.providers import get_ossapi_async
 
-# TODO: 5 min score cache?
+_SCORE_HOT_CACHE_TTL_SECONDS = 300
+_SCORE_HOT_CACHE_MAX_SIZE = 1024
+_score_hot_cache: dict[tuple[Any, ...], tuple[float, Scores]] = {}
+
+
+def _make_score_cache_key(
+    beatmap_id: int,
+    game_mode: osuGameMode,
+    leaderboard_type: LeaderboardType,
+    stable_only: bool,
+    ranking_type: ossapi.enums.RankingType,
+    req_mods: int | None,
+    req_limit: int,
+    lazer_only: bool,
+) -> tuple[Any, ...]:
+    return (
+        beatmap_id,
+        int(game_mode),
+        int(leaderboard_type),
+        stable_only,
+        str(ranking_type),
+        req_mods,
+        req_limit,
+        lazer_only,
+    )
+
+
+def _get_cached_scores(cache_key: tuple[Any, ...]) -> Scores | None:
+    cached = _score_hot_cache.get(cache_key)
+    if cached is None:
+        return None
+
+    cached_at, cached_scores = cached
+    if time.monotonic() - cached_at > _SCORE_HOT_CACHE_TTL_SECONDS:
+        _score_hot_cache.pop(cache_key, None)
+        return None
+
+    return cached_scores
+
+
+def _cache_scores(cache_key: tuple[Any, ...], scores: Scores) -> None:
+    if cache_key in _score_hot_cache:
+        _score_hot_cache.pop(cache_key, None)
+
+    if len(_score_hot_cache) >= _SCORE_HOT_CACHE_MAX_SIZE:
+        oldest_key = next(iter(_score_hot_cache))
+        _score_hot_cache.pop(oldest_key, None)
+
+    _score_hot_cache[cache_key] = (time.monotonic(), scores)
 
 
 class ScoresResolver: ...
@@ -52,6 +101,7 @@ async def get_scores_for(
     stable_only: bool,
     mods: osuMods | None = None,
 ) -> Scores | None:
+    show_lazer_only_if_score_v2 = False
     lazer_only = False
 
     profile_repo = ProfilesRepository(PROFILES_FILE)
@@ -64,6 +114,7 @@ async def get_scores_for(
         profile = profile_repo.get_profile(session.profile_name)
         if profile:
             ranking_type = profile.settings.scoring_algorithm.to_api_v2()
+            show_lazer_only_if_score_v2 = profile.settings.score_v2_shows_lazer_only_leaderboard
 
     osuApi = await get_ossapi_async()
 
@@ -72,7 +123,7 @@ async def get_scores_for(
     # if score v2, show only lazer scores to kinda match the slider acc lbs.
     # TODO MAKE THIS A CONFIG OPTION.
     # Some users might want to see score v2 scores on the all mods lb, even if they have score v1 scores.
-    if mods and mods & osuMods.SCOREV2:
+    if mods and mods & osuMods.SCOREV2 and show_lazer_only_if_score_v2:
         mods &= ~osuMods.SCOREV2
         lazer_only = True
         # Override limit to fetch more scores in case there is more lazer
@@ -84,6 +135,21 @@ async def get_scores_for(
     else:
         req_mods = None
         req_limit = limit
+
+    cache_key = _make_score_cache_key(
+        beatmap_id=beatmap.id,
+        game_mode=game_mode,
+        leaderboard_type=leaderboard_type,
+        stable_only=stable_only,
+        ranking_type=ranking_type,
+        req_mods=req_mods,
+        req_limit=req_limit,
+        lazer_only=lazer_only,
+    )
+
+    cached_scores = _get_cached_scores(cache_key)
+    if cached_scores is not None:
+        return cached_scores
 
     # print(f"Fetching scores for beatmap {beatmap.id} with mods {mods} and leaderboard type {leaderboard_type.name}...")
 
@@ -167,5 +233,7 @@ async def get_scores_for(
         )
 
         scores.all_scores.append(parsed_score)
+
+    _cache_scores(cache_key, scores)
 
     return scores

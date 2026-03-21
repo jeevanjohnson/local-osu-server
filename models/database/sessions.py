@@ -10,7 +10,8 @@ from pathlib import Path
 from jays_tools.json_database import MigratableModel
 from pydantic import Field, field_serializer, field_validator
 
-from osuProtocol.server_packets import osuAction, osuGameMode, osuMods
+from models.domain.gameplay import osuGameMode, osuMods
+from osuProtocol.server_packets import osuAction
 
 
 class SessionOsuClientActivityV1(MigratableModel):

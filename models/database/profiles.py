@@ -8,8 +8,9 @@ from pathlib import Path
 from jays_tools.json_database import MigratableModel
 from pydantic import Field
 
+from models.domain.gameplay import osuGameMode
 from osuProtocol.client_web import ScoringAlgorithm
-from osuProtocol.server_packets import osuCountryCode, osuGameMode
+from osuProtocol.server_packets import osuCountryCode
 
 
 class difficultyAdjustedBeatmapConfigV1(MigratableModel):
@@ -25,9 +26,7 @@ class LeaderboardConfigV1(MigratableModel):
     show_lazer_scores_on_leaderboard: bool = Field(default=True)
     truncate_user_names_on_leaderboard: bool = Field(default=False)
 
-
 CurrentLeaderboardConfig = LeaderboardConfigV1
-
 
 class SettingsV1(MigratableModel):
     relax_submission: bool = Field(default=False)
@@ -43,7 +42,7 @@ class SettingsV1(MigratableModel):
         default_factory=CurrentLeaderboardConfig
     )
     scoring_algorithm: ScoringAlgorithm = Field(default=ScoringAlgorithm.LAZER)
-
+    score_v2_shows_lazer_only_leaderboard: bool = Field(default=False)
 
 CurrentSettings = SettingsV1
 

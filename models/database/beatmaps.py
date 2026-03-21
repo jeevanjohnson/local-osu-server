@@ -8,7 +8,7 @@ from jays_tools import MigratableModel
 from pydantic import Field, field_serializer, field_validator
 
 from osuProtocol.client_web import osuMapStatus
-from osuProtocol.server_packets import osuGameMode
+from models.domain.gameplay import osuGameMode
 
 
 class BeatmapV1(MigratableModel):
@@ -28,9 +28,9 @@ class BeatmapV1(MigratableModel):
     osu_file_content: bytes | None = Field(default=None)
     # Just in case something goes wrong with the osu!trainer generated file,
     # we can keep the original one as a backup so replay is still playable.
+
+    # TODO: Should probably only be stored in scores?
     audio_file_content: bytes | None = Field(default=None)
-    # TODO: could take up space quick?
-    # TODO: Compression?
 
     @field_serializer("osu_file_content", "audio_file_content")
     def serialize_binary_fields(self, value: bytes | None) -> str | None:

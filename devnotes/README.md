@@ -2,6 +2,26 @@
 
 This directory contains personal notes I have taken while working on this project.
 
+# 3.21.2026
+- Score Sub
+- - Store score in db
+- - filter no no scores
+- - pp calc
+- GUI
+- - Better folder structure
+- - load plays from replays
+- - load maps from session
+- - - rank/love/approve maps
+- - score assist
+- - top play
+- - resizeable window
+- Friends
+- - Friend Leaderboard
+- - Friends Showing In Game
+- - Gui page for managing friends
+- Replays
+- Figure out why session may randomly die?
+
 # 3.20.2026
 
 - async da requests BUDDY (beatmap cache, songs folder scan (funorage determiner), then fall on remote api)

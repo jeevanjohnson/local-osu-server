@@ -44,4 +44,24 @@ class BeatmapsRepository:
         with self.beatmaps as beatmaps:
             beatmaps.all["by_set_id"][beatmap_set.id] = beatmap_set
 
+            for beatmap in beatmap_set.maps:
+                beatmaps.all["by_id"][beatmap.id] = beatmap
+                beatmaps.all["by_md5"][beatmap.md5] = beatmap
+
+            self.beatmaps.set(beatmaps)
+
+    def delete_beatmap(self, beatmap: Beatmap) -> None:
+        with self.beatmaps as beatmaps:
+            beatmaps.all["by_id"].pop(beatmap.id, None)
+            beatmaps.all["by_md5"].pop(beatmap.md5, None)
+
+            existing_set = beatmaps.all["by_set_id"].get(beatmap.set_id)
+            if existing_set is not None:
+                remaining_maps = [b for b in existing_set.maps if b.md5 != beatmap.md5]
+                if remaining_maps:
+                    existing_set.maps = remaining_maps
+                    beatmaps.all["by_set_id"][beatmap.set_id] = existing_set
+                else:
+                    beatmaps.all["by_set_id"].pop(beatmap.set_id, None)
+
             self.beatmaps.set(beatmaps)
