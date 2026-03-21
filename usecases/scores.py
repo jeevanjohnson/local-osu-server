@@ -21,6 +21,28 @@ from typing import TypedDict, Any
 class ScoresResolver:
     ...
 
+def parse_difficulty_adjustment_settings(mod_settings: dict[str, Any]) -> list[str]:
+    settings = []
+
+    modifications = [
+        ("cs_change", "CS"),
+        ("approach_rate", "AR"),
+        ("drain_rate", "HP"),
+        ("overall_difficulty", "OD"),
+    ]
+
+    for setting_key, setting_prefix in modifications:
+        setting_value = mod_settings.get(setting_key)
+        if setting_value is not None:
+            setting_value_length = len(str(setting_value))
+
+            if setting_value_length > 4:
+                setting_value = round(setting_value, 2)
+
+            settings.append(f"{setting_prefix}{setting_value}")
+
+    return settings
+
 async def get_scores_for(
     beatmap: Beatmap,
     leaderboard_type: LeaderboardType,
@@ -89,25 +111,14 @@ async def get_scores_for(
                             score_mods.append(f"{speed_change}x")
 
                     if mod.acronym == "DA":
-                        cs = mod_settings.get("cs_change")
-                        if cs is not None:
-                            score_mods.append(f"CS{cs}")
-                        ar = mod_settings.get("approach_rate")
-                        if ar is not None:
-                            score_mods.append(f"AR{ar}")
-                        hp = mod_settings.get("drain_rate")
-                        if hp is not None:
-                            score_mods.append(f"HP{hp}")
-                        od = mod_settings.get("overall_difficulty")
-                        if od is not None:
-                            score_mods.append(f"OD{od}")
+                        score_mods.extend(
+                            parse_difficulty_adjustment_settings(mod_settings)
+                        )
 
                 except Exception as e:
                     pprint(f"Error processing mod settings for mod {mod.acronym}: {e}\nMod settings: {mod.settings}")
-                    # score_mods.append(mod.acronym)
             else:
                 score_mods.append(mod.acronym)
-                
 
         perfect = bool(score.is_perfect_combo)
 
@@ -134,7 +145,8 @@ async def get_scores_for(
                 user_id=user.id,
                 time_set=int(score.ended_at.timestamp()),
                 replay_available=score.has_replay,
-                performance_points=pp
+                performance_points=pp,
+                game_mode=game_mode,
             )
         )
 

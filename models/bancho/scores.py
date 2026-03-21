@@ -7,6 +7,7 @@ from pydantic import AliasChoices
 from typing import Annotated
 from osuProtocol.server_packets import osuMods
 from pydantic import field_serializer, field_validator
+from osuProtocol.server_packets import osuGameMode
 
 if TYPE_CHECKING:
     from osuProtocol.client_web import ScoringAlgorithm
@@ -28,6 +29,94 @@ class Mods(list[str]):
 
         return stable_mods, lazer_mods
     
+    def mod_multipler(
+        self, 
+        game_mode: osuGameMode
+    ) -> float:
+        if game_mode == osuGameMode.STANDARD:
+            return self.mod_multiplier_standard()
+        else:
+            print(f"Warning: mod multiplier for game mode {game_mode} not implemented, returning 1.0")
+            return 1.0
+        
+    def mod_multiplier_standard(self) -> float:
+        multiplier = 1.0
+        
+        # Score multiplier mods in lazer
+        # TODO: implement rest of the mods
+        # https://osu.ppy.sh/community/forums/topics/1959149?n=2https://osu.ppy.sh/community/forums/topics/1959149?n=2
+        mod_multipliers = {
+            # Difficulty Reduction
+            "EZ": 0.50,      # Easy
+            "NF": 0.50,      # No Fail
+            "HT": 0.30,      # Half Time
+            "DC": 0.30,      # Daycore
+            # "NR": 0.90,      # No Release (mania only, but multiplier applies)
+
+            # Difficulty Increase
+            "HR": 1.06,      # Hard Rock
+            "SD": 1.00,      # Sudden Death
+            "PF": 1.00,      # Perfect
+            "DT": 1.10,      # Double Time
+            "NC": 1.10,      # Nightcore (same as DT)
+            "FI": 1.00,      # Fade In (mania)
+            "HD": 1.06,      # Hidden
+            "CO": 1.00,      # Cover (mania)
+            "FL": 1.12,      # Flashlight
+            "BL": 1.12,      # Blinds
+            "ST": 1.00,      # Strict Tracking
+            "AC": 1.00,      # Accuracy Challenge
+
+            # Automation
+            "AT": 1.00,      # Autoplay
+            "CN": 1.00,      # Cinema
+            # "RX": 0.10,      # Relax
+            # "AP": 0.10,      # Autopilot
+            "SO": 0.90,      # Spun Out
+
+            # Conversion
+            "TP": 0.10,      # Target Practice
+            "DA": 0.50,      # Difficulty Adjust
+            "CL": 0.96,      # Classic
+            "RD": 1.00,      # Random
+            "MR": 1.00,      # Mirror
+            "AL": 1.00,      # Alternate
+            "SW": 1.00,      # Swap
+            "SG": 1.00,      # Single Tap
+            "IN": 1.00,      # Invert (mania)
+            "CS": 0.90,      # Constant Speed (mania)
+            "HO": 0.90,      # Hold Off (mania)
+            # xK mods (1K, 2K, etc.) have a 1.00x multiplier
+
+            # Fun
+            "TR": 1.00,      # Transform
+            "WG": 1.00,      # Wiggle
+            "SI": 1.00,      # Spin In
+            "GR": 1.00,      # Grow
+            "DF": 1.00,      # Deflate
+            "WU": 0.50,      # Wind Up
+            "WD": 0.50,      # Wind Down
+            "TC": 1.00,      # Traceable
+            "BR": 1.00,      # Barrel Roll
+            "AD": 1.00,      # Approach Different
+            "FF": 1.00,      # Floating Fruits (catch)
+            "MU": 1.00,      # Muted
+            "NS": 1.00,      # No Scope
+            "MG": 0.50,      # Magnetised
+            "RP": 1.00,      # Repel
+            "AS": 0.50,      # Adaptive Speed
+            "FR": 1.00,      # Freeze Frame
+            "BU": 1.00,      # Bubbles
+            "SY": 0.80,      # Synesthesia
+            "DP": 1.00,      # Depth
+        }
+        
+        for mod in self:
+            if mod in mod_multipliers:
+                multiplier *= mod_multipliers[mod]
+        
+        return multiplier
+
 EpochTime = int
 
 class Combo(BaseModel):
@@ -41,6 +130,7 @@ class BaseScore(BaseModel):
     )
 
     score_id: int
+    game_mode: osuGameMode
     username: str
     total_score_value: int = Field(
         validation_alias=AliasChoices("_total_score", "total_score"),
@@ -101,85 +191,16 @@ class BaseScore(BaseModel):
 
         # Apply the 0.96× "Classic" multiplier (always present for imported scores)
         # Then apply any mod multiplier from the original play (DT, HT, etc.)
-        final_score = base_score * 0.96 * self.mod_multiplier
+        final_score = base_score * 0.96 * self.enabled_mods.mod_multipler(self.game_mode)
 
         return round(final_score)
-
-    @property
-    def mod_multiplier(self) -> float:
-        raise NotImplementedError("mod_multiplier should be implemented in subclasses")
 
 class StableScore(BaseScore):
     lazer: Literal[False] = False
 
-    @property
-    def mod_multiplier(self) -> float:
-        """
-        Calculate score multiplier based on enabled mods
-        This is a simplified version - you'll need to adjust based on exact lazer behavior
-        """
-        multiplier = 1.0
-        
-        # Score multiplier mods in lazer
-        mod_multipliers = {
-            "EZ": 0.5,      # Easy
-            "NF": 1.0,      # No Fail (no multiplier)
-            "HT": 0.9,      # Half Time
-            "HR": 1.06,     # Hard Rock
-            "DT": 1.12,     # Double Time
-            "NC": 1.12,     # Nightcore (same as DT)
-            "HD": 1.06,    # Hidden (TODO: Verify this multiplier)
-            "FL": 1.0,      # Flashlight (adds bonus points instead)
-            "SO": 1.0,      # Spun Out
-            "SD": 1.0,      # Sudden Death
-            "PF": 1.0,      # Perfect
-            "RX": 0.0,      # Relax (no score)
-            "AP": 0.0,      # Auto Pilot (no score)
-        }
-        
-        for mod in self.enabled_mods:
-            if mod in mod_multipliers:
-                multiplier *= mod_multipliers[mod]
-        
-        return multiplier
-
 class LazerScore(BaseScore):
     lazer: Literal[True] = True
 
-    @property
-    def mod_multiplier(self) -> float:
-        """
-        Calculate score multiplier based on enabled mods
-        This is a simplified version - you'll need to adjust based on exact lazer behavior
-        """
-        multiplier = 1.0
-        
-        # Score multiplier mods in lazer
-        # https://osu.ppy.sh/community/forums/topics/1959149?n=2https://osu.ppy.sh/community/forums/topics/1959149?n=2
-        mod_multipliers = {
-            "EZ": 0.5,      # Easy
-            "NF": 1.0,      # No Fail (no multiplier)
-            "HT": 0.9,      # Half Time
-            "HR": 1.06,     # Hard Rock
-            "DT": 1.12,     # Double Time
-            "NC": 1.12,     # Nightcore (same as DT)
-            # "HD": 1.06,    # Hidden (TODO: Verify this multiplier)
-            "FL": 1.0,      # Flashlight (adds bonus points instead)
-            "SO": 1.0,      # Spun Out
-            "SD": 1.0,      # Sudden Death
-            "PF": 1.0,      # Perfect
-            "RX": 0.0,      # Relax (no score)
-            "AP": 0.0,      # Auto Pilot (no score)
-            "WU": 0.5,     # Wind Up
-            "WD": 0.5,     # Wind Down
-            "DA": 0.5     # Difficulty Adjust
-        }
-        
-        for mod in self.enabled_mods:
-            if mod in mod_multipliers:
-                multiplier *= mod_multipliers[mod]
-        
-        return multiplier
 
 Score = Annotated[StableScore | LazerScore, Field(discriminator="lazer")]
 
@@ -197,13 +218,13 @@ class Scores(BaseModel):
 
     def sort_by_pp(self) -> None:
         self.all_scores.sort(
-            key=lambda s: s.performance_points or 0, 
+            key=lambda s: (s.performance_points or 0, -s.time_set), 
             reverse=True
         )
 
     def sort_by_score(self):
         self.all_scores.sort(
-            key=lambda s: s.total_score, 
+            key=lambda s: (s.total_score, -s.time_set), 
             reverse=True
         )
     
