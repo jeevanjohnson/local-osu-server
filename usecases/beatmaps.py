@@ -20,6 +20,7 @@ from datetime import datetime
 from osuProtocol.server_packets import osuGameMode
 import re
 import ossapi
+import functools
 
 
 FILENAME_REGEX = re.compile(
@@ -101,10 +102,8 @@ class BeatmapResolver:
         return False
 
     @staticmethod
+    @functools.cache
     def valid_difficulty_adjusted_beatmap_filename(file_name: str) -> bool:
-        if not DIFFICULTY_ADJUSTED_REGEX.search(file_name):
-            return False
-        
         file_name_data = FILENAME_REGEX.search(file_name)
         if not file_name_data:
             return False
@@ -113,9 +112,12 @@ class BeatmapResolver:
         if not difficulty_name:
             return False
 
-        return bool(
-            ATTRIBUTE_EDIT_REGEX.search(difficulty_name)
-        )
+        has_rate_adjust = bool(DIFFICULTY_ADJUSTED_REGEX.search(difficulty_name))
+        has_attribute_adjust = bool(ATTRIBUTE_EDIT_REGEX.search(difficulty_name))
+
+        # Accept either type of adjustment: rate-only (e.g. 0.89x (240bpm))
+        # or explicit stat edits (AR/CS/HP/OD).
+        return has_rate_adjust or has_attribute_adjust
 
     async def get_file_content(self, beatmap_id: int) -> bytes | None:
         url = f'https://osu.ppy.sh/osu/{beatmap_id}'
@@ -291,9 +293,6 @@ class BeatmapResolver:
         if not self.valid_difficulty_adjusted_beatmap_filename(map_filename):
             return None
 
-        if not self.is_difficulty_adjusted_from_filename(map_filename):
-            return None
-
         # Since the beatmap is difficulty adjusted, get og id
         result = self.get_osu_file_from_set_and_filename(
             beatmap_set_id=beatmap_set_id,
@@ -311,6 +310,13 @@ class BeatmapResolver:
 
         if result is None:
             return None
+
+        # Prefer list verification when available, but don't block valid resolved maps.
+        if not self.is_difficulty_adjusted_from_filename(map_filename):
+            print(
+                "Warning: difficulty-adjusted map not found in modified_mp3_list.txt "
+                f"for filename '{map_filename}', continuing via resolved .osu file"
+            )
         
         osu_file_path, osu_file = result
 
