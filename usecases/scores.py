@@ -15,6 +15,8 @@ from repositories.profiles import ProfilesRepository
 from repositories.sessions import SessionRepository
 from usecases.providers import get_ossapi_async
 
+# TODO: 5 min score cache?
+
 
 class ScoresResolver: ...
 

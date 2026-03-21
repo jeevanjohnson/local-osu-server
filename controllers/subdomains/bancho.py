@@ -22,14 +22,14 @@ from osuProtocol.client_packets import (
     Packets,
     Ping,
 )
+from osuProtocol.server_packets import Packet as ServerPacket
+from osuProtocol.server_packets import Packets as ServerPackets
 from osuProtocol.server_packets import (
     PlayerStats,
     osuAction,
     osuGameMode,
     osuMods,
 )
-from osuProtocol.server_packets import Packet as ServerPacket
-from osuProtocol.server_packets import Packets as ServerPackets
 
 bancho = APIRouter()
 

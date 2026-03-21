@@ -1,8 +1,6 @@
 import functools
 import hashlib
-import os
 import re
-import tempfile
 from datetime import datetime
 from pathlib import Path
 
@@ -136,17 +134,7 @@ class BeatmapResolver:
             if not content:
                 return
 
-            fd, temp_path = tempfile.mkstemp(suffix=".osu")
-            os.close(fd)
-
-            try:
-                with open(temp_path, "wb") as temp_file:
-                    temp_file.write(content)
-
-                return OsuFile(temp_path).parse_file()
-            finally:
-                if os.path.exists(temp_path):
-                    os.remove(temp_path)
+            return OsuFile.from_raw(content)
 
     def from_db(
         self, beatmap_md5: str | None = None, beatmap_id: int | None = None
@@ -229,11 +217,10 @@ class BeatmapResolver:
             osu_file_content=osu_file.raw_file,
         )
 
-    def get_osu_file_from_md5(self, beatmap_md5: str) -> tuple[Path, OsuFile] | None:
+    def get_osu_file_from_md5(self, beatmap_md5: str) -> OsuFile | None:
         for osu_file in self.songs_folder.glob("**/*.osu"):
             if hashlib.md5(osu_file.read_bytes()).hexdigest() == beatmap_md5:
-                parsed_osu_file = OsuFile(str(osu_file.absolute())).parse_file()
-                return osu_file, parsed_osu_file
+                return OsuFile.from_path(str(osu_file.absolute()))
 
         return None
 
@@ -241,7 +228,7 @@ class BeatmapResolver:
         self,
         beatmap_set_id: int,
         map_filename: str,
-    ) -> tuple[Path, OsuFile] | None:
+    ) -> OsuFile | None:
         # Fast path: resolve file directly from provided set id + filename.
         for set_folder in self.songs_folder.glob(f"{beatmap_set_id}*"):
             if not set_folder.is_dir():
@@ -251,8 +238,8 @@ class BeatmapResolver:
             if not osu_file.exists():
                 continue
 
-            parsed_osu_file = OsuFile(str(osu_file.absolute())).parse_file()
-            return osu_file, parsed_osu_file
+            parsed_osu_file = OsuFile.from_path(str(osu_file.absolute()))
+            return parsed_osu_file
 
         return None
 
@@ -261,8 +248,7 @@ class BeatmapResolver:
         if osu_file is None:
             return None
 
-        osu_file_parsed = OsuFile(str(osu_file))
-        return osu_file_parsed.beatmap_id
+        return osu_file.beatmap_id
 
     def build_difficulty_adjusted_beatmap(
         self, original_beatmap: Beatmap, difficulty_adjusted_md5: str, osu_file: OsuFile
@@ -328,7 +314,7 @@ class BeatmapResolver:
         )
 
         if result is not None:
-            _, osu_file = result
+            osu_file = result
             # Safety check: if direct path does not match request md5, fallback to full md5 scan.
             if osu_file.md5 != beatmap_md5:
                 result = self.get_osu_file_from_md5(beatmap_md5)
@@ -346,11 +332,22 @@ class BeatmapResolver:
                 f"for filename '{map_filename}', continuing via resolved .osu file"
             )
 
-        _, osu_file = result
+        osu_file = result
 
         original_beatmap = self.from_db(beatmap_id=osu_file.beatmap_id)
         if original_beatmap is None:
-            original_beatmap = await self.from_api_id(beatmap_id=osu_file.beatmap_id)
+            try:
+                original_beatmap = await self.from_api_id(
+                    beatmap_id=osu_file.beatmap_id
+                )
+            except ValueError as e:
+                if "osuMapStatus" in str(e):
+                    print(
+                        f"Irrelevant Status for fetching leaderboards beatmap with md5 {beatmap_md5}"
+                    )
+                    return None
+                else:
+                    raise e
 
         if original_beatmap is None:
             return None

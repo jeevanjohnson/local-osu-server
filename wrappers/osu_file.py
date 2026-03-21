@@ -1,4 +1,6 @@
 import hashlib
+import os
+import tempfile
 from pathlib import Path
 
 from osupyparser import OsuFile as BaseOsuFile
@@ -11,6 +13,23 @@ class OsuFile(BaseOsuFile):
         self.raw_file: bytes | None = None
         super().__init__(file_path)
 
+    @classmethod
+    def from_path(cls, file_path: str) -> "OsuFile":
+        return cls(file_path).parse_file()
+
+    @classmethod
+    def from_raw(cls, raw_file: bytes) -> "OsuFile":
+
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".osu") as tmp_file:
+            tmp_file.write(raw_file)
+            tmp_file_path = tmp_file.name
+
+        parsed_file = cls(tmp_file_path).parse_file()
+
+        os.remove(tmp_file_path)
+
+        return parsed_file
+
     def parse_file(self) -> "OsuFile":
         """Parses sections and set them to class variables."""
 
@@ -22,7 +41,6 @@ class OsuFile(BaseOsuFile):
         self.md5 = hashlib.md5(buffer).digest().hex()
 
         header_line = lines[0]
-        print(f"Parsing osu file with header: {header_line}")
         if not header_line.startswith(OSU_FILE_HEADER):
             # First line should have osu special header.
             raise ValueError(
