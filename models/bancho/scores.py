@@ -113,6 +113,12 @@ class Mods(list[str]):
         
         for mod in self:
             if mod in mod_multipliers:
+                if mod in ["DT", "NC", "HT", "DC"]:
+                    # need to check if rate change so we can skip false multipler
+                    rate_change = [m for m in self if m.endswith("x")]
+                    if rate_change:
+                        continue
+
                 multiplier *= mod_multipliers[mod]
         
         return multiplier

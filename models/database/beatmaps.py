@@ -5,9 +5,6 @@ from pydantic import AfterValidator, Field
 from typing import TypedDict
 from pathlib import Path
 from datetime import datetime
-import ossapi
-from typing import Literal
-from osupyparser import OsuFile
 from typing import Annotated
 
 def is_valid_status_for_saving(status: osuMapStatus) -> osuMapStatus:
@@ -47,69 +44,6 @@ class BeatmapV1(MigratableModel):
             osuMapStatus.RANKED,
             osuMapStatus.APPROVED
         }
-
-    @classmethod
-    def from_osu_file(
-        cls, 
-        osu_file_path: Path | OsuFile,
-        status: osuMapStatus
-    ) -> "BeatmapV1":
-        if isinstance(osu_file_path, Path): 
-            osu_file_content = osu_file_path.read_bytes()
-            osu_file = OsuFile(str(osu_file_path))
-        else:
-            osu_file_content = Path(osu_file_path.__file_path).absolute().read_bytes()
-            osu_file = osu_file_path
-
-
-        return cls(
-            time_inserted=datetime.now(),
-            id=osu_file.beatmap_id,
-            set_id=osu_file.beatmap_set_id,
-            md5=osu_file.md5,
-            artist=osu_file.artist,
-            title=osu_file.title,
-            difficulty_name=osu_file.version,
-            max_combo=osu_file.max_combo,
-            status=status,
-            mode=osuGameMode.from_osu_file(
-                osu_file.mode
-            ),
-            difficulty_adjusted=False,
-            osu_file_content=osu_file_content,
-            audio_file_content=None
-        )
-
-    @classmethod
-    def from_api(
-        cls, 
-        api_beatmap: ossapi.Beatmap,
-        status: osuMapStatus,
-        osu_file_content: bytes
-    ) -> "BeatmapV1":
-        beatmap_set = api_beatmap.beatmapset()
-        
-        assert beatmap_set is not None, "BeatmapSet not found for Beatmap with id {}".format(api_beatmap.id)
-        assert api_beatmap.checksum is not None, "Checksum not found for Beatmap with id {}".format(api_beatmap.id)
-        assert api_beatmap.max_combo is not None, "Max combo not found for Beatmap with id {}".format(api_beatmap.id)
-
-        return cls(
-            time_inserted=datetime.now(),
-            id=api_beatmap.id,
-            set_id=api_beatmap.beatmapset_id,
-            md5=api_beatmap.checksum,
-            artist=beatmap_set.artist,
-            title=beatmap_set.title,
-            difficulty_name=api_beatmap.version,
-            max_combo=api_beatmap.max_combo,
-            status=status,
-            mode=osuGameMode.from_api_v2(
-                api_beatmap.mode
-            ),
-            difficulty_adjusted=False,
-            osu_file_content=osu_file_content,
-            audio_file_content=None
-        )
 
 CurrentBeatmap = BeatmapV1
 

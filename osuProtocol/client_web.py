@@ -132,12 +132,15 @@ class LeaderboardScore:
             # either Rate 1.5x for DT or NC
             # Rate 0.75x for HT
             # Or Rate 1x for all else
-                if "DT" in score.enabled_mods or "NC" in score.enabled_mods:
-                    title += " (1.5x)"
-                elif "HT" in score.enabled_mods or "DC" in score.enabled_mods:
-                    title += " (0.75x)"
-                else:
-                    title += " (1x)"
+            if "DT" in score.enabled_mods or "NC" in score.enabled_mods:
+                title += " (1.5x)"
+            elif "HT" in score.enabled_mods or "DC" in score.enabled_mods:
+                title += " (0.75x)"
+            else:
+                title += " (1x)"
+
+            if not score.lazer or "DA" not in score.enabled_mods:
+                title += " (base diff)"
         
         return cls(
             score_id=score.score_id,
