@@ -23,6 +23,7 @@ CurrentDifficultyAdjustedBeatmapConfig = difficultyAdjustedBeatmapConfigV1
 class LeaderboardConfigV1(MigratableModel):
     leaderboard_score_limit: int = Field(default=50)
     show_lazer_scores_on_leaderboard: bool = Field(default=True)
+    truncate_user_names_on_leaderboard: bool = Field(default=False)
 
 
 CurrentLeaderboardConfig = LeaderboardConfigV1

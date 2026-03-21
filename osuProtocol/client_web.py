@@ -109,6 +109,7 @@ class LeaderboardScore:
         position: int,
         ingame_score: int,
         from_difficulty_adjusted: bool = False,
+        truncate_username: bool = False,
     ) -> "LeaderboardScore":
         stable_mods, lazer_mods = score.enabled_mods.to_stable_mods()
 
@@ -144,8 +145,8 @@ class LeaderboardScore:
             else:
                 title += " (1x)"
 
-            # if not score.lazer or "DA" not in score.enabled_mods:
-            #     title += " (base diff)"
+        if truncate_username and len(title) > 15 + 3:  # 15 chars + 3 for "..."
+            title = title[:15] + "..."  # Truncate username to 20 characters
 
         return cls(
             score_id=score.score_id,

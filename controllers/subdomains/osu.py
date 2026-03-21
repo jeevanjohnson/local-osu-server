@@ -148,6 +148,7 @@ async def get_leaderboard(
             position=index + 1,
             ingame_score=ingame_score,
             from_difficulty_adjusted=beatmap.difficulty_adjusted,
+            truncate_username=profile.settings.leaderboard.truncate_user_names_on_leaderboard,
         )
         leaderboard_scores.append(leaderboard_score)
 

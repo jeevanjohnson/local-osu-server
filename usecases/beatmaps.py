@@ -26,6 +26,26 @@ DIFFICULTY_ADJUSTED_REGEX = re.compile(
 )
 ATTRIBUTE_EDIT_REGEX = re.compile(r"(.*) (HP|CS|AR|OD)([0-9]{1,2}(?:\.[0-9]{1,2})?)")
 
+_BEATMAP_HOT_CACHE_MAX_SIZE = 512
+_beatmap_hot_cache_by_md5: dict[str, Beatmap] = {}
+
+
+def _get_cached_beatmap_by_md5(beatmap_md5: str) -> Beatmap | None:
+    return _beatmap_hot_cache_by_md5.get(beatmap_md5)
+
+
+def _cache_beatmap(beatmap: Beatmap) -> None:
+    # Keep a small FIFO cache to avoid repeated DB/API work for hot maps.
+    if beatmap.md5 in _beatmap_hot_cache_by_md5:
+        _beatmap_hot_cache_by_md5[beatmap.md5] = beatmap
+        return
+
+    if len(_beatmap_hot_cache_by_md5) >= _BEATMAP_HOT_CACHE_MAX_SIZE:
+        oldest_key = next(iter(_beatmap_hot_cache_by_md5))
+        del _beatmap_hot_cache_by_md5[oldest_key]
+
+    _beatmap_hot_cache_by_md5[beatmap.md5] = beatmap
+
 
 class BeatmapResolver:
     def __init__(
@@ -279,23 +299,23 @@ class BeatmapResolver:
         # 5. Build difficulty adjusted beatmap using original beatmap data and osu file from songs folder, then insert to DB and return
         # 6. if its not a difficulty adjusted beatmap, return None?
 
-        # DB Check
-        beatmap = self.from_db(beatmap_md5)
+        # Hot cache check
+        beatmap = _get_cached_beatmap_by_md5(beatmap_md5)
         if beatmap:
             return beatmap
 
+        # DB Check
+        beatmap = self.from_db(beatmap_md5)
+        if beatmap:
+            _cache_beatmap(beatmap)
+            return beatmap
+
         # API Check
-        try:
-            beatmap = await self.from_api_md5(beatmap_md5)
-        except ValueError as e:
-            if "osuMapStatus" in str(e):
-                print(
-                    f"Irrelevant Status for fetching leaderboards beatmap with md5 {beatmap_md5}"
-                )
-                return None
+        beatmap = await self.from_api_md5(beatmap_md5)
 
         if beatmap:
             self.beatmaps_repo.insert_beatmap(beatmap)
+            _cache_beatmap(beatmap)
             return beatmap
 
         # Not found in DB or API, check if its a difficulty adjusted beatmap
@@ -336,18 +356,7 @@ class BeatmapResolver:
 
         original_beatmap = self.from_db(beatmap_id=osu_file.beatmap_id)
         if original_beatmap is None:
-            try:
-                original_beatmap = await self.from_api_id(
-                    beatmap_id=osu_file.beatmap_id
-                )
-            except ValueError as e:
-                if "osuMapStatus" in str(e):
-                    print(
-                        f"Irrelevant Status for fetching leaderboards beatmap with md5 {beatmap_md5}"
-                    )
-                    return None
-                else:
-                    raise e
+            original_beatmap = await self.from_api_id(beatmap_id=osu_file.beatmap_id)
 
         if original_beatmap is None:
             return None
@@ -356,6 +365,7 @@ class BeatmapResolver:
             original_beatmap, beatmap_md5, osu_file
         )
         self.beatmaps_repo.insert_beatmap(difficulty_adjusted_beatmap)
+        _cache_beatmap(difficulty_adjusted_beatmap)
         return difficulty_adjusted_beatmap
 
 
