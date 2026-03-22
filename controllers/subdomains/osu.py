@@ -240,7 +240,7 @@ async def osuSubmitModularSelector(
     # build score object
     score_id = usecases.scores.generate_score_id()
 
-    replay = ReplayFile.from_bytes(await replay_file.read())
+    replay = ReplayFile.from_bytes(await replay_file.read(), pure_lzma=True)
 
     score = Score.from_score_submission(
         score_id=score_id,
