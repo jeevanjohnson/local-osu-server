@@ -752,37 +752,42 @@ class BeatmapResolver:
         else:
             _debug(f"Hot cache miss md5={beatmap_md5}")
 
-        # Practice/unsubmitted map check: beatmap_id == 0 means local-only
-        osu_file = self.get_osu_file_from_set_and_filename(
-            beatmap_set_id=beatmap_set_id,
-            map_filename=map_filename,
-        )
-        if osu_file is None:
-            osu_file = self.get_osu_file_from_md5(beatmap_md5)
-
-        if osu_file is not None and osu_file.beatmap_id == 0:
-            _debug(
-                f"Detected practice/unsubmitted map beatmap_id=0 md5={beatmap_md5}, building from local .osu metadata"
-            )
-            self._schedule_persist_osu_file(beatmap_md5, osu_file)
-            self._schedule_audio_warmup(beatmap_md5, osu_file)
-
-            practice_beatmap = self.build_beatmap_from_local_osu_file(
-                beatmap_md5=beatmap_md5,
+        if not self.current_settings.ignore_beatmap_updates:
+            # Practice/unsubmitted map check: beatmap_id == 0 means local-only
+            osu_file = self.get_osu_file_from_set_and_filename(
                 beatmap_set_id=beatmap_set_id,
-                osu_file=osu_file,
+                map_filename=map_filename,
             )
-            # Try to insert into DB; if already exists, just return it
-            try:
-                await self.beatmaps_repo.insert_beatmap(practice_beatmap)
-            except Exception:
-                pass
+            if osu_file is None:
+                osu_file = self.get_osu_file_from_md5(beatmap_md5)
 
-            _cache_beatmap(practice_beatmap)
+            if osu_file is not None and osu_file.beatmap_id == 0:
+                _debug(
+                    f"Detected practice/unsubmitted map beatmap_id=0 md5={beatmap_md5}, building from local .osu metadata"
+                )
+                self._schedule_persist_osu_file(beatmap_md5, osu_file)
+                self._schedule_audio_warmup(beatmap_md5, osu_file)
+
+                practice_beatmap = self.build_beatmap_from_local_osu_file(
+                    beatmap_md5=beatmap_md5,
+                    beatmap_set_id=beatmap_set_id,
+                    osu_file=osu_file,
+                )
+                # Try to insert into DB; if already exists, just return it
+                try:
+                    await self.beatmaps_repo.insert_beatmap(practice_beatmap)
+                except Exception:
+                    pass
+
+                _cache_beatmap(practice_beatmap)
+                _debug(
+                    f"Loaded local practice/unsubmitted beatmap md5={beatmap_md5} (beatmap_id=0)"
+                )
+                return practice_beatmap
+        else:
             _debug(
-                f"Loaded local practice/unsubmitted beatmap md5={beatmap_md5} (beatmap_id=0)"
+                f"Fast beatmap resolve enabled; skipping local practice/unsubmitted check md5={beatmap_md5}"
             )
-            return practice_beatmap
 
         # DB Check
         beatmap = await self.from_db(beatmap_md5)
@@ -818,6 +823,12 @@ class BeatmapResolver:
         _debug(
             f"API md5 path failed md5={beatmap_md5}, trying difficulty-adjusted resolution"
         )
+
+        if self.current_settings.ignore_beatmap_updates:
+            _debug(
+                f"Fast beatmap resolve enabled; skipping difficulty-adjusted fallback md5={beatmap_md5}"
+            )
+            return None
 
         # Not found in DB or API, check if its a difficulty adjusted beatmap
 

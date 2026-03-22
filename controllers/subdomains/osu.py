@@ -116,11 +116,16 @@ async def get_leaderboard(
         return Response(
              OsuErrors.NON.value.encode(),
          )
-
+    
     if beatmap is None:
-        session.latest_beatmap = None
-        await usecases.sessions.update_current_session(session)
-        return Response(UPDATE_BEATMAP_REQUEST_LEADERBOARD)
+        if not profile.settings.ignore_beatmap_updates:
+            session.latest_beatmap = None
+            await usecases.sessions.update_current_session(session)
+            return Response(UPDATE_BEATMAP_REQUEST_LEADERBOARD)
+        else:
+            session.latest_beatmap = None
+            await usecases.sessions.update_current_session(session)
+            return Response(GRAVEYARD_LEADERBOARD)
     
     if beatmap.id == 0:
         # practice/unsubmitted map, just return empty leaderboard but save the beatmap info in the session so it can be used for score submission

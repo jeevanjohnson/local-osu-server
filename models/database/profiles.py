@@ -43,6 +43,7 @@ class SettingsV1(MigratableModel):
     )
     scoring_algorithm: ScoringAlgorithm = Field(default=ScoringAlgorithm.LAZER)
     score_v2_shows_lazer_only_leaderboard: bool = Field(default=False)
+    ignore_beatmap_updates: bool = Field(default=False)
 
 CurrentSettings = SettingsV1
 
