@@ -3,7 +3,7 @@ from enum import IntEnum, unique
 
 import ossapi.enums
 
-from models.bancho.scores import LazerScore, Score
+from models.bancho.scores import LazerScore, Score, StableScore
 from models.domain.gameplay import osuMods
 
 
@@ -20,6 +20,14 @@ class osuMapStatus(IntEnum):
     APPROVED = 3
     QUALIFIED = 4
     LOVED = 5
+
+    def has_leaderboard(self) -> bool:
+        return self in {
+            osuMapStatus.RANKED, 
+            osuMapStatus.APPROVED, 
+            osuMapStatus.QUALIFIED, 
+            osuMapStatus.LOVED
+        }
 
     @classmethod
     def from_api_v2(cls, ranked_status: ossapi.enums.RankStatus) -> "osuMapStatus":
@@ -112,6 +120,7 @@ class LeaderboardScore:
         truncate_username: bool = False,
     ) -> "LeaderboardScore":
         stable_mods, lazer_mods = score.enabled_mods.to_stable_mods()
+        has_lazer_rate_change = any(m.endswith("x") for m in lazer_mods)
 
         if isinstance(score, LazerScore):
             title = f"[LAZER] {score.username}"
@@ -135,6 +144,9 @@ class LeaderboardScore:
                             & ~osuMods.NIGHTCORE
                         )
 
+                        if float(lazer_mod[:-1]) < 1.0:
+                            lazer_mod = lazer_mod.replace("0.", ".", count=1)
+
                     if i == total_lazer_mods - 1:
                         title += lazer_mod
                     else:
@@ -148,12 +160,21 @@ class LeaderboardScore:
             # https://capitalizemytitle.com/small-text-converter/
             title = f"[ᵒᵍ ᵈⁱᶠᶠ] {title}"
 
-            if "DT" in score.enabled_mods or "NC" in score.enabled_mods:
-                title += " (1.5x)"
-            elif "HT" in score.enabled_mods or "DC" in score.enabled_mods:
-                title += " (0.75x)"
+            if isinstance(score, StableScore):
+                if "DT" in score.enabled_mods or "NC" in score.enabled_mods:
+                    title += " (1.5x)"
+                elif "HT" in score.enabled_mods or "DC" in score.enabled_mods:
+                    title += " (.75x)"
+                else:
+                    title += " (1x)"
             else:
-                title += " (1x)"
+                if not has_lazer_rate_change:
+                    if "DT" in score.enabled_mods or "NC" in score.enabled_mods:
+                        title += " (1.5x)"
+                    elif "HT" in score.enabled_mods or "DC" in score.enabled_mods:
+                        title += " (.75x)"
+                    else:
+                        title += " (1x)"
 
         if truncate_username and len(title) > 15 + 3:  # 15 chars + 3 for "..."
             title = title[:15] + "..."  # Truncate username to 20 characters
@@ -259,7 +280,7 @@ class Leaderboard:
         return bytes(buffer)
 
 
-class GraveyardLeaderboard(Leaderboard):
+class _GraveyardLeaderboard(Leaderboard):
     """
     Represents a leaderboard for beatmaps that are in the graveyard.
     """
@@ -277,21 +298,39 @@ class GraveyardLeaderboard(Leaderboard):
             [],
         )
 
+GRAVEYARD_LEADERBOARD = _GraveyardLeaderboard().serialize()
 
-# class UpdatedBeatmapLeaderboard(Leaderboard):
-#     """
-#     Represents a leaderboard for beatmaps that have been updated.
-#     """
-#     def __init__(self, beatmap_id: int, beatmap_set_id: int, artist: str, title: str):
-#         super().__init__(LeaderboardHeader(
-#             beatmap_status=osuMapStatus.UPDATEAVALIABLE,
-#             beatmap_id=beatmap_id,
-#             beatmap_set_id=beatmap_set_id,
-#             num_of_scores=0,
-#             artist=artist,
-#             title=title
-#         ), [])
+class _UpdateBeatmapRequestLeaderboard(Leaderboard):
+    """
+    Represents a leaderboard for beatmaps that have been updated.
+    """
+    def __init__(self):
+        super().__init__(LeaderboardHeader(
+            beatmap_status=osuMapStatus.UPDATEAVALIABLE,
+            beatmap_id=0,
+            beatmap_set_id=0,
+            num_of_scores=0,
+            artist="",
+            title=""
+        ), [])
 
+UPDATE_BEATMAP_REQUEST_LEADERBOARD = _UpdateBeatmapRequestLeaderboard().serialize()
+
+class _NotSubmittedLeaderboard(Leaderboard):
+    """
+    Represents a leaderboard for beatmaps that have not been submitted.
+    """
+    def __init__(self):
+        super().__init__(LeaderboardHeader(
+            beatmap_status=osuMapStatus.NOTSUBMITTED,
+            beatmap_id=0,
+            beatmap_set_id=0,
+            num_of_scores=0,
+            artist="",
+            title=""
+        ), [])
+
+NOT_SUBMITTED_LEADERBOARD = _NotSubmittedLeaderboard().serialize()
 
 class ScoringAlgorithm(IntEnum):
     LAZER = 0

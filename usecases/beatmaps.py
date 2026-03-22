@@ -340,27 +340,6 @@ class BeatmapResolver:
         # Implementation for finding audio file in songs folder
         pass
 
-    # async def get_file_content(self, beatmap_id: int) -> OsuFile | None:
-    #     url = f"https://osu.ppy.sh/osu/{beatmap_id}"
-    #     http_session = self._get_http_session()
-    #     _debug(f"Downloading .osu content from api for beatmap_id={beatmap_id}")
-
-    #     async with http_session.get(url) as response:
-    #         if not response or response.status != 200:
-    #             _debug(
-    #                 f"Failed downloading .osu for beatmap_id={beatmap_id}, status={getattr(response, 'status', None)}"
-    #             )
-    #             return
-
-    #         content = await response.content.read()
-
-    #         if not content:
-    #             _debug(f"Empty .osu content received for beatmap_id={beatmap_id}")
-    #             return
-
-    #         _debug(f"Downloaded .osu content for beatmap_id={beatmap_id}")
-    #         return OsuFile.from_raw(content)
-
     @app_logger.log(msg="beatmap resolver from db")
     async def from_db(
         self, beatmap_md5: str | None = None, beatmap_id: int | None = None
@@ -702,6 +681,47 @@ class BeatmapResolver:
             difficulty_adjusted=True,
         )
 
+    @staticmethod
+    @app_logger.log(msg="beatmap resolver build from local osu file")
+    def build_beatmap_from_local_osu_file(
+        beatmap_md5: str,
+        beatmap_set_id: int,
+        osu_file: OsuFile,
+    ) -> Beatmap:
+        """Build a beatmap model from local .osu file metadata.
+        Used for practice/unsubmitted diffs (beatmap_id == 0) that don't exist on bancho.
+        Uses PENDING status as default for local-only maps.
+        """
+        # Extract metadata from osu file (may use dynamic attributes)
+        artist = getattr(osu_file, "artist", "Unknown")
+        if not artist:
+            artist = "Unknown"
+        
+        title = getattr(osu_file, "title", "Unknown")
+        if not title:
+            title = "Unknown"
+        
+        version = getattr(osu_file, "version", "Unknown")
+        if not version:
+            version = "Unknown"
+        
+        max_combo = getattr(osu_file, "max_combo", 0) or 0
+        beatmap_id = getattr(osu_file, "beatmap_id", 0) or 0
+        
+        return Beatmap(
+            time_inserted=datetime.now(),
+            id=beatmap_id,
+            set_id=beatmap_set_id,
+            md5=beatmap_md5,
+            artist=artist,
+            title=title,
+            difficulty_name=version,
+            max_combo=max_combo,
+            status=osuMapStatus.PENDING,
+            mode=osuGameMode.STANDARD,
+            difficulty_adjusted=False,
+        )
+
     @app_logger.log(msg="beatmap resolver from leaderboard request")
     async def from_leaderboard_request(
         self, beatmap_md5: str, beatmap_set_id: int, map_filename: str
@@ -731,6 +751,38 @@ class BeatmapResolver:
                 return beatmap
         else:
             _debug(f"Hot cache miss md5={beatmap_md5}")
+
+        # Practice/unsubmitted map check: beatmap_id == 0 means local-only
+        osu_file = self.get_osu_file_from_set_and_filename(
+            beatmap_set_id=beatmap_set_id,
+            map_filename=map_filename,
+        )
+        if osu_file is None:
+            osu_file = self.get_osu_file_from_md5(beatmap_md5)
+
+        if osu_file is not None and osu_file.beatmap_id == 0:
+            _debug(
+                f"Detected practice/unsubmitted map beatmap_id=0 md5={beatmap_md5}, building from local .osu metadata"
+            )
+            self._schedule_persist_osu_file(beatmap_md5, osu_file)
+            self._schedule_audio_warmup(beatmap_md5, osu_file)
+
+            practice_beatmap = self.build_beatmap_from_local_osu_file(
+                beatmap_md5=beatmap_md5,
+                beatmap_set_id=beatmap_set_id,
+                osu_file=osu_file,
+            )
+            # Try to insert into DB; if already exists, just return it
+            try:
+                await self.beatmaps_repo.insert_beatmap(practice_beatmap)
+            except Exception:
+                pass
+
+            _cache_beatmap(practice_beatmap)
+            _debug(
+                f"Loaded local practice/unsubmitted beatmap md5={beatmap_md5} (beatmap_id=0)"
+            )
+            return practice_beatmap
 
         # DB Check
         beatmap = await self.from_db(beatmap_md5)
@@ -770,14 +822,10 @@ class BeatmapResolver:
         # Not found in DB or API, check if its a difficulty adjusted beatmap
 
         # Difficulty Adjusted Check
-        if not self.current_settings.difficulty_adjusted_beatmaps.sync_rank_status_with_bancho:
-            _debug("Difficulty-adjusted sync disabled, aborting resolution")
-            return None
-
-        if not self.valid_difficulty_adjusted_beatmap_filename(map_filename):
-            _debug(
-                f"Filename did not match difficulty-adjusted pattern filename={map_filename}"
-            )
+        if (
+            not self.current_settings.difficulty_adjusted_beatmaps.sync_rank_status_with_bancho or
+            not self.valid_difficulty_adjusted_beatmap_filename(map_filename)
+        ):
             return None
 
         # Since the beatmap is difficulty adjusted, get og id

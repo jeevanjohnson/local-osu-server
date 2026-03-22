@@ -32,7 +32,9 @@ from constants import SEASONAL_BG_GIT_URL
 from models.database.sessions import CurrentSessionBeatmapInfo as SessionBeatmapInfo
 from models.domain.gameplay import osuGameMode, osuMods
 from osuProtocol.client_web import (
-    GraveyardLeaderboard,
+    GRAVEYARD_LEADERBOARD,
+    UPDATE_BEATMAP_REQUEST_LEADERBOARD,
+    NOT_SUBMITTED_LEADERBOARD,
     Leaderboard,
     LeaderboardHeader,
     LeaderboardScore,
@@ -86,8 +88,8 @@ async def get_leaderboard(
     map_filename = urlparse.unquote(map_filename)
 
     if session.songs_folder is None:
-        await usecases.sessions.notify_client(
-            "Failed to retrieve songs folder. Session data may be corrupted, please relog."
+        await usecases.sessions.restart_client(
+            "Failed to retrieve songs folder. Relogging"
         )
         return Response(
             OsuErrors.NON.value.encode(),
@@ -118,8 +120,13 @@ async def get_leaderboard(
     if beatmap is None:
         session.latest_beatmap = None
         await usecases.sessions.update_current_session(session)
-
-        return Response(GraveyardLeaderboard().serialize())
+        return Response(UPDATE_BEATMAP_REQUEST_LEADERBOARD)
+    
+    if beatmap.id == 0:
+        # practice/unsubmitted map, just return empty leaderboard but save the beatmap info in the session so it can be used for score submission
+        session.latest_beatmap = None
+        await usecases.sessions.update_current_session(session)
+        return Response(NOT_SUBMITTED_LEADERBOARD)
 
     session.latest_beatmap = SessionBeatmapInfo(
         id=beatmap.id,
@@ -128,6 +135,9 @@ async def get_leaderboard(
     )
 
     await usecases.sessions.update_current_session(session)
+
+    if not beatmap.status.has_leaderboard():
+        return Response(GRAVEYARD_LEADERBOARD)
 
     mods = osuMods(mods_arg)
 
@@ -186,6 +196,20 @@ async def get_leaderboard(
 
     return Response(content=leaderboard.serialize())
 
+@osu.get("/web/maps/{map_filename}")
+@app_logger.log(msg="router osu get map file")
+async def get_map_file(
+    request: Request,
+    map_filename: str,
+    host: str = Header(...),
+):
+    raw_path: str = request["raw_path"].decode()
+    raw_path = raw_path.removeprefix('/osu')
+
+    return RedirectResponse(
+        url=f"https://osu.ppy.sh{raw_path}",
+        status_code=status.HTTP_301_MOVED_PERMANENTLY,
+    )
 
 @osu.post("/web/osu-submit-modular-selector.php")
 @app_logger.log(msg="router osu submit modular selector")
@@ -213,8 +237,8 @@ async def osuSubmitModularSelector(
     session: Session = Depends(retrive_session(OsuErrors.NON)),
 ):
     if session.songs_folder is None:
-        await usecases.sessions.notify_client(
-            "Failed to retrieve songs folder. Session data may be corrupted, please relog."
+        await usecases.sessions.restart_client(
+            "Failed to retrieve songs folder. Relogging."
         )
         return Response(
             OsuErrors.NON.value.encode(),
