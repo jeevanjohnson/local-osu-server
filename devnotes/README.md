@@ -3,11 +3,11 @@
 This directory contains personal notes I have taken while working on this project.
 
 # 3.21.2026
-- Score Sub
+1. Score Sub
 - - Store score in db
 - - filter no no scores
 - - pp calc
-- GUI
+2. GUI
 - - Better folder structure
 - - load plays from replays
 - - load maps from session
@@ -15,11 +15,14 @@ This directory contains personal notes I have taken while working on this projec
 - - score assist
 - - top play
 - - resizeable window
-- Friends
+3. Logging
+- Wrote a custom log library that can log errors with different levels, save them to a file, and optionally bypass them without crashing the app. This will help with debugging and understanding issues that users may encounter.
+4. Friends
 - - Friend Leaderboard
 - - Friends Showing In Game
 - - Gui page for managing friends
-- Replays
+5. Replays
+- - Both ours and other's & manual redirect of lazer score osu page thing
 - Figure out why session may randomly die?
 
 # 3.20.2026

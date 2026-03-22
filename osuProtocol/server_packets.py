@@ -357,6 +357,48 @@ class osuMods(IntFlag):
     SCOREV2 = 1 << 29
     MIRROR = 1 << 30
 
+    def to_acronym_list(self) -> list[str]:
+        acronym_mapping = {
+            self.DOUBLETIME: "DT",
+            self.NIGHTCORE: "NC",
+            self.HARDROCK: "HR",
+            self.HIDDEN: "HD",
+            self.FLASHLIGHT: "FL",
+            self.EASY: "EZ",
+            self.NOFAIL: "NF",
+            self.SUDDENDEATH: "SD",
+            self.TOUCHSCREEN: "TD",
+            self.RELAX: "RX",
+            self.HALFTIME: "HT",
+            self.AUTOPLAY: "AU",
+            self.SPUNOUT: "SO",
+            self.AUTOPILOT: "AP",
+            self.PERFECT: "PF",
+            self.KEY4: "4K",
+            self.KEY5: "5K",
+            self.KEY6: "6K",
+            self.KEY7: "7K",
+            self.KEY8: "8K",
+            self.FADEIN: "FI",
+            self.RANDOM: "RN",
+            self.CINEMA: "CM",
+            self.TARGET: "TP",
+            self.KEY9: "9K",
+            self.KEYCOOP: "COOP",
+            self.KEY1: "1K",
+            self.KEY3: "3K",
+            self.KEY2: "2K",
+            self.SCOREV2: "SV2",
+            self.MIRROR: "MR",
+        }
+
+        acronyms = []
+        for mod in osuMods:
+            if mod != osuMods.NOMOD and (self & mod) == mod:
+                acronyms.append(acronym_mapping[mod])
+
+        return acronyms
+
     @classmethod
     def from_acronym(cls, acronym: str) -> "osuMods":
         try:

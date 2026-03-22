@@ -9,7 +9,7 @@ from typing import Any, Callable, Coroutine, Literal, TypeVar
 from fastapi import APIRouter, Header, Request, Response
 
 import osuProtocol.server_packets
-import usecases.bancho
+import usecases.cho
 import usecases.beatmaps
 import usecases.gui
 import usecases.profiles
@@ -53,7 +53,7 @@ async def client_request_handler(
                 headers={"cho-token": "not-logged-in-gui"},
             )
 
-        login_data = usecases.bancho.parse_login_data(await request.body())
+        login_data = usecases.cho.parse_login_data(await request.body())
 
         session = usecases.sessions.get_current_session()
         if session is None:

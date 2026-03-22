@@ -6,12 +6,13 @@ Purpose/Domain/Concept:
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, Response
 
 from constants import DATA_FOLDER
+from controllers.dependencies import ClientResponseException
 from controllers.subdomains.assets import assets
 from controllers.subdomains.avatar import avatar
-from controllers.subdomains.bancho import bancho
+from controllers.subdomains.cho import bancho
 from controllers.subdomains.beatmaps import beatmaps
 from controllers.subdomains.osu import osu
 from controllers.subdomains.resources import resources
@@ -30,6 +31,15 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
+
+
+@app.exception_handler(ClientResponseException)
+async def client_response_exception_handler(
+    _request: Request,
+    exc: ClientResponseException,
+) -> Response:
+    return Response(content=exc.content, status_code=exc.status_code)
+
 
 app.include_router(assets)
 app.include_router(beatmaps)

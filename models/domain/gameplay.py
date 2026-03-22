@@ -1,3 +1,5 @@
+from typing import Any
+
 from osuProtocol.server_packets import osuGameMode, osuMods
 
 LAZER_MODS = list[str]
@@ -5,6 +7,22 @@ LAZER_MODS = list[str]
 
 class Mods(list[str]):
     """A list of mods, represented as short names, e.g. ['HD', 'HR', 'DT']."""
+
+    @classmethod
+    def from_stable_mods(
+        cls, stable_mods: osuMods, lazer_mods: LAZER_MODS | None = None
+    ) -> "Mods":
+        mods = stable_mods.to_acronym_list()
+
+        if lazer_mods:
+            mods.extend(lazer_mods)
+
+        return cls(mods)
+
+    @classmethod
+    def from_score_submission(cls, mods: int) -> "Mods":
+        stable_mods = osuMods(mods)
+        return cls.from_stable_mods(stable_mods, None)
 
     def approximate_score_multiplier(self, rate: float) -> float:
         # Known (rate, multiplier) points.
@@ -109,14 +127,15 @@ class Mods(list[str]):
             "DP": 1.00,
         }
 
+        rate_change = [m for m in self if m.endswith("x")]
+
         for mod in self:
             if mod in mod_multipliers:
-                if mod in ["DT", "NC", "HT", "DC"]:
-                    rate_change = [m for m in self if m.endswith("x")]
-                    if rate_change:
-                        continue
-
-                multiplier *= mod_multipliers[mod]
+                if mod in ["DT", "NC", "HT", "DC"] and rate_change:
+                    # Ignore DT/NC/HT/DC if there's a rate change mod, since the rate change mod will handle the multiplier for those mods
+                    continue
+                else:
+                    multiplier *= mod_multipliers[mod]
             elif mod.endswith("x"):
                 rate = float(mod[:-1])
                 multiplier *= self.approximate_score_multiplier(rate)

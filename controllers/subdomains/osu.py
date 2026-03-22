@@ -1,13 +1,32 @@
 import json
 import urllib.parse as urlparse
 
-from fastapi import APIRouter, Query, Response, status
+from fastapi import (
+    APIRouter,
+    Query,
+    Response,
+    status,
+    Header,
+    Form,
+    File,
+    Request,
+    Depends,
+)
 from fastapi.responses import RedirectResponse
+import usecases.scores
 
+from models.database.profiles import CurrentProfile as Profile
+from models.database.sessions import (
+    CurrentSession as Session,
+)
+from models.database.scores import (
+    CurrentScore as Score,
+)
 import usecases.beatmaps
 import usecases.profiles
-import usecases.scores
+import usecases.bancho_scores
 import usecases.sessions
+import usecases.score_submission
 from constants import SEASONAL_BG_GIT_URL
 from models.database.sessions import CurrentSessionBeatmapInfo as SessionBeatmapInfo
 from models.domain.gameplay import osuGameMode, osuMods
@@ -19,12 +38,12 @@ from osuProtocol.client_web import (
     LeaderboardType,
     ScoringAlgorithm,
 )
+from controllers.dependencies import retrive_profile, retrive_session, OsuErrors
+from osupyparser.osr.osr_parser import ReplayFile
 
 osu = APIRouter(
     prefix="/osu",
 )
-
-NULL_RESPONSE = Response(b"error: no")
 
 
 # osu is weird for this
@@ -56,19 +75,18 @@ async def get_leaderboard(
     mods_arg: int = Query(..., alias="mods"),
     map_package_hash: str = Query(..., alias="h"),
     aqn_files_found: bool = Query(..., alias="a"),
+    profile: Profile = Depends(retrive_profile(OsuErrors.NON)),
+    session: Session = Depends(retrive_session(OsuErrors.NON)),
 ):
     map_filename = urlparse.unquote(map_filename)
 
-    session = usecases.sessions.get_current_session()
-    if session is None:
-        return NULL_RESPONSE
-
-    profile = usecases.profiles.get_profile(session.profile_name)
-    if profile is None:
-        return NULL_RESPONSE
-
     if session.songs_folder is None:
-        return NULL_RESPONSE  # TODO: should never happen, so something is up with architecture if it does.
+        usecases.sessions.notify_client(
+            "Failed to retrieve songs folder. Session data may be corrupted, please relog."
+        )
+        return Response(
+            OsuErrors.NON.value.encode(),
+        )
 
     leaderboard_type = LeaderboardType(leaderboard_type)
     mode_arg = osuGameMode(mode_arg)
@@ -106,7 +124,7 @@ async def get_leaderboard(
     else:
         stable_only = True
 
-    scores = await usecases.scores.get_scores_for(
+    scores = await usecases.bancho_scores.get_scores_for(
         beatmap=beatmap,
         leaderboard_type=leaderboard_type,
         game_mode=mode_arg,
@@ -155,3 +173,81 @@ async def get_leaderboard(
     leaderboard.scores = leaderboard_scores
 
     return Response(content=leaderboard.serialize())
+
+
+@osu.post("/web/osu-submit-modular-selector.php")
+async def osuSubmitModularSelector(
+    request: Request,
+    # TODO: should token be allowed
+    # through but ac'd if not found?
+    # TODO: validate token format
+    # TODO: save token in the database
+    token: str = Header(...),
+    # TODO: do ft & st contain pauses?
+    exited_out: bool = Form(..., alias="x"),
+    fail_time: int = Form(..., alias="ft"),
+    visual_settings_b64: bytes = Form(..., alias="fs"),
+    updated_beatmap_hash: str = Form(..., alias="bmk"),
+    storyboard_md5: str | None = Form(None, alias="sbk"),
+    iv_b64: bytes = Form(..., alias="iv"),
+    unique_ids: str = Form(..., alias="c1"),
+    score_time: int = Form(..., alias="st"),
+    pw_md5: str = Form(..., alias="pass"),
+    osu_version: str = Form(..., alias="osuver"),
+    client_hash_b64: bytes = Form(..., alias="s"),
+    fl_cheat_screenshot: bytes | None = File(None, alias="i"),
+    profile: Profile = Depends(retrive_profile(OsuErrors.NON)),
+    session: Session = Depends(retrive_session(OsuErrors.NON)),
+):
+    if session.songs_folder is None:
+        usecases.sessions.notify_client(
+            "Failed to retrieve songs folder. Session data may be corrupted, please relog."
+        )
+        return Response(
+            OsuErrors.NON.value.encode(),
+        )
+
+    score_parameters = usecases.score_submission.parse_form_data(
+        await request.form(),
+    )
+
+    if score_parameters is None:
+        return Response(b"")
+
+    score_data_b64, replay_file = score_parameters
+
+    score_data, client_hash_decoded = usecases.score_submission.decrypt_score_aes_data(
+        score_data_b64=score_data_b64,
+        client_hash_b64=client_hash_b64,
+        iv_b64=iv_b64,
+        osu_version=osu_version,
+    )
+
+    beatmap = await usecases.beatmaps.from_score_submission_request(
+        beatmap_md5=score_data.beatmap_md5,
+        songs_folder=session.songs_folder,
+        current_settings=profile.settings,
+    )
+
+    if beatmap is None:
+        usecases.sessions.notify_client(
+            "Failed to find beatmap for submitted score. Score may not have been saved, please relog and try again."
+        )
+        return Response(
+            OsuErrors.BEATMAP.value.encode(),
+        )
+
+    # build score object
+    score_id = usecases.scores.generate_score_id()
+
+    replay = ReplayFile.from_bytes(await replay_file.read())
+
+    score = Score.from_score_submission(
+        score_id=score_id,
+        score_data=score_data,
+        replay_file=replay,
+        map_file=beatmap.file,
+        beatmap_md5=beatmap.md5,
+    )
+
+    # TODO: FINISH SCORE SUB 

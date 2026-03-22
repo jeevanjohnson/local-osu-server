@@ -22,4 +22,7 @@ SERVER_SETTINGS_FILE = (
 BEATMAPS_FILE = (
     DATA_FOLDER / "beatmaps.json"
 )  # The file where beatmap information & cache will be stored
+SCORES_FILE = (
+    DATA_FOLDER / "scores.json"
+)  # The file where submitted scores will be stored before being processed
 SEASONAL_BG_GIT_URL = "https://raw.githubusercontent.com/jeevanjohnson/local-osu-server/refs/heads/2026/resources/seasonal_bg.png"

@@ -125,6 +125,16 @@ class LeaderboardScore:
                     if lazer_mod == "DA":
                         continue
 
+                    if lazer_mod.endswith("x"):  # Rate change
+                        # remove any rate changing mod
+                        # so more space can be given to lazer-exclusive mods in the title
+                        stable_mods = (
+                            stable_mods
+                            & ~osuMods.DOUBLETIME
+                            & ~osuMods.HALFTIME
+                            & ~osuMods.NIGHTCORE
+                        )
+
                     if i == total_lazer_mods - 1:
                         title += lazer_mod
                     else:

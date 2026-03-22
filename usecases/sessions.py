@@ -15,6 +15,7 @@ from osuProtocol.server_packets import (
     Packet,
     Packets,
     PlayerStats,
+    Notification,
 )
 from repositories.server_settings import ServerSettingsRepository
 from repositories.sessions import SessionRepository
@@ -96,6 +97,22 @@ def update_current_session(session: Session, update_client: bool = False) -> Non
 
     return
 
+def notify_client(
+    message: str,
+) -> None:
+    session = get_current_session()
+    if session is None:
+        print(
+            "Attempted to notify client but no active session was found. Message was: "
+            + message
+        )
+        return
+
+    session.packet_queue += Notification(message).build()
+
+    update_current_session(session)
+
+    return
 
 # TODO: Log decorator that catches and logs errors and neatly formats them with json so when dev ask
 # for logs its easily readable and replicatable.

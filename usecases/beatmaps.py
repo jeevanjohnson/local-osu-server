@@ -35,6 +35,13 @@ _NON_EXPIRING_STATUSES = {
     osuMapStatus.LOVED,
 }
 _UNSTABLE_MAP_TTL = timedelta(minutes=30)
+_BEATMAP_DEBUG = True
+# os.getenv("LOS_BEATMAP_DEBUG", "1") == "1"
+
+
+def _debug(msg: str) -> None:
+    if _BEATMAP_DEBUG:
+        print(f"[beatmap-resolver] {msg}")
 
 
 def _get_cached_beatmap_by_md5(beatmap_md5: str) -> Beatmap | None:
@@ -91,7 +98,7 @@ class BeatmapResolver:
     def build_from_bmap_api(
         api_beatmap: ossapi.Beatmap,
         status: osuMapStatus,
-        osu_file_content: bytes | None,
+        osu_file: OsuFile,
         beatmap_set: ossapi.Beatmapset | ossapi.BeatmapsetCompact | None = None,
     ) -> Beatmap:
         if beatmap_set is None:
@@ -119,7 +126,7 @@ class BeatmapResolver:
             status=status,
             mode=osuGameMode.from_api_v2(api_beatmap.mode),
             difficulty_adjusted=False,
-            osu_file_content=osu_file_content,
+            file=osu_file,
         )
 
     @staticmethod
@@ -132,7 +139,7 @@ class BeatmapResolver:
     def _store_full_set_if_eligible(
         self,
         requested_api_beatmap: ossapi.Beatmap,
-        requested_osu_file_content: bytes | None,
+        requested_osu_file_content: OsuFile,
     ) -> None:
         beatmap_set = requested_api_beatmap.beatmapset()
         if beatmap_set is None or not beatmap_set.beatmaps:
@@ -152,10 +159,16 @@ class BeatmapResolver:
                 else None
             )
 
+            assert set_map_osu_content is not None, (
+                "Expected osu file content for requested beatmap id {}, but got None".format(
+                    requested_api_beatmap.id
+                )
+            )
+
             parsed_set_map = self.build_from_bmap_api(
                 api_beatmap=api_set_map,
                 status=set_map_status,
-                osu_file_content=set_map_osu_content,
+                osu_file=set_map_osu_content,
                 beatmap_set=beatmap_set,
             )
             set_maps.append(parsed_set_map)
@@ -204,20 +217,30 @@ class BeatmapResolver:
         # or explicit stat edits (AR/CS/HP/OD).
         return has_rate_adjust or has_attribute_adjust
 
-    async def get_file_content(self, beatmap_id: int) -> OsuFile | None:
-        url = f"https://osu.ppy.sh/osu/{beatmap_id}"
-        http_session = self._get_http_session()
+    def get_audio_file_in_songs_folder(self, beatmap_md5: str) -> Path | None:
+        # Implementation for finding audio file in songs folder
+        pass
 
-        async with http_session.get(url) as response:
-            if not response or response.status != 200:
-                return
+    # async def get_file_content(self, beatmap_id: int) -> OsuFile | None:
+    #     url = f"https://osu.ppy.sh/osu/{beatmap_id}"
+    #     http_session = self._get_http_session()
+    #     _debug(f"Downloading .osu content from api for beatmap_id={beatmap_id}")
 
-            content = await response.content.read()
+    #     async with http_session.get(url) as response:
+    #         if not response or response.status != 200:
+    #             _debug(
+    #                 f"Failed downloading .osu for beatmap_id={beatmap_id}, status={getattr(response, 'status', None)}"
+    #             )
+    #             return
 
-            if not content:
-                return
+    #         content = await response.content.read()
 
-            return OsuFile.from_raw(content)
+    #         if not content:
+    #             _debug(f"Empty .osu content received for beatmap_id={beatmap_id}")
+    #             return
+
+    #         _debug(f"Downloaded .osu content for beatmap_id={beatmap_id}")
+    #         return OsuFile.from_raw(content)
 
     def from_db(
         self, beatmap_md5: str | None = None, beatmap_id: int | None = None
@@ -230,8 +253,25 @@ class BeatmapResolver:
 
         return None
 
-    async def from_api_md5(self, beatmap_md5: str) -> Beatmap | None:
+    def _ensure_audio_loaded(self, osu_file: OsuFile, beatmap_md5: str) -> None:
+        if osu_file.raw_audio_file is not None:
+            return
+
+        audio = osu_file.get_audio_file()
+        if audio is None:
+            _debug(
+                f"No audio file found for md5={beatmap_md5}; storing empty audio payload"
+            )
+        else:
+            _debug(
+                f"Loaded audio bytes for md5={beatmap_md5} (size={len(audio)} bytes)"
+            )
+
+    async def from_api_md5(
+        self, beatmap_md5: str, filename: str | None = None
+    ) -> Beatmap | None:
         osuApiAsync = await get_ossapi_async()
+        _debug(f"API md5 lookup start md5={beatmap_md5}")
 
         try:
             api_beatmap = await osuApiAsync.beatmap(checksum=beatmap_md5)
@@ -240,11 +280,42 @@ class BeatmapResolver:
             return None
 
         if api_beatmap is None:
+            _debug(f"API md5 lookup miss md5={beatmap_md5}")
             return None
 
-        osu_file = await self.get_file_content(api_beatmap.id)
+        _debug(
+            "API md5 lookup hit "
+            f"md5={beatmap_md5} beatmap_id={api_beatmap.id} set_id={api_beatmap.beatmapset_id} "
+            f"status={api_beatmap.status}"
+        )
+
+        # get .osu file from songs folder
+        if filename is None:
+            osu_file = self.get_osu_file_from_md5_and_set_id(
+                beatmap_md5, api_beatmap.beatmapset_id
+            )
+        else:
+            osu_file = self.get_osu_file_from_set_and_filename(
+                beatmap_set_id=api_beatmap.beatmapset_id,
+                map_filename=filename,
+            )
+
         if osu_file is None:
+            # Attempt fallback
+            print(
+                f"Failed to find .osu file for beatmap with md5 {beatmap_md5} using set id hint, attempting full scan by md5"
+            )
+            _debug(
+                f"Fast songs-folder lookup miss md5={beatmap_md5}, falling back to full md5 scan"
+            )
+            osu_file = self.get_osu_file_from_md5(beatmap_md5)
+
+        if osu_file is None:
+            _debug(f"Could not resolve local .osu file for md5={beatmap_md5}")
             return None
+
+        # Keep retrieval fast, but ensure persisted beatmaps still include audio bytes.
+        self._ensure_audio_loaded(osu_file, beatmap_md5)
 
         beatmap_set = api_beatmap.beatmapset()
 
@@ -263,27 +334,57 @@ class BeatmapResolver:
 
         self._store_full_set_if_eligible(
             requested_api_beatmap=api_beatmap,
-            requested_osu_file_content=osu_file.raw_file,
+            requested_osu_file_content=osu_file,
+        )
+
+        _debug(
+            f"Built beatmap from API md5 md5={beatmap_md5} beatmap_id={api_beatmap.id} status={api_beatmap.status}"
         )
 
         return self.build_from_bmap_api(
             api_beatmap=api_beatmap,
             status=osuMapStatus.from_api_v2(api_beatmap.status),
-            osu_file_content=osu_file.raw_file,
+            osu_file=osu_file,
             beatmap_set=beatmap_set,
         )
 
-    async def from_api_id(self, beatmap_id: int) -> Beatmap | None:
+    async def from_api_id(
+        self, beatmap_id: int, filename: str | None = None
+    ) -> Beatmap | None:
         osuApiAsync = await get_ossapi_async()
+        _debug(f"API id lookup start beatmap_id={beatmap_id}")
 
         api_beatmap = await osuApiAsync.beatmap(beatmap_id=beatmap_id)
 
         if api_beatmap is None:
+            _debug(f"API id lookup miss beatmap_id={beatmap_id}")
             return None
 
-        osu_file = await self.get_file_content(api_beatmap.id)
+        _debug(
+            f"API id lookup hit beatmap_id={beatmap_id} md5={api_beatmap.checksum} status={api_beatmap.status}"
+        )
+
+        # osu_file = await self.get_file_content(api_beatmap.id)
+        if filename is None:
+            assert api_beatmap.checksum is not None, (
+                "Checksum not found for Beatmap with id {}".format(api_beatmap.id)
+            )
+            osu_file = self.get_osu_file_from_md5_and_set_id(
+                api_beatmap.checksum, api_beatmap.beatmapset_id
+            )
+        else:
+            osu_file = self.get_osu_file_from_set_and_filename(
+                beatmap_set_id=api_beatmap.beatmapset_id,
+                map_filename=filename,
+            )
+
         if osu_file is None:
             return None
+
+        self._ensure_audio_loaded(
+            osu_file,
+            api_beatmap.checksum or str(api_beatmap.id),
+        )
 
         beatmap_set = api_beatmap.beatmapset()
 
@@ -302,21 +403,50 @@ class BeatmapResolver:
 
         self._store_full_set_if_eligible(
             requested_api_beatmap=api_beatmap,
-            requested_osu_file_content=osu_file.raw_file,
+            requested_osu_file_content=osu_file,
         )
 
         return self.build_from_bmap_api(
             api_beatmap=api_beatmap,
             status=osuMapStatus.from_api_v2(api_beatmap.status),
-            osu_file_content=osu_file.raw_file,
+            osu_file=osu_file,
             beatmap_set=beatmap_set,
         )
 
+    def get_osu_file_from_md5_and_set_id(
+        self, beatmap_md5: str, beatmap_set_id: int
+    ) -> OsuFile | None:
+        _debug(
+            f"Songs-folder fast scan start md5={beatmap_md5} set_id={beatmap_set_id}"
+        )
+        for set_folder in self.songs_folder.glob(f"{beatmap_set_id}*"):
+            if not set_folder.is_dir():
+                continue
+
+            for osu_file in set_folder.glob("*.osu"):
+                if hashlib.md5(osu_file.read_bytes()).hexdigest() == beatmap_md5:
+                    _debug(
+                        f"Songs-folder fast scan hit md5={beatmap_md5} path={osu_file}"
+                    )
+                    return OsuFile.from_path(
+                        str(osu_file.absolute()),
+                        load_audio_file=False,
+                    )
+
+        _debug(f"Songs-folder fast scan miss md5={beatmap_md5} set_id={beatmap_set_id}")
+        return None
+
     def get_osu_file_from_md5(self, beatmap_md5: str) -> OsuFile | None:
+        _debug(f"Songs-folder full scan start md5={beatmap_md5}")
         for osu_file in self.songs_folder.glob("**/*.osu"):
             if hashlib.md5(osu_file.read_bytes()).hexdigest() == beatmap_md5:
-                return OsuFile.from_path(str(osu_file.absolute()))
+                _debug(f"Songs-folder full scan hit md5={beatmap_md5} path={osu_file}")
+                return OsuFile.from_path(
+                    str(osu_file.absolute()),
+                    load_audio_file=False,
+                )
 
+        _debug(f"Songs-folder full scan miss md5={beatmap_md5}")
         return None
 
     def get_osu_file_from_set_and_filename(
@@ -333,7 +463,10 @@ class BeatmapResolver:
             if not osu_file.exists():
                 continue
 
-            parsed_osu_file = OsuFile.from_path(str(osu_file.absolute()))
+            parsed_osu_file = OsuFile.from_path(
+                str(osu_file.absolute()),
+                load_audio_file=False,
+            )
             return parsed_osu_file
 
         return None
@@ -360,13 +493,16 @@ class BeatmapResolver:
             status=original_beatmap.status,
             mode=original_beatmap.mode,
             difficulty_adjusted=True,
-            osu_file_content=osu_file.raw_file,
-            audio_file_content=osu_file.raw_audio_file,
+            file=osu_file,
         )
 
     async def from_leaderboard_request(
         self, beatmap_md5: str, beatmap_set_id: int, map_filename: str
     ) -> Beatmap | None:
+        _debug(
+            "Leaderboard resolve start "
+            f"md5={beatmap_md5} set_id={beatmap_set_id} filename={map_filename}"
+        )
         # 1. Check DB for beatmap with md5
         # 2. If not found, fetch from API using md5
         # 3. If thats not found validate that its a difficulty adjusted beatmap
@@ -377,54 +513,81 @@ class BeatmapResolver:
         # Hot cache check
         beatmap = _get_cached_beatmap_by_md5(beatmap_md5)
         if beatmap:
+            _debug(
+                f"Hot cache hit md5={beatmap_md5} status={beatmap.status.name} inserted={beatmap.time_inserted.isoformat()}"
+            )
             if self._should_refresh_stale_unstable_map(beatmap):
+                _debug(f"Hot cache stale unstable map md5={beatmap_md5}, evicting")
                 _remove_cached_beatmap_by_md5(beatmap_md5)
             else:
+                _debug(f"Returning beatmap from hot cache md5={beatmap_md5}")
                 return beatmap
+        else:
+            _debug(f"Hot cache miss md5={beatmap_md5}")
 
         # DB Check
         beatmap = self.from_db(beatmap_md5)
         if beatmap:
+            _debug(
+                f"DB hit md5={beatmap_md5} status={beatmap.status.name} inserted={beatmap.time_inserted.isoformat()}"
+            )
             if self._should_refresh_stale_unstable_map(beatmap):
+                _debug(
+                    f"DB stale unstable map md5={beatmap_md5}, deleting and refreshing"
+                )
                 self.beatmaps_repo.delete_beatmap(beatmap)
                 _remove_cached_beatmap_by_md5(beatmap_md5)
             else:
+                _debug(f"Returning beatmap from DB md5={beatmap_md5}")
                 _cache_beatmap(beatmap)
                 return beatmap
+        else:
+            _debug(f"DB miss md5={beatmap_md5}")
 
         # API Check
-        beatmap = await self.from_api_md5(beatmap_md5)
+        beatmap = await self.from_api_md5(beatmap_md5, filename=map_filename)
 
         if beatmap:
             self.beatmaps_repo.insert_beatmap(beatmap)
             _cache_beatmap(beatmap)
+            _debug(
+                f"Returning beatmap from API md5={beatmap_md5} status={beatmap.status.name} and cached in DB/hot-cache"
+            )
             return beatmap
+
+        _debug(
+            f"API md5 path failed md5={beatmap_md5}, trying difficulty-adjusted resolution"
+        )
 
         # Not found in DB or API, check if its a difficulty adjusted beatmap
 
         # Difficulty Adjusted Check
         if not self.current_settings.difficulty_adjusted_beatmaps.sync_rank_status_with_bancho:
+            _debug("Difficulty-adjusted sync disabled, aborting resolution")
             return None
 
         if not self.valid_difficulty_adjusted_beatmap_filename(map_filename):
+            _debug(
+                f"Filename did not match difficulty-adjusted pattern filename={map_filename}"
+            )
             return None
 
         # Since the beatmap is difficulty adjusted, get og id
-        result = self.get_osu_file_from_set_and_filename(
+        osu_file = self.get_osu_file_from_set_and_filename(
             beatmap_set_id=beatmap_set_id,
             map_filename=map_filename,
         )
 
-        if result is not None:
-            osu_file = result
+        if osu_file is not None:
             # Safety check: if direct path does not match request md5, fallback to full md5 scan.
             if osu_file.md5 != beatmap_md5:
-                result = self.get_osu_file_from_md5(beatmap_md5)
+                osu_file = self.get_osu_file_from_md5(beatmap_md5)
 
-        if result is None:
-            result = self.get_osu_file_from_md5(beatmap_md5)
+        if osu_file is None:
+            osu_file = self.get_osu_file_from_md5(beatmap_md5)
 
-        if result is None:
+        if osu_file is None:
+            _debug("Difficulty-adjusted path could not resolve .osu file")
             return None
 
         # Prefer list verification when available, but don't block valid resolved maps.
@@ -434,13 +597,14 @@ class BeatmapResolver:
                 f"for filename '{map_filename}', continuing via resolved .osu file"
             )
 
-        osu_file = result
-
         original_beatmap = self.from_db(beatmap_id=osu_file.beatmap_id)
         if original_beatmap is None:
             original_beatmap = await self.from_api_id(beatmap_id=osu_file.beatmap_id)
 
         if original_beatmap is None:
+            _debug(
+                f"Original beatmap not found for difficulty-adjusted map md5={beatmap_md5}, source beatmap_id={osu_file.beatmap_id}"
+            )
             return None
 
         difficulty_adjusted_beatmap = self.build_difficulty_adjusted_beatmap(
@@ -448,7 +612,34 @@ class BeatmapResolver:
         )
         self.beatmaps_repo.insert_beatmap(difficulty_adjusted_beatmap)
         _cache_beatmap(difficulty_adjusted_beatmap)
+        _debug(
+            f"Returning difficulty-adjusted beatmap md5={beatmap_md5} based_on_beatmap_id={original_beatmap.id}"
+        )
         return difficulty_adjusted_beatmap
+
+    async def from_score_submission_request(self, beatmap_md5: str) -> Beatmap | None:
+        _debug(f"Score submission resolve start md5={beatmap_md5}")
+        # Simpler path for score submissions since we don't have filename or set id hints to resolve from.
+        # Just check DB and then API by md5.
+        # TODO: Maybe attempt diff adjust via scanning songs folder?
+        beatmap = self.from_db(beatmap_md5)
+        if beatmap:
+            _debug(
+                f"Score submission DB hit md5={beatmap_md5} status={beatmap.status.name}"
+            )
+            return beatmap
+
+        _debug(f"Score submission DB miss md5={beatmap_md5}, trying API")
+        beatmap = await self.from_api_md5(beatmap_md5)
+        if beatmap:
+            self.beatmaps_repo.insert_beatmap(beatmap)
+            _debug(
+                f"Score submission API hit md5={beatmap_md5} status={beatmap.status.name}"
+            )
+            return beatmap
+
+        _debug(f"Score submission resolve failed md5={beatmap_md5}")
+        return None
 
 
 async def from_leaderboard_request(
@@ -470,5 +661,22 @@ async def from_leaderboard_request(
             beatmap_set_id=beatmap_set_id,
             map_filename=map_filename,
         )
+    finally:
+        await resolver.close()
+
+
+async def from_score_submission_request(
+    beatmap_md5: str,
+    songs_folder: Path,
+    current_settings: CurrentSettings,
+) -> Beatmap | None:
+    resolver = BeatmapResolver(
+        songs_folder=songs_folder,
+        beatmaps_repo=BeatmapsRepository(BEATMAPS_FILE),
+        current_settings=current_settings,
+    )
+
+    try:
+        return await resolver.from_score_submission_request(beatmap_md5=beatmap_md5)
     finally:
         await resolver.close()
