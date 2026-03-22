@@ -1,4 +1,5 @@
-from .performance import pp, rank_for_pp
+from .performance import pp
+from .rank import rank_for_pp
 
 __all__ = [
     "pp",
