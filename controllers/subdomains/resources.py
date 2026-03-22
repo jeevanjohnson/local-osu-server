@@ -1,5 +1,6 @@
 from fastapi import APIRouter, status
 from fastapi.responses import FileResponse, JSONResponse
+from adapters.app_logger import app_logger
 
 import usecases.resources
 
@@ -9,6 +10,7 @@ resources = APIRouter(
 
 
 @resources.get("/{full_path:path}")
+@app_logger.log(msg="router resources get")
 async def get_resource(full_path: str):
     resource = usecases.resources.retrive(full_path)
 

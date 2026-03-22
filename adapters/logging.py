@@ -167,6 +167,14 @@ def _repr_result(value: Any, max_len: int = 80) -> str:
     return f"{type_name}={raw}"
 
 
+def _format_elapsed(elapsed: float) -> str:
+    """Format elapsed seconds as '<m>m <s>s <ms>ms' for readability."""
+    total_ms = int(round(elapsed * 1000))
+    minutes, remainder_ms = divmod(total_ms, 60_000)
+    seconds, milliseconds = divmod(remainder_ms, 1000)
+    return f"{minutes}m {seconds}s {milliseconds}ms"
+
+
 # ---------------------------------------------------------------------------
 # Log entry dataclass
 # ---------------------------------------------------------------------------
@@ -343,6 +351,7 @@ class JaysLogger:
         save_on: list[SaveOnOption] | None = None,
         log_file: str | Path | None = None,
         save_backend: SaveBackend = "jsonl",
+        suppress_success_below_s: float | None = None,
     ) -> None:
         self.track_time = track_time
         self.track_call_count = track_call_count
@@ -350,12 +359,25 @@ class JaysLogger:
         self.save_on: list[str] = [s.lower() for s in (save_on or [])]
         self.log_file = Path(log_file) if log_file else None
         self.save_backend = save_backend
+        self.suppress_success_below_s = suppress_success_below_s
 
         self._call_counts: dict[str, int] = {}
         self._log_entries: list[LogEntry] = []
 
         if self.save_logs and self.log_file:
             atexit.register(self._flush_logs)
+
+    def _should_print_post(self, status: str, elapsed: float | None) -> bool:
+        if status != "success":
+            return True
+
+        if self.suppress_success_below_s is None:
+            return True
+
+        if elapsed is None:
+            return True
+
+        return elapsed >= self.suppress_success_below_s
 
     # ------------------------------------------------------------------
     # Public decorator
@@ -466,6 +488,24 @@ class JaysLogger:
             slug = _format_name(f.__qualname__)
             self._call_counts.setdefault(slug, 0)
 
+            if inspect.iscoroutinefunction(f):
+
+                @functools.wraps(f)
+                async def async_wrapper(*args, **kwargs):
+                    return await self._execute_async(
+                        f,
+                        slug,
+                        args,
+                        kwargs,
+                        msg=msg,
+                        running_msg=running_msg,
+                        success_msg=success_msg,
+                        error_msg=error_msg,
+                        warning_msg=warning_msg,
+                    )
+
+                return async_wrapper
+
             @functools.wraps(f)
             def wrapper(*args, **kwargs):
                 return self._execute(
@@ -530,8 +570,11 @@ class JaysLogger:
         count = self._call_counts[slug]
         call_sig = _format_call(func, args, kwargs)
         timestamp = datetime.now().isoformat(timespec="milliseconds")
+        pre_printed = False
 
-        self._print_pre(slug, call_sig, msg=msg, running_msg=running_msg)
+        if self.suppress_success_below_s is None:
+            self._print_pre(slug, call_sig, msg=msg, running_msg=running_msg)
+            pre_printed = True
 
         caught_warnings: list[warnings.WarningMessage] = []
         error: Exception | None = None
@@ -555,20 +598,117 @@ class JaysLogger:
         else:
             status = "success"
 
-        self._print_post(
-            slug,
-            call_sig,
-            status,
-            result=result,
-            elapsed=elapsed,
-            count=count,
-            caught_warnings=caught_warnings,
-            error=error,
-            msg=msg,
-            success_msg=success_msg,
-            error_msg=error_msg,
-            warning_msg=warning_msg,
-        )
+        should_print_post = self._should_print_post(status, elapsed)
+
+        if should_print_post and not pre_printed:
+            self._print_pre(slug, call_sig, msg=msg, running_msg=running_msg)
+            pre_printed = True
+
+        if should_print_post:
+            self._print_post(
+                slug,
+                call_sig,
+                status,
+                result=result,
+                elapsed=elapsed,
+                count=count,
+                caught_warnings=caught_warnings,
+                error=error,
+                msg=msg,
+                success_msg=success_msg,
+                error_msg=error_msg,
+                warning_msg=warning_msg,
+            )
+
+        if self.save_logs:
+            should_save = (not self.save_on) or (status in self.save_on)
+            if should_save:
+                entry = LogEntry(
+                    slug=slug,
+                    func_name=func.__qualname__,
+                    call_signature=call_sig,
+                    status=status,
+                    timestamp=timestamp,
+                    elapsed_s=round(elapsed, 6) if elapsed is not None else None,
+                    call_count=count,
+                    return_repr=_repr_result(result) if error is None else None,
+                    custom_msg=msg,
+                    warnings_raised=[str(w.message) for w in caught_warnings],
+                    error=repr(error) if error else None,
+                )
+                self._log_entries.append(entry)
+
+        if error is not None:
+            raise error
+
+        return result
+
+    async def _execute_async(
+        self,
+        func: Callable,
+        slug: str,
+        args: tuple,
+        kwargs: dict,
+        *,
+        msg: str,
+        running_msg: str,
+        success_msg: str,
+        error_msg: str,
+        warning_msg: str,
+    ) -> Any:
+        self._call_counts[slug] += 1
+        count = self._call_counts[slug]
+        call_sig = _format_call(func, args, kwargs)
+        timestamp = datetime.now().isoformat(timespec="milliseconds")
+        pre_printed = False
+
+        if self.suppress_success_below_s is None:
+            self._print_pre(slug, call_sig, msg=msg, running_msg=running_msg)
+            pre_printed = True
+
+        caught_warnings: list[warnings.WarningMessage] = []
+        error: Exception | None = None
+        result: Any = None
+        start = time.perf_counter() if self.track_time else None
+
+        try:
+            with warnings.catch_warnings(record=True) as w:
+                warnings.simplefilter("always")
+                result = await func(*args, **kwargs)
+                caught_warnings = list(w)
+        except Exception as exc:
+            error = exc
+        finally:
+            elapsed = (time.perf_counter() - start) if start is not None else None
+
+        if error is not None:
+            status = "error"
+        elif caught_warnings:
+            status = "warning"
+        else:
+            status = "success"
+
+        should_print_post = self._should_print_post(status, elapsed)
+
+        if should_print_post and not pre_printed:
+            self._print_pre(slug, call_sig, msg=msg, running_msg=running_msg)
+            pre_printed = True
+
+        if should_print_post:
+            self._print_post(
+                slug,
+                call_sig,
+                status,
+                result=result,
+                elapsed=elapsed,
+                count=count,
+                caught_warnings=caught_warnings,
+                error=error,
+                msg=msg,
+                success_msg=success_msg,
+                error_msg=error_msg,
+                warning_msg=warning_msg,
+            )
 
         if self.save_logs:
             should_save = (not self.save_on) or (status in self.save_on)
@@ -691,7 +831,9 @@ class JaysLogger:
             f"{call_sig} {detail}"
         ]
         if elapsed is not None:
-            suffix_parts.append(f"{Fore.MAGENTA}TIME: {elapsed:.3f}s{Style.RESET_ALL}")
+            suffix_parts.append(
+                f"{Fore.MAGENTA}TIME: {_format_elapsed(elapsed)}{Style.RESET_ALL}"
+            )
         if self.track_call_count:
             suffix_parts.append(f"{Fore.CYAN}CALL COUNT: {count}{Style.RESET_ALL}")
 

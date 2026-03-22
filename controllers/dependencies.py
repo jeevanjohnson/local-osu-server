@@ -1,13 +1,13 @@
 from enum import Enum
-from typing import Callable
+from typing import Awaitable, Callable
 
 from fastapi import Depends
 
 import usecases.profiles
 import usecases.sessions
+from models.domain.errors import ProfileNotFoundError, SessionNotFoundError
 from models.database.profiles import CurrentProfile as Profile
 from models.database.sessions import CurrentSession as Session
-from osuProtocol.server_packets import client_relog_response
 
 
 class OsuErrors(Enum):
@@ -41,12 +41,13 @@ def _encode_error_response(error_response: OsuErrors | str | bytes | None) -> by
 
 def retrieve_session(
     error_response: OsuErrors | str | bytes | None = None,
-) -> Callable[[], Session]:
+) -> Callable[[], Awaitable[Session]]:
     encoded_error_response = _encode_error_response(error_response)
 
-    def _retrieve_session() -> Session:
-        session = usecases.sessions.get_current_session()
-        if session is None:
+    async def _retrieve_session() -> Session:
+        try:
+            session = await usecases.sessions.require_current_session()
+        except SessionNotFoundError:
             raise ClientResponseException(encoded_error_response)
 
         return session
@@ -58,19 +59,17 @@ def retrieve_profile(
     error_response: OsuErrors | str | bytes | None = None,
     error_response_message: str = "Session has no associated profile, please relog.",
     relog_on_failure: bool = True,
-) -> Callable[[], Profile]:
+) -> Callable[[], Awaitable[Profile]]:
     encoded_error_response = _encode_error_response(error_response)
 
-    def _retrieve_profile(
+    async def _retrieve_profile(
         session: Session = Depends(retrieve_session(error_response)),
     ) -> Profile:
-        profile = usecases.profiles.get_profile(session.profile_name)
-        if profile is None:
+        try:
+            profile = await usecases.profiles.require_profile(session.profile_name)
+        except ProfileNotFoundError:
             if relog_on_failure:
-                usecases.sessions.enqueue_packets_to_current_session(
-                    client_relog_response(message=error_response_message),
-                )
-
+                await usecases.sessions.restart_client(error_response_message)
             raise ClientResponseException(encoded_error_response)
 
         return profile

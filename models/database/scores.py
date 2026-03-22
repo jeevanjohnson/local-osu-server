@@ -1,5 +1,3 @@
-import base64
-
 from jays_tools import MigratableModel
 from pydantic import Field
 from pydantic import field_serializer
@@ -8,47 +6,17 @@ from pydantic import field_validator
 from models.domain.gameplay import Mods
 from osuProtocol.server_packets import osuGameMode
 from osupyparser.osr.osr_parser import ReplayFile
-from adapters import OsuFile
 from usecases.score_submission import ScoreData
 from pydantic import ConfigDict
 
 EpochTime = int
 
 
-class BeatmapScoreV1(MigratableModel):
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-
-    md5: str
-    file: OsuFile
-
-    @field_serializer("file")
-    def osu_file_to_json(self, value: OsuFile) -> str:
-        assert value.raw_file is not None, "OsuFile must have raw_file to be serialized"
-
-        compressed_osu_file = value.compress()
-
-        return base64.b64encode(compressed_osu_file).decode("ascii")
-
-    @field_validator("file", mode="before")
-    @classmethod
-    def json_to_osu_file(cls, value: object) -> OsuFile:
-        if isinstance(value, OsuFile):
-            return value
-        
-        assert isinstance(value, str), "Expected base64 string for osu file"
-
-        compressed_osu_file = base64.b64decode(value.encode("ascii"))
-
-        return OsuFile.decompress(compressed_osu_file)
-
-
-CurrentBeatmapScore = BeatmapScoreV1
-
-
 class ScoreV1(MigratableModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     score_id: int
+    beatmap_md5: str
     game_mode: osuGameMode
     username: str
     count50: int
@@ -60,9 +28,9 @@ class ScoreV1(MigratableModel):
     perfect: bool
     time_set: EpochTime
     performance_points: int | None = Field(default=None)
-
     replay: ReplayFile
-    beatmap: CurrentBeatmapScore
+
+    beatmap_max_combo: int
 
     @field_serializer("enabled_mods")
     def serialize_mods(self, value: Mods) -> list[str]:
@@ -78,9 +46,9 @@ class ScoreV1(MigratableModel):
         cls,
         score_id: int,
         score_data: ScoreData,
-        map_file: OsuFile,
         beatmap_md5: str,
         replay_file: ReplayFile,
+        beatmap_max_combo: int,
     ) -> "ScoreV1":
         # This is where we would calculate the total score based on the score data and beatmap info.
         # For now, we'll just set it to 0 and fill it in later.
@@ -98,7 +66,8 @@ class ScoreV1(MigratableModel):
             time_set=int(score_data.play_time.timestamp()),
             performance_points=None,  # This will be calculated later based on the beatmap and mods
             replay=replay_file,
-            beatmap=CurrentBeatmapScore(file=map_file, md5=beatmap_md5),
+            beatmap_md5=beatmap_md5,
+            beatmap_max_combo=beatmap_max_combo,
         )
 
     @property
@@ -116,9 +85,7 @@ class ScoreV1(MigratableModel):
 
         # Combo progress: achieved combo / max possible combo
         combo_progress = (
-            self.combo / self.beatmap.file.max_combo
-            if self.beatmap.file.max_combo > 0
-            else 0
+            self.combo / self.beatmap_max_combo if self.beatmap_max_combo > 0 else 0
         )
 
         # Accuracy progress: in osu!standard this is always 1.0

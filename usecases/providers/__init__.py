@@ -8,7 +8,6 @@ from repositories.server_settings import ServerSettingsRepository
 class ApiV2CredentialsError(Exception):
     pass
 
-
 async def get_ossapi_async() -> OssapiAsync:
     """
     Reads credentials from ServerSettingsRepository and constructs OssapiAsync.
@@ -17,7 +16,7 @@ async def get_ossapi_async() -> OssapiAsync:
     usecases/scores.py and usecases/beatmaps.py.
     """
     server_settings_repo = ServerSettingsRepository(SERVER_SETTINGS_FILE)
-    server_settings = server_settings_repo.get_server_settings()
+    server_settings = await server_settings_repo.get_server_settings()
 
     if server_settings.osu_api_v2_client_id is None:
         raise ApiV2CredentialsError(
@@ -42,13 +41,13 @@ async def get_ossapi_async() -> OssapiAsync:
     return osuApiAsync
 
 
-def get_ossapi_v1() -> OssapiV1:
+async def get_ossapi_v1() -> OssapiV1:
     """
     Same pattern as above for v1.
     Replaces the duplicated get_ossapi_v1() in usecases/scores.py.
     """
     server_settings_repo = ServerSettingsRepository(SERVER_SETTINGS_FILE)
-    server_settings = server_settings_repo.get_server_settings()
+    server_settings = await server_settings_repo.get_server_settings()
 
     if server_settings.osu_api_key_v1 is None:
         raise ApiV2CredentialsError(

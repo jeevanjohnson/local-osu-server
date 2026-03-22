@@ -2,9 +2,11 @@ from pathlib import Path
 
 from jays_tools import JsonDatabase
 
+from adapters.app_logger import app_logger
 from models.database.beatmaps import CurrentBeatmap as Beatmap
 from models.database.beatmaps import CurrentBeatmaps as Beatmaps
 from models.database.beatmaps import CurrentBeatmapSet as BeatmapSet
+from models.domain.errors import BeatmapNotFoundError, BeatmapSetNotFoundError
 
 
 # TODO: Async?
@@ -12,36 +14,64 @@ class BeatmapsRepository:
     def __init__(self, path: Path) -> None:
         self.beatmaps = JsonDatabase(path=path, models=Beatmaps)
 
-    def get_by_md5(self, md5: str) -> Beatmap | None:
-        with self.beatmaps as beatmaps:
+    @app_logger.log(msg="repository get beatmap by md5")
+    async def get_by_md5(self, md5: str) -> Beatmap | None:
+        try:
+            return await self.require_by_md5(md5)
+        except BeatmapNotFoundError:
+            return None
+
+    @app_logger.log(msg="repository require beatmap by md5")
+    async def require_by_md5(self, md5: str) -> Beatmap:
+        async with self.beatmaps as beatmaps:
             if md5 not in beatmaps.all["by_md5"]:
-                return None
+                raise BeatmapNotFoundError(f"Beatmap with md5 '{md5}' was not found.")
 
             return beatmaps.all["by_md5"][md5]
 
-    def get_by_id(self, id: int) -> Beatmap | None:
-        with self.beatmaps as beatmaps:
+    @app_logger.log(msg="repository get beatmap by id")
+    async def get_by_id(self, id: int) -> Beatmap | None:
+        try:
+            return await self.require_by_id(id)
+        except BeatmapNotFoundError:
+            return None
+
+    @app_logger.log(msg="repository require beatmap by id")
+    async def require_by_id(self, id: int) -> Beatmap:
+        async with self.beatmaps as beatmaps:
             if id not in beatmaps.all["by_id"]:
-                return None
+                raise BeatmapNotFoundError(f"Beatmap with id '{id}' was not found.")
 
             return beatmaps.all["by_id"][id]
 
-    def get_by_set_id(self, set_id: int) -> BeatmapSet | None:
-        with self.beatmaps as beatmaps:
+    @app_logger.log(msg="repository get beatmap set by id")
+    async def get_by_set_id(self, set_id: int) -> BeatmapSet | None:
+        try:
+            return await self.require_by_set_id(set_id)
+        except BeatmapSetNotFoundError:
+            return None
+
+    @app_logger.log(msg="repository require beatmap set by id")
+    async def require_by_set_id(self, set_id: int) -> BeatmapSet:
+        async with self.beatmaps as beatmaps:
             if set_id not in beatmaps.all["by_set_id"]:
-                return None
+                raise BeatmapSetNotFoundError(
+                    f"Beatmap set with id '{set_id}' was not found."
+                )
 
             return beatmaps.all["by_set_id"][set_id]
 
-    def insert_beatmap(self, bmap: Beatmap) -> None:
-        with self.beatmaps as beatmaps:
+    @app_logger.log(msg="repository insert beatmap")
+    async def insert_beatmap(self, bmap: Beatmap) -> None:
+        async with self.beatmaps as beatmaps:
             beatmaps.all["by_id"][bmap.id] = bmap
             beatmaps.all["by_md5"][bmap.md5] = bmap
 
             self.beatmaps.set(beatmaps)
 
-    def insert_beatmap_set(self, beatmap_set: BeatmapSet) -> None:
-        with self.beatmaps as beatmaps:
+    @app_logger.log(msg="repository insert beatmap set")
+    async def insert_beatmap_set(self, beatmap_set: BeatmapSet) -> None:
+        async with self.beatmaps as beatmaps:
             beatmaps.all["by_set_id"][beatmap_set.id] = beatmap_set
 
             for beatmap in beatmap_set.maps:
@@ -50,8 +80,9 @@ class BeatmapsRepository:
 
             self.beatmaps.set(beatmaps)
 
-    def delete_beatmap(self, beatmap: Beatmap) -> None:
-        with self.beatmaps as beatmaps:
+    @app_logger.log(msg="repository delete beatmap")
+    async def delete_beatmap(self, beatmap: Beatmap) -> None:
+        async with self.beatmaps as beatmaps:
             beatmaps.all["by_id"].pop(beatmap.id, None)
             beatmaps.all["by_md5"].pop(beatmap.md5, None)
 

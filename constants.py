@@ -22,6 +22,9 @@ SERVER_SETTINGS_FILE = (
 BEATMAPS_FILE = (
     DATA_FOLDER / "beatmaps.json"
 )  # The file where beatmap information & cache will be stored
+OSU_FILES_FILE = (
+    DATA_FOLDER / "osu_files.json"
+)  # The file where osu map/audio payloads are stored by beatmap md5
 SCORES_FILE = (
     DATA_FOLDER / "scores.json"
 )  # The file where submitted scores will be stored before being processed

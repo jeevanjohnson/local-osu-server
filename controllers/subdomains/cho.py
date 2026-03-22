@@ -8,12 +8,14 @@ from typing import Any, Callable, Coroutine, Literal, TypeVar
 
 from fastapi import APIRouter, Header, Request, Response
 
-import osuProtocol.server_packets
 import usecases.cho
 import usecases.beatmaps
 import usecases.gui
 import usecases.profiles
 import usecases.sessions
+import usecases.server_settings
+from adapters.app_logger import app_logger
+from models.domain.errors import ProfileNotFoundError, SessionNotFoundError
 from osuProtocol.client_packets import (
     ChangeAction,
     ClientPackets,
@@ -29,12 +31,17 @@ from osuProtocol.server_packets import (
     osuAction,
     osuGameMode,
     osuMods,
+    SilentRelog,
+    LoginAuthFailed,
+    LoginError,
+    Login,
 )
 
 bancho = APIRouter()
 
 
 @bancho.post("/")
+@app_logger.log(msg="router bancho client request")
 async def client_request_handler(
     request: Request,
     osu_token: str | None = Header(None),
@@ -43,39 +50,50 @@ async def client_request_handler(
     wants_login = osu_token is None
 
     if wants_login:
-        if not usecases.gui.logged_in():
-            failed_login_response = osuProtocol.server_packets.failed_login_response(
+        if not await usecases.gui.logged_in():
+            content = LoginAuthFailed(
                 "You must be logged in through the GUI to use the osu! client."
-            )
+            ).build()
 
             return Response(
-                content=failed_login_response.build(),
+                content=content,
                 headers={"cho-token": "not-logged-in-gui"},
             )
 
         login_data = usecases.cho.parse_login_data(await request.body())
 
-        session = usecases.sessions.get_current_session()
-        if session is None:
-            failed_login_response = osuProtocol.server_packets.failed_login_response(
+        try:
+            session = await usecases.sessions.require_current_session()
+        except SessionNotFoundError:
+            content = LoginError(
                 "No active session found. Please log in through the GUI."
-            )
+            ).build()
 
             return Response(
-                content=failed_login_response.build(),
+                content=content,
                 headers={"cho-token": "no-active-session"},
             )
 
-        profile = usecases.profiles.get_profile(session.profile_name)
-
-        if profile is None:
-            failed_login_response = osuProtocol.server_packets.failed_login_response(
+        try:
+            profile = await usecases.profiles.require_profile(session.profile_name)
+        except ProfileNotFoundError:
+            content = LoginError(
                 "Profile not found. Please log in through the GUI."
-            )
+            ).build()
 
             return Response(
-                content=failed_login_response.build(),
+                content=content,
                 headers={"cho-token": "profile-not-found"},
+            )
+
+        if not await usecases.server_settings.credentials_exist():
+            content = LoginError(
+                "API v2 credentials not found. Please set up your credentials through the GUI and relog."
+            ).build()
+
+            return Response(
+                content=content,
+                headers={"cho-token": "api-v2-credentials-missing"},
             )
 
         rank = profile.performance[session.current_game_mode].rank
@@ -87,40 +105,39 @@ async def client_request_handler(
             session.current_game_mode
         ].performance_points
 
-        successful_login_response = (
-            osuProtocol.server_packets.successful_login_response(
-                username=session.profile_name,
-                friend_ids=profile.friend_ids,
-                utc_offset=login_data["utc_offset"],
-                country_code=profile.country_code,
-                game_mode=session.current_game_mode,
-                longitude=0.0,
-                latitude=0.0,
-                rank=rank,
-                ranked_score=ranked_score,
-                accuracy=accuracy,
-                play_count=play_count,
-                total_score=total_score,
-                performance_points=performance_points,
-            )
+        login_response = Login(
+            username=session.profile_name,
+            friend_ids=profile.friend_ids,
+            utc_offset=login_data["utc_offset"],
+            country_code=profile.country_code,
+            game_mode=session.current_game_mode,
+            longitude=0.0,
+            latitude=0.0,
+            rank=rank,
+            ranked_score=ranked_score,
+            accuracy=accuracy,
+            play_count=play_count,
+            total_score=total_score,
+            performance_points=performance_points,
         )
 
         session.osu_client.opened = True
         session.osu_client.logged_in_at = datetime.now()
-        session.songs_folder = usecases.sessions.retrieve_songs_folder()
-        session.replays_folder = usecases.sessions.retrieve_replays_folder()
+        session.songs_folder = await usecases.sessions.retrieve_songs_folder()
+        session.replays_folder = await usecases.sessions.retrieve_replays_folder()
 
-        usecases.sessions.update_current_session(session)
+        await usecases.sessions.update_current_session(session)
 
         return Response(
-            content=successful_login_response.build(),
+            content=login_response.build(),
             headers={"cho-token": f"login-successful-for-{session.profile_name}"},
         )
 
-    session = usecases.sessions.get_current_session()
-    if session is None:
+    try:
+        session = await usecases.sessions.require_current_session()
+    except SessionNotFoundError:
         return Response(
-            content=osuProtocol.server_packets.client_relog_response().build(),
+            content=SilentRelog.build(),
         )
 
     incoming_packets = Packets(await request.body())
@@ -128,7 +145,7 @@ async def client_request_handler(
 
     for packet in incoming_packets:
         if packet._id not in PACKET_HANDLERS:
-            print(
+            app_logger.warning(
                 f"Received packet with ID {ClientPackets(packet._id).name} but no handler is registered for this packet type."
             )
             continue
@@ -147,7 +164,7 @@ async def client_request_handler(
 
     response_packets = session.packet_queue
 
-    usecases.sessions.clear_packet_queue()
+    await usecases.sessions.clear_packet_queue()
 
     return Response(content=response_packets)
 
@@ -177,19 +194,25 @@ def register_packet_handler(packet_id: ClientPackets, packet_type: type[PacketTy
 
 
 @register_packet_handler(ClientPackets.PING, packet_type=Ping)
+@app_logger.log(msg="bancho handle ping")
 async def handle_ping(packet: Ping) -> ServerPackets | ServerPacket | None:
     return
 
 
 @register_packet_handler(ClientPackets.CHANGE_ACTION, packet_type=ChangeAction)
+@app_logger.log(msg="bancho handle action change")
 async def on_action_change(packet: ChangeAction) -> ServerPackets | ServerPacket | None:
-    session = usecases.sessions.get_current_session()
-    if session is None:
-        return osuProtocol.server_packets.client_relog_response()
+    # This should be taken care of via the decorater to remove redundancy
+    # and be passed in as a parameter along with the packet
+    try:
+        session = await usecases.sessions.require_current_session()
+    except SessionNotFoundError:
+        return SilentRelog
 
-    profile = usecases.profiles.get_profile(session.profile_name)
-    if profile is None:
-        return osuProtocol.server_packets.client_relog_response()
+    try:
+        profile = await usecases.profiles.require_profile(session.profile_name)
+    except ProfileNotFoundError:
+        return SilentRelog
 
     session.osu_client.status = osuAction(packet.action.value)
     session.osu_client.status_message = packet.info_text.value
@@ -231,17 +254,15 @@ async def on_action_change(packet: ChangeAction) -> ServerPackets | ServerPacket
     )
 
     session.packet_queue += packet_enqueue.build()
-    usecases.sessions.update_current_session(session)
-
-    # TODO: Handle this error case?
-    # if updated_session is None:
-    #     return osuProtocol.server_packets.client_relog_response()
+    await usecases.sessions.update_current_session(session)
 
 
 @register_packet_handler(ClientPackets.LOGOUT, packet_type=LogOut)
+@app_logger.log(msg="bancho handle logout")
 async def on_logout(packet: LogOut):
-    session = usecases.sessions.get_current_session()
-    if session is None:
+    try:
+        session = await usecases.sessions.require_current_session()
+    except SessionNotFoundError:
         return
 
     # osu! client logs out as soon as the user logs in
@@ -258,4 +279,4 @@ async def on_logout(packet: LogOut):
     session.latest_enabled_mods = osuMods.NOMOD
     session.packet_queue = b""
 
-    usecases.sessions.update_current_session(session)
+    await usecases.sessions.update_current_session(session)

@@ -7,6 +7,7 @@ from pathlib import Path
 
 from fastapi import APIRouter
 from fastapi.responses import FileResponse, RedirectResponse
+from adapters.app_logger import app_logger
 
 import usecases.avatar
 
@@ -16,6 +17,7 @@ avatar = APIRouter(
 
 
 @avatar.get("/{user_id}")
+@app_logger.log(msg="router avatar get")
 async def get_avatar(user_id: int):
     if user_id != 2:
         return RedirectResponse(
@@ -23,7 +25,7 @@ async def get_avatar(user_id: int):
             status_code=301,
         )
 
-    avatar_value = usecases.avatar.get_session_avatar()
+    avatar_value = await usecases.avatar.get_session_avatar()
 
     if avatar_value is None:
         return RedirectResponse(

@@ -10,6 +10,7 @@ from enum import IntEnum, unique
 from pprint import pformat
 from typing import Callable, Type, TypedDict, TypeVar, get_type_hints
 
+from adapters.app_logger import app_logger
 from osuProtocol.osuTypes import (
     osuBaseType,
     osuIntSigned32Bit,
@@ -188,14 +189,14 @@ class Packet:
         base_fields = {"_id", "raw_data", "offset"}
         type_hints = get_type_hints(type(self))
 
-        for field in fields(self):
-            if field.name in base_fields:
+        for dataclass_field in fields(self):
+            if dataclass_field.name in base_fields:
                 continue
 
-            data_type: osuBaseType = type_hints[field.name]
+            data_type: osuBaseType = type_hints[dataclass_field.name]
             data, offset = data_type.osu_protocol_deserialize(self.remaining_data)
 
-            setattr(self, field.name, data)
+            setattr(self, dataclass_field.name, data)
             self.offset += offset
 
         return self.offset
@@ -278,12 +279,14 @@ class Packets(list[Packet]):
             try:
                 packet_id = ClientPackets(packet_id_raw)
             except ValueError:
-                print("Skipping unknown packet ID:", packet_id_raw)
+                app_logger.warning(f"Skipping unknown packet ID: {packet_id_raw}")
                 self.offset += packet_length
                 continue
 
             if packet_id not in READABLE_PACKETS:
-                print("Skipping unimplemented packet with ID:", packet_id.name)
+                app_logger.warning(
+                    f"Skipping unimplemented packet with ID: {packet_id.name}"
+                )
                 self.offset += packet_length
                 continue
 
@@ -292,18 +295,6 @@ class Packets(list[Packet]):
                 offset=0,
                 raw_data=self.remaining_data[: packet_header["packet_length"]],
             )
-
-            # consumed = packet.read()
-            # if consumed != packet_length:
-            #     print(
-            #         "Packet length mismatch:",
-            #         packet_id,
-            #         "declared=",
-            #         packet_length,
-            #         "consumed=",
-            #         consumed,
-            #     )
-
             packet.read()
 
             self.offset += packet_length

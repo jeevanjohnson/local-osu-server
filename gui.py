@@ -3,6 +3,7 @@ Purpose/Domain/Concept:
 - This file builds the GUI for the application using NiceGUI.
 """
 
+import asyncio
 import os
 
 import emoji
@@ -62,30 +63,34 @@ async def login():
                 )
 
     with ui.row():
-        profiles = usecases.profiles.get_profiles()
+        profiles = await usecases.profiles.get_profiles()
         render_profiles(profiles)
 
-    def on_login_click():
+    async def on_login_click():
         if not profile_textarea.value:
             ui.notify("Please enter a profile name.")
             return
 
-        profile = usecases.profiles.get_profile(profile_textarea.value)
+        profile = await usecases.profiles.get_profile(profile_textarea.value)
         if profile is None:
             ui.notify("Profile not found. Please enter a valid profile name.")
             return
 
-        active_session = usecases.sessions.get_current_session()
+        active_session = await usecases.sessions.maybe_get_current_session()
         if active_session:
-            usecases.sessions.delete_current_session()
+            await usecases.sessions.delete_current_session()
 
-        usecases.sessions.create_session(profile_textarea.value)
+        await usecases.sessions.create_session(profile_textarea.value)
 
         ui.notify(
             f"Login successful! Profile '{profile_textarea.value}' is now active. Please start the osu! client to use this profile."
         )
 
         ui.navigate.to("/dashboard")
+
+    async def on_confirm_delete_click():
+        dialog.close()
+        await _on_delete_click()
 
     with ui.dialog() as dialog, ui.card():
         ui.label(
@@ -98,10 +103,7 @@ async def login():
             ui.button("Cancel", on_click=dialog.close)
             ui.button(
                 "Yes",
-                on_click=lambda: [
-                    dialog.close(),
-                    _on_delete_click(),  # lil cursed, but allows both funcs to be called without doing too much
-                ],
+                on_click=on_confirm_delete_click,
             )
 
     def on_delete_click():
@@ -111,30 +113,30 @@ async def login():
 
         dialog.open()
 
-    def _on_delete_click():
+    async def _on_delete_click():
         if not profile_textarea.value:
             ui.notify("Please enter a profile name.")
             return
 
-        profile = usecases.profiles.get_profile(profile_textarea.value)
+        profile = await usecases.profiles.get_profile(profile_textarea.value)
         if profile is None:
             ui.notify("Profile not found. Please enter a valid profile name.")
             return
 
-        usecases.profiles.delete_profile(profile_textarea.value)
+        await usecases.profiles.delete_profile(profile_textarea.value)
 
-        render_profiles.refresh(usecases.profiles.get_profiles())
+        render_profiles.refresh(await usecases.profiles.get_profiles())
 
         profile_textarea.set_value("")
 
         ui.notify(f"Deleted profile {profile_textarea.value}")
 
-    def on_create_click():
+    async def on_create_click():
         if not profile_textarea.value:
             ui.notify("Please enter a profile name.")
             return
 
-        profile = usecases.profiles.get_profile(profile_textarea.value)
+        profile = await usecases.profiles.get_profile(profile_textarea.value)
 
         if profile is not None:
             ui.notify("Profile already exists. Please choose a different name.")
@@ -144,9 +146,9 @@ async def login():
             ui.notify("Profile name cannot contain emojis.")
             return
 
-        usecases.profiles.create_profile(profile_textarea.value)
+        await usecases.profiles.create_profile(profile_textarea.value)
 
-        render_profiles.refresh(usecases.profiles.get_profiles())
+        render_profiles.refresh(await usecases.profiles.get_profiles())
 
         ui.notify(
             (
@@ -169,7 +171,7 @@ async def server_settings():
 
     ui.label("Server Settings")
 
-    server_settings = usecases.server_settings.get_server_settings()
+    server_settings = await usecases.server_settings.get_server_settings()
 
     if server_settings is None:
         ui.label(
@@ -177,8 +179,8 @@ async def server_settings():
         )
         return
 
-    def on_setting_change(setting_name: str, setting_value):
-        server_settings = usecases.server_settings.get_server_settings()
+    async def on_setting_change(setting_name: str, setting_value):
+        server_settings = await usecases.server_settings.get_server_settings()
 
         if server_settings is None:
             ui.notify(
@@ -192,7 +194,7 @@ async def server_settings():
         server_settings = server_settings.model_copy(
             update={setting_name: setting_value}
         )
-        usecases.server_settings.update_server_settings(server_settings)
+        await usecases.server_settings.update_server_settings(server_settings)
 
         ui.notify(f"Updated setting '{setting_name}' to '{setting_value}'")
 
@@ -205,19 +207,25 @@ async def server_settings():
             ui.checkbox(
                 setting_name,
                 value=setting_value,
-                on_change=lambda e, name=setting_name: on_setting_change(name, e.value),
+                on_change=lambda e, name=setting_name: asyncio.create_task(
+                    on_setting_change(name, e.value)
+                ),
             )
         elif setting_value is None:
             ui.textarea(
                 f"{setting_name}",
                 value="",
-                on_change=lambda e, name=setting_name: on_setting_change(name, e.value),
+                on_change=lambda e, name=setting_name: asyncio.create_task(
+                    on_setting_change(name, e.value)
+                ),
             )
         else:
             ui.textarea(
                 f"{setting_name}",
                 value=str(setting_value),
-                on_change=lambda e, name=setting_name: on_setting_change(name, e.value),
+                on_change=lambda e, name=setting_name: asyncio.create_task(
+                    on_setting_change(name, e.value)
+                ),
             )
 
     ui.button("Previous Page", on_click=ui.navigate.back)
@@ -234,7 +242,7 @@ async def profile_settings():
 async def dashboard():
     dark_mode()
 
-    session = usecases.sessions.get_current_session()
+    session = await usecases.sessions.maybe_get_current_session()
     if session is None:
         ui.notify("No active session found. Please log in first.")
         ui.navigate.to("/")
@@ -244,10 +252,10 @@ async def dashboard():
 
     client_opened: bool = session.osu_client.opened
 
-    def render_if_client_opened():
+    async def render_if_client_opened():
         nonlocal client_opened
 
-        session = usecases.sessions.get_current_session()
+        session = await usecases.sessions.maybe_get_current_session()
         if session is None:
             ui.notify("No active session found. Please log in first.")
             ui.navigate.to("/")
@@ -285,7 +293,7 @@ async def dashboard():
 
     ui.timer(2, render_if_client_opened)
 
-    profile = usecases.profiles.get_profile(profile_name)
+    profile = await usecases.profiles.get_profile(profile_name)
     if profile is None:
         ui.notify("Profile not found. Please log in again.")
         ui.navigate.to("/")
@@ -318,7 +326,7 @@ async def dashboard():
     async def on_change_profile_picture_click():
         nonlocal pfp_file_upload
 
-        profile = usecases.profiles.get_profile(profile_name)
+        profile = await usecases.profiles.get_profile(profile_name)
         if profile is None:
             ui.notify("Profile not found. Please log in again.")
             ui.navigate.to("/")
@@ -337,7 +345,7 @@ async def dashboard():
             )
             return
 
-        usecases.profiles.update_profile(profile_name, profile)
+        await usecases.profiles.update_profile(profile_name, profile)
 
         render_profile_picture.refresh(profile.profile_picture)
 
@@ -349,10 +357,10 @@ async def dashboard():
 
     last_cover_url: str | None = None
 
-    def render_currently_looking_at_if_changed():
+    async def render_currently_looking_at_if_changed():
         nonlocal last_cover_url
 
-        session = usecases.sessions.get_current_session()
+        session = await usecases.sessions.maybe_get_current_session()
         if session is None:
             cover_url = None
         else:
@@ -378,20 +386,20 @@ async def dashboard():
         with ui.column() as currently_looking_at_container:
             ui.label("Not currently looking at any beatmap in game.")
 
-    render_currently_looking_at_if_changed()
+    await render_currently_looking_at_if_changed()
     ui.timer(2, render_currently_looking_at_if_changed)
 
     ui.button("Change Profile Picture", on_click=change_pfp_confirmation)
 
     async def on_logout_click():
-        usecases.sessions.delete_current_session()
+        await usecases.sessions.delete_current_session()
         ui.notify("Logged out successfully!")
         ui.navigate.to("/")
 
     ui.button("Logout", on_click=on_logout_click)
 
-    def update_notes(new_notes: str):
-        profile = usecases.profiles.get_profile(profile_name)
+    async def update_notes(new_notes: str):
+        profile = await usecases.profiles.get_profile(profile_name)
         if profile is None:
             ui.notify("Profile not found. Please log in again.")
             ui.navigate.to("/")
@@ -399,14 +407,14 @@ async def dashboard():
 
         profile.notes = new_notes
 
-        usecases.profiles.update_profile(profile_name, profile)
+        await usecases.profiles.update_profile(profile_name, profile)
 
         ui.notify("Notes updated successfully!")
 
     ui.textarea(
         "Notes",
         value=profile.notes if profile.notes is not None else "",
-        on_change=lambda e: update_notes(e.value),
+        on_change=lambda e: asyncio.create_task(update_notes(e.value)),
     )
 
     ui.button("Server Settings", on_click=lambda: ui.navigate.to("/server_settings"))

@@ -4,24 +4,28 @@ Purpose/Domain/Concept:
 """
 
 from constants import PROFILES_FILE, SESSIONS_FILE
+from adapters.app_logger import app_logger
+from models.domain.errors import ProfileNotFoundError, SessionNotFoundError
 from repositories.profiles import ProfilesRepository
 from repositories.sessions import SessionRepository
 
 
-def logged_in() -> bool:
+@app_logger.log(msg="usecase gui logged in check")
+async def logged_in() -> bool:
     sessions_repo = SessionRepository(SESSIONS_FILE)
     profile_repo = ProfilesRepository(PROFILES_FILE)
 
-    session = sessions_repo.get_current_session()
-    if session is None:
-        print(
+    try:
+        session = await sessions_repo.require_current_session()
+    except SessionNotFoundError:
+        app_logger.warning(
             "Attempted to check if user is logged in but no active session was found."
         )
         return False
 
-    profile = profile_repo.get_profile(session.profile_name)
-
-    if profile is None:
+    try:
+        await profile_repo.require_profile(session.profile_name)
+    except ProfileNotFoundError:
         return False
 
     return True

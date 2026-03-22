@@ -1,8 +1,10 @@
 from typing import Any
+from adapters.app_logger  import app_logger
 
 from osuProtocol.server_packets import osuGameMode, osuMods
 
 LAZER_MODS = list[str]
+_NON_SCORING_ATTRIBUTE_PREFIXES = ("AR", "OD", "HP", "CS")
 
 
 class Mods(list[str]):
@@ -66,8 +68,8 @@ class Mods(list[str]):
         if game_mode == osuGameMode.STANDARD:
             return self.mod_multiplier_standard()
 
-        print(
-            f"Warning: mod multiplier for game mode {game_mode} not implemented, returning 1.0"
+        app_logger.warning(
+            f"Mod multiplier for game mode {game_mode} not implemented, defaulting to 1.0"
         )
         return 1.0
 
@@ -118,6 +120,7 @@ class Mods(list[str]):
             "FF": 1.00,
             "MU": 1.00,
             "NS": 1.00,
+            "TD": 1.00,
             "MG": 0.50,
             "RP": 1.00,
             "AS": 0.50,
@@ -139,9 +142,12 @@ class Mods(list[str]):
             elif mod.endswith("x"):
                 rate = float(mod[:-1])
                 multiplier *= self.approximate_score_multiplier(rate)
+            elif mod.startswith(_NON_SCORING_ATTRIBUTE_PREFIXES):
+                # DA settings like AR10.5/OD8/HP6/CS4 affect map attributes, not score multiplier.
+                continue
             else:
-                print(
-                    f"Warning: unknown mod {mod} with no defined multiplier, ignoring in score calculation"
+                app_logger.warning(
+                    f"Unknown mod {mod} with no defined multiplier, ignoring in score calculation"
                 )
 
         return multiplier

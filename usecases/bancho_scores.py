@@ -1,15 +1,17 @@
-from pprint import pprint
 import time
+import asyncio
 from typing import Any
 
 import ossapi.enums
 from ossapi import UserCompact
 
+from adapters.app_logger import app_logger
 from constants import PROFILES_FILE, SESSIONS_FILE
 from models.bancho.scores import Combo, LazerScore, Mods, Scores, StableScore
 from models.database.beatmaps import (
     CurrentBeatmap as Beatmap,
 )
+from models.domain.errors import ProfileNotFoundError, SessionNotFoundError
 from models.domain.gameplay import osuGameMode, osuMods
 from osuProtocol.client_web import LeaderboardType
 from repositories.profiles import ProfilesRepository
@@ -19,6 +21,7 @@ from usecases.providers import get_ossapi_async
 _SCORE_HOT_CACHE_TTL_SECONDS = 300
 _SCORE_HOT_CACHE_MAX_SIZE = 1024
 _score_hot_cache: dict[tuple[Any, ...], tuple[float, Scores]] = {}
+_score_inflight_requests: dict[tuple[Any, ...], asyncio.Task[Scores | None]] = {}
 
 
 def _make_score_cache_key(
@@ -93,6 +96,7 @@ def parse_difficulty_adjustment_settings(mod_settings: dict[str, Any]) -> list[s
     return settings
 
 
+@app_logger.log(msg="usecase get scores for beatmap")
 async def get_scores_for(
     beatmap: Beatmap,
     leaderboard_type: LeaderboardType,
@@ -109,12 +113,15 @@ async def get_scores_for(
 
     ranking_type = ossapi.enums.RankingType.SCORE
 
-    session = session_repo.get_current_session()
-    if session:
-        profile = profile_repo.get_profile(session.profile_name)
-        if profile:
-            ranking_type = profile.settings.scoring_algorithm.to_api_v2()
-            show_lazer_only_if_score_v2 = profile.settings.score_v2_shows_lazer_only_leaderboard
+    try:
+        session = await session_repo.require_current_session()
+        profile = await profile_repo.require_profile(session.profile_name)
+        ranking_type = profile.settings.scoring_algorithm.to_api_v2()
+        show_lazer_only_if_score_v2 = (
+            profile.settings.score_v2_shows_lazer_only_leaderboard
+        )
+    except (SessionNotFoundError, ProfileNotFoundError):
+        pass
 
     osuApi = await get_ossapi_async()
 
@@ -151,89 +158,105 @@ async def get_scores_for(
     if cached_scores is not None:
         return cached_scores
 
-    # print(f"Fetching scores for beatmap {beatmap.id} with mods {mods} and leaderboard type {leaderboard_type.name}...")
+    inflight_request = _score_inflight_requests.get(cache_key)
+    if inflight_request is not None:
+        return await asyncio.shield(inflight_request)
 
-    try:
-        requested_scores = await osuApi.beatmap_scores(
-            beatmap_id=beatmap.id,
-            mode=game_mode.to_api_v2(),
-            mods=req_mods,
-            limit=req_limit,
-            legacy_only=stable_only,
-            type=ranking_type,
+    async def _resolve_scores() -> Scores | None:
+        app_logger.warning(
+            f"Fetching scores for beatmap {beatmap.id} with mods {mods} and leaderboard type {leaderboard_type.name}..."
         )
-    except ValueError as e:
-        print(f"Error fetching scores for beatmap {beatmap.id}: {e}")
-        return
 
-    if not requested_scores:
-        return None
+        try:
+            requested_scores = await osuApi.beatmap_scores(
+                beatmap_id=beatmap.id,
+                mode=game_mode.to_api_v2(),
+                mods=req_mods,
+                limit=req_limit,
+                legacy_only=stable_only,
+                type=ranking_type,
+            )
+        except ValueError as e:
+            app_logger.error(f"Error fetching scores for beatmap {beatmap.id}: {e}")
+            return None
 
-    scores = Scores(all_scores=[])
+        if not requested_scores:
+            return None
 
-    for score in requested_scores.scores:
-        user: UserCompact = score._ossapi_data["_user"]
+        scores = Scores(all_scores=[])
 
-        if score.legacy_score_id and lazer_only:
-            continue
+        for score in requested_scores.scores:
+            user: UserCompact = score._ossapi_data["_user"]
 
-        if score.legacy_score_id:
-            score_model = StableScore
-        else:
-            score_model = LazerScore
+            if score.legacy_score_id and lazer_only:
+                continue
 
-        score_mods = []  # https://github.com/ppy/osu-web/blob/master/database/mods.json
-        for mod in score.mods:
-            mod_settings: dict[str, Any] = mod.settings
+            if score.legacy_score_id:
+                score_model = StableScore
+            else:
+                score_model = LazerScore
 
-            if mod_settings:
-                try:
+            score_mods = []  # https://github.com/ppy/osu-web/blob/master/database/mods.json
+            for mod in score.mods:
+                mod_settings: dict[str, Any] = mod.settings
+
+                if mod_settings:
+                    try:
+                        score_mods.append(mod.acronym)
+
+                        if mod_settings.get("speed_change"):
+                            speed_change = mod_settings["speed_change"]
+                            if speed_change != 1.5 and speed_change != 0.75:
+                                score_mods.append(f"{speed_change}x")
+
+                        if mod.acronym == "DA":
+                            score_mods.extend(
+                                parse_difficulty_adjustment_settings(mod_settings)
+                            )
+
+                    except Exception as e:
+                        app_logger.warning(
+                            f"Error processing mod settings for mod {mod.acronym}: {e}\nMod settings: {mod.settings}"
+                        )
+                else:
                     score_mods.append(mod.acronym)
 
-                    if mod_settings.get("speed_change"):
-                        speed_change = mod_settings["speed_change"]
-                        if speed_change != 1.5 and speed_change != 0.75:
-                            score_mods.append(f"{speed_change}x")
+            perfect = bool(score.is_perfect_combo)
 
-                    if mod.acronym == "DA":
-                        score_mods.extend(
-                            parse_difficulty_adjustment_settings(mod_settings)
-                        )
-
-                except Exception as e:
-                    pprint(
-                        f"Error processing mod settings for mod {mod.acronym}: {e}\nMod settings: {mod.settings}"
-                    )
+            if score.pp is None:
+                pp = 0
             else:
-                score_mods.append(mod.acronym)
+                pp = int(score.pp)
 
-        perfect = bool(score.is_perfect_combo)
+            parsed_score = score_model(
+                score_id=score.id or 0,
+                username=user.username,
+                total_score_value=score.total_score,
+                combo=Combo(actual=score.max_combo, max=beatmap.max_combo),
+                count50=score.statistics.meh or 0,
+                count100=score.statistics.ok or 0,
+                count300=score.statistics.great or 0,
+                count_miss=score.statistics.miss or 0,
+                perfect=perfect,
+                enabled_mods=Mods(score_mods),
+                user_id=user.id,
+                time_set=int(score.ended_at.timestamp()),
+                replay_available=score.has_replay,
+                performance_points=pp,
+                game_mode=game_mode,
+            )
 
-        if score.pp is None:
-            pp = 0
-        else:
-            pp = int(score.pp)
+            scores.all_scores.append(parsed_score)
 
-        parsed_score = score_model(
-            score_id=score.id or 0,
-            username=user.username,
-            total_score_value=score.total_score,
-            combo=Combo(actual=score.max_combo, max=beatmap.max_combo),
-            count50=score.statistics.meh or 0,
-            count100=score.statistics.ok or 0,
-            count300=score.statistics.great or 0,
-            count_miss=score.statistics.miss or 0,
-            perfect=perfect,
-            enabled_mods=Mods(score_mods),
-            user_id=user.id,
-            time_set=int(score.ended_at.timestamp()),
-            replay_available=score.has_replay,
-            performance_points=pp,
-            game_mode=game_mode,
-        )
+        _cache_scores(cache_key, scores)
 
-        scores.all_scores.append(parsed_score)
+        return scores
 
-    _cache_scores(cache_key, scores)
+    inflight_task: asyncio.Task[Scores | None] = asyncio.create_task(_resolve_scores())
+    _score_inflight_requests[cache_key] = inflight_task
 
-    return scores
+    try:
+        return await asyncio.shield(inflight_task)
+    finally:
+        if _score_inflight_requests.get(cache_key) is inflight_task:
+            _score_inflight_requests.pop(cache_key, None)

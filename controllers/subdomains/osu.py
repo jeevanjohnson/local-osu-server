@@ -14,6 +14,7 @@ from fastapi import (
 )
 from fastapi.responses import RedirectResponse
 import usecases.scores
+from adapters.app_logger import app_logger
 
 from models.database.profiles import CurrentProfile as Profile
 from models.database.sessions import (
@@ -40,6 +41,7 @@ from osuProtocol.client_web import (
 )
 from controllers.dependencies import retrive_profile, retrive_session, OsuErrors
 from osupyparser.osr.osr_parser import ReplayFile
+from usecases.providers import ApiV2CredentialsError
 
 osu = APIRouter(
     prefix="/osu",
@@ -48,11 +50,13 @@ osu = APIRouter(
 
 # osu is weird for this
 @osu.get("/web/osu-getseasonal.php")
+@app_logger.log(msg="router osu get seasonal backgrounds")
 async def get_seasonal_backgrounds():
     return Response(content=json.dumps([SEASONAL_BG_GIT_URL]))
 
 
 @osu.get("/beatmaps/{full_path:path}")
+@app_logger.log(msg="router osu get beatmap redirect")
 async def get_beatmap(full_path: str):
     return RedirectResponse(
         url=f"https://osu.ppy.sh/beatmaps/{full_path}",
@@ -61,6 +65,7 @@ async def get_beatmap(full_path: str):
 
 
 @osu.get("/web/osu-osz2-getscores.php")
+@app_logger.log(msg="router osu get leaderboard")
 async def get_leaderboard(
     requesting_from_editor_song_select: bool = Query(..., alias="s"),
     leaderboard_version: int = Query(..., alias="vv"),
@@ -81,7 +86,7 @@ async def get_leaderboard(
     map_filename = urlparse.unquote(map_filename)
 
     if session.songs_folder is None:
-        usecases.sessions.notify_client(
+        await usecases.sessions.notify_client(
             "Failed to retrieve songs folder. Session data may be corrupted, please relog."
         )
         return Response(
@@ -94,18 +99,25 @@ async def get_leaderboard(
     if session.current_game_mode != mode_arg:
         session.current_game_mode = mode_arg
 
-        usecases.sessions.update_current_session(session, update_client=True)
+        await usecases.sessions.update_current_session(session, update_client=True)
 
-    beatmap = await usecases.beatmaps.from_leaderboard_request(
-        beatmap_md5=map_md5,
-        beatmap_set_id=map_set_id,
-        map_filename=map_filename,
-        songs_folder=session.songs_folder,
-        current_settings=profile.settings,
-    )
+    try:
+        beatmap = await usecases.beatmaps.from_leaderboard_request(
+            beatmap_md5=map_md5,
+            beatmap_set_id=map_set_id,
+            map_filename=map_filename,
+            songs_folder=session.songs_folder,
+            current_settings=profile.settings,
+        )
+    except ApiV2CredentialsError:
+        await usecases.sessions.silent_restart_client()
+        return Response(
+             OsuErrors.NON.value.encode(),
+         )
+
     if beatmap is None:
         session.latest_beatmap = None
-        usecases.sessions.update_current_session(session)
+        await usecases.sessions.update_current_session(session)
 
         return Response(GraveyardLeaderboard().serialize())
 
@@ -115,7 +127,7 @@ async def get_leaderboard(
         set_id=beatmap.set_id,
     )
 
-    usecases.sessions.update_current_session(session)
+    await usecases.sessions.update_current_session(session)
 
     mods = osuMods(mods_arg)
 
@@ -176,6 +188,7 @@ async def get_leaderboard(
 
 
 @osu.post("/web/osu-submit-modular-selector.php")
+@app_logger.log(msg="router osu submit modular selector")
 async def osuSubmitModularSelector(
     request: Request,
     # TODO: should token be allowed
@@ -200,7 +213,7 @@ async def osuSubmitModularSelector(
     session: Session = Depends(retrive_session(OsuErrors.NON)),
 ):
     if session.songs_folder is None:
-        usecases.sessions.notify_client(
+        await usecases.sessions.notify_client(
             "Failed to retrieve songs folder. Session data may be corrupted, please relog."
         )
         return Response(
@@ -230,7 +243,7 @@ async def osuSubmitModularSelector(
     )
 
     if beatmap is None:
-        usecases.sessions.notify_client(
+        await usecases.sessions.notify_client(
             "Failed to find beatmap for submitted score. Score may not have been saved, please relog and try again."
         )
         return Response(
@@ -238,16 +251,16 @@ async def osuSubmitModularSelector(
         )
 
     # build score object
-    score_id = usecases.scores.generate_score_id()
+    score_id = await usecases.scores.generate_score_id()
 
     replay = ReplayFile.from_bytes(await replay_file.read(), pure_lzma=True)
 
-    score = Score.from_score_submission(
+    _score = Score.from_score_submission(
         score_id=score_id,
         score_data=score_data,
         replay_file=replay,
-        map_file=beatmap.file,
         beatmap_md5=beatmap.md5,
+        beatmap_max_combo=beatmap.max_combo,
     )
 
-    # TODO: FINISH SCORE SUB 
+    # TODO: FINISH SCORE SUB

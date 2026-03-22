@@ -7,15 +7,16 @@ from install_dependencies import install_dependencies
 
 install_dependencies()
 
-import multiprocessing
-import os
-import sys
-from typing import Callable
+import asyncio  # noqa: E402
+import multiprocessing  # noqa: E402
+import os  # noqa: E402
+import sys  # noqa: E402
+from typing import Callable  # noqa: E402
 
-import uvicorn
-import webview
+import uvicorn  # noqa: E402
+import webview  # noqa: E402
 
-from constants import LOS_GUI_PORT, LOS_PORT
+from constants import LOS_GUI_PORT, LOS_PORT  # noqa: E402
 
 PROCESSES: dict[str, multiprocessing.Process] = {}
 
@@ -44,7 +45,13 @@ def middleman_proxy():
 
 @graceful_shutdown
 def local_server():
-    uvicorn.run("server:app", host="127.0.0.1", port=LOS_PORT)
+    uvicorn.run(
+        "server:app",
+        host="127.0.0.1",
+        port=LOS_PORT,
+        access_log=False,
+        log_level="critical",
+    )
 
 
 @graceful_shutdown
@@ -56,7 +63,7 @@ def gui():
 def open_gui():
     import usecases.sessions
 
-    if usecases.sessions.session_exists():
+    if asyncio.run(usecases.sessions.session_exists()):
         url = f"http://localhost:{LOS_GUI_PORT}/dashboard"
     else:
         url = f"http://localhost:{LOS_GUI_PORT}/"

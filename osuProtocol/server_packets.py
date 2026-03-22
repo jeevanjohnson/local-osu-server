@@ -765,6 +765,7 @@ class UserID(Packet):
             _id=ServerPackets.USER_ID, data={"user_id": osuIntSigned32Bit(user_id)}
         )
 
+LOGIN_FAILED = UserID(LoginFailureReason.AUTHENTICATION_FAILED)
 
 class Notification(Packet):
     def __init__(self, message: str) -> None:
@@ -899,16 +900,25 @@ class ClientRelog(Packet):
         )
 
 
-def failed_login_response(message: str) -> Packets:
+def LoginFailed(
+        reason: LoginFailureReason,
+        message: str | None = None
+    ) -> Packets:
     packets = Packets()
 
     packets += UserID(LoginFailureReason.AUTHENTICATION_FAILED)
-    packets += Notification(message)
+    if message is not None:
+        packets += Notification(message)
 
     return packets
 
+def LoginAuthFailed(message: str | None = None) -> Packets:
+    return LoginFailed(LoginFailureReason.AUTHENTICATION_FAILED, message)
 
-def bancho_bot() -> Packets:
+def LoginError(message: str | None = None) -> Packets:
+    return LoginFailed(LoginFailureReason.ERROR_OCCURRED, message)
+
+def _BanchoBot() -> Packets:
     packets = Packets()
 
     packets += PlayerPresence(
@@ -941,8 +951,9 @@ def bancho_bot() -> Packets:
 
     return packets
 
+BanchoBot = _BanchoBot()
 
-def successful_login_response(
+def Login(
     username: str,
     friend_ids: list[int],
     utc_offset: int,
@@ -1008,19 +1019,19 @@ def successful_login_response(
         performance_points=performance_points,
     )
 
-    packets += bancho_bot()
+    packets += BanchoBot
 
     return packets
 
 
-def client_relog_response(
-    millisecond_delay: int = 0, message: str | None = None
-) -> Packets:
+def Relog(message: str | None = None) -> Packets:
     packets = Packets()
 
     if message is not None:
         packets += Notification(message)
 
-    packets += ClientRelog(millisecond_delay)
+    packets += ClientRelog(0)
 
     return packets
+
+SilentRelog = Relog()
