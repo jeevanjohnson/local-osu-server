@@ -143,4 +143,15 @@ class ScoresRepository:
         """Get total score count across all profiles"""
         async with self.scores as scores:
             return scores.total_scores
+        
+    async def get_score_by_id(self, score_id: int) -> Score | None:
+        """Get a score by its unique ID (O(n) lookup)"""
+        async with self.scores as scores:
+            for profile_scores in scores.profiles.values():
+                for map_scores in profile_scores.scores.values():
+                    for score in map_scores.scores:
+                        if score.id == score_id:
+                            return score
+        
+        return None
 

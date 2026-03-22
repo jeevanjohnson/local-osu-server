@@ -8,9 +8,10 @@ from models.database.scores import (
     CurrentMapScores as MapScores,
 )
 from models.domain.accuracy import to_percentage
+from models.domain.gameplay import Mods, osuGameMode
 from models.bancho.scores import (
     Score as BanchoScore,
-
+    Scores as BanchoScores,
 )
 from models.database.beatmaps import (
     CurrentBeatmap as Beatmap,
@@ -25,8 +26,19 @@ from osuProtocol.client_web import (
     MaxCombo, Accuracy, PerformancePoints
 )
 import usecases.bancho_scores
+from osuProtocol.replay import extract_replay_frames_from_osr
 
 class AllScores(list[BanchoScore | Score]):
+
+    def position_of_score(self, target_score: BanchoScore | Score, scoring_algorithm: ScoringAlgorithm) -> int:
+        """Get the position of a score in the list when sorted by the given scoring algorithm."""
+        temp_scores = AllScores(self)
+        temp_scores.sort(scoring_algorithm)
+
+        try:
+            return temp_scores.index(target_score) + 1
+        except ValueError:
+            return -1
 
     def sort(self, scoring_algorithm: ScoringAlgorithm) -> None:
         if scoring_algorithm == ScoringAlgorithm.PP:
@@ -88,9 +100,7 @@ async def score_rank(
     all_scores.extend(bancho_scores.all_scores)
     all_scores.append(score)
 
-    all_scores.sort(settings.scoring_algorithm)
-
-    return all_scores.index(score) + 1
+    return all_scores.position_of_score(score, settings.scoring_algorithm)
 
 async def previous_best_score(
     beatmap: Beatmap,
@@ -245,5 +255,70 @@ async def get_ranking_charts(
 
     return beatmap_chart, overall_ranking_chart
 
+async def personal_best_for_beatmap(
+        beatmap: Beatmap,
+        profile_name: str,
+        game_mode: osuGameMode,
+        scoring_algorithm: ScoringAlgorithm,
+        mods: Mods | None = None,
+) -> Score | None:
+    """Get the personal best score for a beatmap and profile."""
+    scores_repo = ScoresRepository(SCORES_FILE)
 
+    map_scores = await scores_repo.get_scores_by_profile_and_beatmap_md5(profile_name, beatmap.md5)
 
+    if not map_scores:
+        return None
+    
+    filtered_scores = map_scores.filter_by(
+        game_mode=game_mode,
+        mods=mods,
+    )
+    
+    if not filtered_scores:
+        return None
+    
+    if not filtered_scores.scores:
+        return None
+
+    filtered_scores.sort(
+        scoring_algorithm
+    )
+
+    return filtered_scores.scores[0]
+
+def leaderboard_position(
+    personal_best: Score,
+    scores: BanchoScores,
+    settings: Settings,
+) -> int:
+    """Calculate the leaderboard position of a score given the current leaderboard scores.
+
+    This is used to determine whether to show the "New #X on the leaderboard!" message after a score submission.
+    """
+    
+    all_scores = AllScores()
+    all_scores.extend(scores.all_scores)
+    all_scores.append(personal_best)
+
+    all_scores.sort(settings.scoring_algorithm)
+
+    return all_scores.index(personal_best) + 1
+
+async def get_replay_frames_for_score_id(score_id: int) -> bytes | None:
+    """Get replay frames for a given score ID, if available."""
+    scores_repo = ScoresRepository(SCORES_FILE)
+
+    score = await scores_repo.get_score_by_id(score_id)  # Ensure score exists; raises if not found
+
+    if score is None:
+        return None
+
+    if score.replay_frames is None:
+        return None
+
+    try:
+        return extract_replay_frames_from_osr(score.replay_frames)[0]
+    except Exception:
+        # Already in form?
+        return score.replay_frames

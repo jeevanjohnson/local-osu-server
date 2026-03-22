@@ -17,12 +17,12 @@ from osuProtocol.client_web import LeaderboardType
 from repositories.profiles import ProfilesRepository
 from repositories.sessions import SessionRepository
 from usecases.providers import get_ossapi_async
+from osuProtocol.replay import extract_replay_frames_from_osr
 
 _SCORE_HOT_CACHE_TTL_SECONDS = 300
 _SCORE_HOT_CACHE_MAX_SIZE = 1024
 _score_hot_cache: dict[tuple[Any, ...], tuple[float, Scores]] = {}
 _score_inflight_requests: dict[tuple[Any, ...], asyncio.Task[Scores | None]] = {}
-
 
 def _make_score_cache_key(
     beatmap_id: int,
@@ -103,8 +103,14 @@ async def get_scores_for(
     game_mode: osuGameMode,
     limit: int,
     stable_only: bool,
-    mods: osuMods | None = None,
-) -> Scores | None:
+    mods: Mods | None = None,
+) -> Scores:
+    
+    if mods is not None:
+        stable_mods, lazer_mods = mods.to_stable_mods()
+    else:
+        stable_mods = None
+
     show_lazer_only_if_score_v2 = False
     lazer_only = False
 
@@ -129,14 +135,14 @@ async def get_scores_for(
 
     # if score v2, show only lazer scores to kinda match the slider acc lbs.
     # Some users might want to see score v2 scores on the all mods lb, even if they have score v1 scores.
-    if mods and mods & osuMods.SCOREV2 and show_lazer_only_if_score_v2:
-        mods &= ~osuMods.SCOREV2
+    if stable_mods and stable_mods & osuMods.SCOREV2 and show_lazer_only_if_score_v2:
+        stable_mods &= ~osuMods.SCOREV2
         lazer_only = True
         # Override limit to fetch more scores in case there is more lazer
         limit = 100
 
-    if leaderboard_type == LeaderboardType.MODS and mods is not None:
-        req_mods = int(mods)
+    if leaderboard_type == LeaderboardType.MODS and stable_mods is not None:
+        req_mods = int(stable_mods)
         req_limit = limit
     else:
         req_mods = None
@@ -161,7 +167,7 @@ async def get_scores_for(
     if inflight_request is not None:
         return await asyncio.shield(inflight_request)
 
-    async def _resolve_scores() -> Scores | None:
+    async def _resolve_scores() -> Scores:
         app_logger.warning(
             f"Fetching scores for beatmap {beatmap.id} with mods {mods} and leaderboard type {leaderboard_type.name}..."
         )
@@ -177,10 +183,10 @@ async def get_scores_for(
             )
         except ValueError as e:
             app_logger.error(f"Error fetching scores for beatmap {beatmap.id}: {e}")
-            return None
+            return Scores(all_scores=[])
 
         if not requested_scores:
-            return None
+            return Scores(all_scores=[])
 
         scores = Scores(all_scores=[])
 
@@ -259,3 +265,34 @@ async def get_scores_for(
     finally:
         if _score_inflight_requests.get(cache_key) is inflight_task:
             _score_inflight_requests.pop(cache_key, None)
+
+async def get_replay_for_score(
+    score_id: int,
+    beatmap_md5: str | None = None
+) -> bytes | None:
+    """Returns compatible stable replay frames for the given score ID or None if it doesn't match the conditions"""
+    # Check if replay is available for this score & md5's match
+    osuApi = await get_ossapi_async()
+
+    try:
+        # Full replay payload
+        replay_data = await osuApi.download_score(
+            score_id=score_id,
+            raw=True,
+        )
+
+        assert replay_data is not None, "Expected replay data to be bytes"
+        assert isinstance(replay_data, bytes), f"Expected replay data to be bytes, got {type(replay_data)}"
+
+        # Extract replay frames from .osr replay data
+        replay_frames, replay_beatmap_md5 = extract_replay_frames_from_osr(replay_data)
+
+        if beatmap_md5 and replay_beatmap_md5 != beatmap_md5:
+            print(f"Replay beatmap md5 {replay_beatmap_md5} does not match expected {beatmap_md5}")
+            return None
+        else:
+            return replay_frames
+
+    except ValueError as e:
+        app_logger.error(f"Error fetching replay for score {score_id}: {e}")
+        raise 

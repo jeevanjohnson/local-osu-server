@@ -6,10 +6,10 @@ from pydantic import ConfigDict, Field, field_serializer, field_validator
 
 from models.domain.accuracy import UnitAccuracy
 from models.domain.gameplay import Mods
-from osuProtocol.client_web import ScoringAlgorithm
 from osuProtocol.server_packets import osuGameMode
 
 if TYPE_CHECKING:
+    from osuProtocol.client_web import ScoringAlgorithm
     from usecases.score_submission import ScoreData
 
 EpochTime = int
@@ -162,6 +162,24 @@ class MapScoresV1(MigratableModel):
         
     def append(self, score: CurrentScore) -> None:
         self.scores.append(score)
+
+    def filter_by(
+            self, 
+            game_mode: osuGameMode | None = None,
+            mods: Mods | None = None
+        ) -> "MapScoresV1":
+        filtered_scores = []
+
+        for score in self.scores:
+            if game_mode is not None and score.game_mode != game_mode:
+                continue
+
+            if mods is not None and score.enabled_mods != mods:
+                continue
+           
+            filtered_scores.append(score)
+
+        return MapScoresV1(beatmap_md5=self.beatmap_md5, scores=filtered_scores)
 
 CurrentMapScores = MapScoresV1
 

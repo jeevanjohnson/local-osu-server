@@ -29,7 +29,7 @@ class SessionBeatmapInfoV1(MigratableModel):
     md5: str = Field(default="")
     id: int = Field(default=0)
     set_id: int = Field(default=0)
-
+    is_difficulty_adjusted: bool = Field(default=False)
 
 CurrentSessionBeatmapInfo = SessionBeatmapInfoV1
 

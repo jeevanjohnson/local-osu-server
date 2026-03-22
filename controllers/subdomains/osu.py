@@ -20,6 +20,7 @@ import usecases.profiles
 import usecases.score_submission
 import usecases.scores
 import usecases.sessions
+from models.domain.gameplay import Mods, osuMods
 from adapters.app_logger import app_logger
 from constants import SEASONAL_BG_GIT_URL
 from controllers.dependencies import OsuErrors, retrieve_profile, retrieve_server_settings, retrieve_session
@@ -29,7 +30,7 @@ from models.database.sessions import (
 )
 from models.database.server_settings import CurrentServerSettings as ServerSettings 
 from models.database.sessions import CurrentSessionBeatmapInfo as SessionBeatmapInfo
-from models.domain.gameplay import osuGameMode, osuMods
+from models.domain.gameplay import osuGameMode
 import usecases.server_settings
 from osuProtocol.client_web import (
     GRAVEYARD_LEADERBOARD,
@@ -87,6 +88,9 @@ async def get_leaderboard(
     profile: Profile = Depends(retrieve_profile(OsuErrors.NON)),
     session: Session = Depends(retrieve_session(OsuErrors.NON)),
 ):
+    if mods_arg & osuMods.SCOREV2:
+        mods_arg &= ~osuMods.SCOREV2
+    
     map_filename = urlparse.unquote(map_filename)
 
     if session.songs_folder is None:
@@ -128,7 +132,8 @@ async def get_leaderboard(
             return Response(GRAVEYARD_LEADERBOARD)
 
     if beatmap.id == 0:
-        # practice/unsubmitted map, just return empty leaderboard but save the beatmap info in the session so it can be used for score submission
+        # practice/unsubmitted map, just return empty leaderboard but save the beatmap info in the 
+        # session so it can be used for other requests
         session.latest_beatmap = None
         await usecases.sessions.update_current_session(session)
         return Response(NOT_SUBMITTED_LEADERBOARD)
@@ -137,6 +142,7 @@ async def get_leaderboard(
         id=beatmap.id,
         md5=beatmap.md5,
         set_id=beatmap.set_id,
+        is_difficulty_adjusted=beatmap.difficulty_adjusted,
     )
 
     await usecases.sessions.update_current_session(session)
@@ -144,7 +150,9 @@ async def get_leaderboard(
     if not beatmap.status.has_leaderboard():
         return Response(GRAVEYARD_LEADERBOARD)
 
-    mods = osuMods(mods_arg)
+    mods = Mods.from_stable_mods(
+        mods_arg
+    )
 
     if profile.settings.leaderboard.show_lazer_scores_on_leaderboard:
         stable_only = False
@@ -160,10 +168,46 @@ async def get_leaderboard(
         stable_only=stable_only,
     )
 
-    # TODO: handle map updates
+    if leaderboard_type == LeaderboardType.MODS:
+        personal_best_mods = mods
+    else:
+        personal_best_mods = None
 
+    personal_best = await usecases.scores.personal_best_for_beatmap(
+        beatmap=beatmap,
+        profile_name=session.profile_name,
+        game_mode=mode_arg,
+        mods=personal_best_mods,
+        scoring_algorithm=profile.settings.scoring_algorithm,
+    )
+    personal_best_row = None
+    if personal_best:
+        personal_best_position = usecases.scores.leaderboard_position(
+            personal_best=personal_best,
+            scores=scores,
+            settings=profile.settings,
+        )
+
+        if profile.settings.scoring_algorithm == ScoringAlgorithm.PP:
+            personal_best_ingame_score = personal_best.performance_points or 0
+        else:
+            personal_best_ingame_score = personal_best.total_score
+
+        personal_best_row = LeaderboardScore.from_score(
+            score=personal_best,
+            position=personal_best_position,
+            ingame_score=personal_best_ingame_score,
+            from_difficulty_adjusted=beatmap.difficulty_adjusted,
+            truncate_username=profile.settings.leaderboard.truncate_user_names_on_leaderboard,
+        )
+
+    from usecases.scores import AllScores
+
+    merged_scores = AllScores()
+    merged_scores.extend(scores.all_scores)
+    merged_scores.append(personal_best) if personal_best else None
+    
     total_scores = scores.total if scores else 0
-
     leaderboard_header = LeaderboardHeader(
         beatmap_status=beatmap.status,
         beatmap_id=beatmap.id,
@@ -173,16 +217,20 @@ async def get_leaderboard(
         title=beatmap.title,
     )
 
-    leaderboard = Leaderboard(header=leaderboard_header, scores=[])
+    leaderboard = Leaderboard(
+        header=leaderboard_header, 
+        scores=[],
+        personal_best=personal_best_row,
+    )
 
-    if not scores:
+    if not scores and personal_best is None:
         return Response(content=leaderboard.serialize())
 
     leaderboard_scores = []
-    scores.sort(profile.settings.scoring_algorithm)
-    scores.limit = profile.settings.leaderboard.leaderboard_score_limit
+    merged_scores.sort(profile.settings.scoring_algorithm)
+    merged_scores = merged_scores[:profile.settings.leaderboard.leaderboard_score_limit]
 
-    for index, score in enumerate(scores.scores):
+    for index, score in enumerate(merged_scores):
         if profile.settings.scoring_algorithm == ScoringAlgorithm.PP:
             ingame_score = score.performance_points or 0
         else:
@@ -397,9 +445,45 @@ async def osuSubmitModularSelector(
 
     return Response(content=submission_charts.serialize())
 
-    
-    
+@osu.get("/web/osu-getreplay.php")
+@app_logger.log(msg="router osu get replay")
+async def get_replay(
+    score_id: int = Query(..., alias="c"),
+    mode: int = Query(..., alias="m"),
+    profile: Profile = Depends(retrieve_profile(OsuErrors.NON)),
+    session: Session = Depends(retrieve_session(OsuErrors.NON)),
+):
+    beatmap_md5 = session.latest_beatmap.md5 if session.latest_beatmap else None
+    is_difficulty_adjusted = session.latest_beatmap.is_difficulty_adjusted if session.latest_beatmap else False
 
+    if score_id > 0:
+        if is_difficulty_adjusted:
+            await usecases.sessions.notify_client(
+                "Replays for difficulty adjusted scores are not available."
+            )
+            return Response(OsuErrors.NON.value.encode())
 
-    
+        replay_data = await usecases.bancho_scores.get_replay_for_score(
+            score_id=score_id,
+            beatmap_md5=beatmap_md5,
+        )
 
+        if replay_data is None:
+            await usecases.sessions.notify_client(
+                "Replay data for this score is not available.\n"
+                "Ensure this score was set on stable in order to view it's replay"
+            )
+            return Response(OsuErrors.NON.value.encode())
+
+        return Response(content=replay_data)
+
+    replay_frames = await usecases.scores.get_replay_frames_for_score_id(score_id=-score_id)
+
+    if replay_frames is None:
+        await usecases.sessions.notify_client(
+            "Replay data for this score is not available.\n"
+            "To recover the replay, head to the score link & recover w/ right beatmap or something like that"
+        )
+        return Response(OsuErrors.NON.value.encode())
+
+    return Response(content=replay_frames)

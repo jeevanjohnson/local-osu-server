@@ -1,5 +1,5 @@
 from base64 import b64decode
-from datetime import datetime
+from datetime import UTC, datetime
 
 from fastapi.datastructures import FormData
 from py3rijndael import Pkcs7Padding, RijndaelCbc
@@ -105,7 +105,8 @@ def decrypt_score_aes_data(
         mods=Mods.from_score_submission(int(score_data[13])),
         passed=score_data[14] == "True",
         game_mode=osuGameMode(int(score_data[15])),
-        play_time=datetime.strptime(score_data[16], "%y%m%d%H%M%S"),
+        # Score submission timestamp is UTC; keep it timezone-aware so epoch conversion is stable.
+        play_time=datetime.strptime(score_data[16], "%y%m%d%H%M%S").replace(tzinfo=UTC),
     )
 
     # score data is delimited by colons (:).

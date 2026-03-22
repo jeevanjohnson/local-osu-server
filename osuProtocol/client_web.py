@@ -6,6 +6,9 @@ import ossapi.enums
 
 from models.bancho.scores import LazerScore, Score, StableScore
 from models.domain.gameplay import osuMods
+from models.database.scores import (
+    CurrentScore as ProfileScore,
+)
 
 
 @unique
@@ -120,7 +123,7 @@ class LeaderboardScore:
     @classmethod
     def from_score(
         cls,
-        score: Score,
+        score: Score | ProfileScore,
         position: int,
         ingame_score: int,
         from_difficulty_adjusted: bool = False,
@@ -163,7 +166,7 @@ class LeaderboardScore:
         else:
             title = score.username
 
-        if from_difficulty_adjusted:
+        if from_difficulty_adjusted and not isinstance(score, ProfileScore):
             # https://capitalizemytitle.com/small-text-converter/
             title = f"[ᵒᵍ ᵈⁱᶠᶠ] {title}"
 
@@ -181,7 +184,7 @@ class LeaderboardScore:
                     title += " (.75x)"
                 else:
                     title += " (1x)"
-            else:
+            elif isinstance(score, LazerScore):
                 if not has_lazer_rate_change:
                     if "DT" in score.enabled_mods or "NC" in score.enabled_mods:
                         title += " (1.5x)"
@@ -193,11 +196,22 @@ class LeaderboardScore:
         if truncate_username and len(title) > 15 + 3:  # 15 chars + 3 for "..."
             title = title[:15] + "..."  # Truncate username to 20 characters
 
+        if isinstance(score, ProfileScore):
+            score_id = -score.id
+            max_combo = score.combo
+            user_id = 2
+            replay_available = score.replay_frames is not None
+        else:
+            user_id = score.user_id
+            score_id = score.score_id
+            max_combo = score.combo.actual
+            replay_available = score.replay_available
+
         return cls(
-            score_id=score.score_id,
+            score_id=score_id,
             username=title,
             score=ingame_score,
-            max_combo=score.combo.actual,
+            max_combo=max_combo,
             count50=score.count50,
             count100=score.count100,
             count300=score.count300,
@@ -206,10 +220,10 @@ class LeaderboardScore:
             countgeki=0,
             perfect=score.perfect,
             enabled_mods=stable_mods,
-            user_id=score.user_id,
+            user_id=user_id,
             position=position,
             time_set=score.time_set,
-            replay_available=score.replay_available,
+            replay_available=replay_available,
         )
 
 

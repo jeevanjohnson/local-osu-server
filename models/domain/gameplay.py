@@ -10,8 +10,11 @@ class Mods(list[str]):
 
     @classmethod
     def from_stable_mods(
-        cls, stable_mods: osuMods, lazer_mods: LAZER_MODS | None = None
+        cls, stable_mods: osuMods | int, lazer_mods: LAZER_MODS | None = None
     ) -> "Mods":
+        if isinstance(stable_mods, int):
+            stable_mods = osuMods(stable_mods)
+
         mods = stable_mods.to_acronym_list()
 
         if lazer_mods:
