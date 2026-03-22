@@ -259,9 +259,7 @@ from pathlib import Path
 from typing import Optional, Union
 
 import utils
-from ext import glob
 from objects.beatmap import Beatmap
-from utils import log_error
 
 # TODO: for right now the finder
 # is pretty good for how it is
@@ -535,7 +533,6 @@ class ModifiedFinder:
 
 import asyncio
 import re
-import urllib.parse as urlparse
 from typing import Union
 
 import aiohttp
@@ -543,8 +540,6 @@ import orjson
 import packets
 import pyperclip
 import regex
-import utils
-from ext import glob
 from objects import (
     DirectResponse,
     Leaderboard,
@@ -553,7 +548,7 @@ from objects import (
     Mods,
     NotSupported,
 )
-from utils import Color, log, log_error, log_success
+from utils import Color, log, log_success
 
 from constants import InvalidMods, ParsedParams
 from server import Alias, Query, Response, Router

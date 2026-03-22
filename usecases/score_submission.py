@@ -6,8 +6,15 @@ from py3rijndael import Pkcs7Padding, RijndaelCbc
 from pydantic import BaseModel, ConfigDict
 from starlette.datastructures import UploadFile as StarletteUploadFile
 
+from adapters.osu_file import OsuFile
 from models.domain.gameplay import Mods, osuGameMode
-
+from models.database.scores import (
+    CurrentScore as Score
+)
+import calculator
+from repositories.scores import ScoresRepository
+from constants import SCORES_FILE
+from adapters.app_logger import app_logger
 
 def parse_form_data(form_data: FormData) -> tuple[bytes, StarletteUploadFile] | None:
     try:
@@ -83,7 +90,7 @@ def decrypt_score_aes_data(
 
     parsed_score_data = ScoreData(
         beatmap_md5=score_data[0],
-        username=score_data[1],
+        username=score_data[1].strip(),
         online_checksum=score_data[2],
         count_300=int(score_data[3]),
         count_100=int(score_data[4]),
@@ -103,3 +110,65 @@ def decrypt_score_aes_data(
 
     # score data is delimited by colons (:).
     return parsed_score_data, client_hash_decoded
+
+@app_logger.log(msg="building score")
+async def build_score(
+    score_id: int,
+    map_file: OsuFile,
+    score_data: ScoreData,
+    beatmap_md5: str,
+    replay_frames: bytes,
+    beatmap_max_combo: int,
+    calc_pp: bool = True,
+) -> Score:
+    if calc_pp:
+        pp = calculator.pp(
+            map_file=map_file,
+            game_mode=score_data.game_mode,
+            mods=score_data.mods,
+            combo=score_data.max_combo,
+            n300=score_data.count_300,
+            n100=score_data.count_100,
+            n50=score_data.count_50,
+            nmiss=score_data.count_miss,
+        )
+    else:
+        pp = None
+
+    return Score.from_score_submission(
+        score_id=score_id,
+        score_data=score_data,
+        beatmap_md5=beatmap_md5,
+        replay_frames=replay_frames,
+        beatmap_max_combo=beatmap_max_combo,
+        pp=pp,
+    )
+
+@app_logger.log(msg="submitting score")
+async def submit_score(
+    score_id: int,
+    map_file: OsuFile,
+    score_data: ScoreData,
+    beatmap_md5: str,
+    replay_frames: bytes,
+    beatmap_max_combo: int,
+    calc_pp: bool = True,
+) -> Score:
+    score_repo = ScoresRepository(path=SCORES_FILE)
+
+    score = await build_score(
+        score_id=score_id,
+        map_file=map_file,
+        score_data=score_data,
+        beatmap_md5=beatmap_md5,
+        replay_frames=replay_frames,
+        beatmap_max_combo=beatmap_max_combo,
+        calc_pp=calc_pp,
+    )
+
+    await score_repo.save_score(score, profile_name=score_data.username)
+
+    return score
+
+
+

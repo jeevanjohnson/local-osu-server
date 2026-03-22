@@ -3,6 +3,7 @@ from ossapi import OssapiV1
 from adapters import OssapiAsync
 from constants import SERVER_SETTINGS_FILE
 from repositories.server_settings import ServerSettingsRepository
+from .osu_daily import OsuDailyCredentialsError as OsuDailyCredentialsError
 
 
 class ApiV2CredentialsError(Exception):

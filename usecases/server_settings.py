@@ -22,5 +22,6 @@ async def credentials_exist() -> bool:
     return (
         server_settings.osu_api_v2_client_id is not None
         and server_settings.osu_api_v2_client_secret is not None
-        and server_settings.osu_api_v2_client_id.isdecimal()
+        and server_settings.osu_api_v2_client_id.isdecimal() and
+        server_settings.osu_daily_api_key is not None
     )

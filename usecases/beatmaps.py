@@ -1176,3 +1176,23 @@ async def from_score_submission_request(
         return await resolver.from_score_submission_request(beatmap_md5=beatmap_md5)
     finally:
         await resolver.close()
+
+async def require_osu_file_for_beatmap(
+    beatmap: Beatmap, 
+    songs_folder: Path
+) -> OsuFile:
+    resolver = BeatmapResolver(
+        songs_folder=songs_folder,
+        beatmaps_repo=BeatmapsRepository(BEATMAPS_FILE),
+        osu_files_repo=OsuFilesRepository(OSU_FILES_FILE),
+        current_settings=CurrentSettings(),
+    )
+
+    try:
+        osu_file = resolver.get_osu_file_from_md5(beatmap.md5)
+        if osu_file is None:
+            raise FileNotFoundError(f"Could not find .osu file for beatmap with md5 {beatmap.md5}")
+        
+        return osu_file
+    finally:
+        await resolver.close()

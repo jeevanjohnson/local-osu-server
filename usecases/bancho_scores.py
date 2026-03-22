@@ -128,7 +128,6 @@ async def get_scores_for(
     # TODO: Implement self scores and friends scores leaderboards
 
     # if score v2, show only lazer scores to kinda match the slider acc lbs.
-    # TODO MAKE THIS A CONFIG OPTION.
     # Some users might want to see score v2 scores on the all mods lb, even if they have score v1 scores.
     if mods and mods & osuMods.SCOREV2 and show_lazer_only_if_score_v2:
         mods &= ~osuMods.SCOREV2

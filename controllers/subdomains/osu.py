@@ -13,7 +13,6 @@ from fastapi import (
     status,
 )
 from fastapi.responses import RedirectResponse
-from osupyparser.osr.osr_parser import ReplayFile
 
 import usecases.bancho_scores
 import usecases.beatmaps
@@ -23,16 +22,15 @@ import usecases.scores
 import usecases.sessions
 from adapters.app_logger import app_logger
 from constants import SEASONAL_BG_GIT_URL
-from controllers.dependencies import OsuErrors, retrieve_profile, retrieve_session
+from controllers.dependencies import OsuErrors, retrieve_profile, retrieve_server_settings, retrieve_session
 from models.database.profiles import CurrentProfile as Profile
-from models.database.scores import (
-    CurrentScore as Score,
-)
 from models.database.sessions import (
     CurrentSession as Session,
 )
+from models.database.server_settings import CurrentServerSettings as ServerSettings 
 from models.database.sessions import CurrentSessionBeatmapInfo as SessionBeatmapInfo
 from models.domain.gameplay import osuGameMode, osuMods
+import usecases.server_settings
 from osuProtocol.client_web import (
     GRAVEYARD_LEADERBOARD,
     NOT_SUBMITTED_LEADERBOARD,
@@ -42,8 +40,12 @@ from osuProtocol.client_web import (
     LeaderboardScore,
     LeaderboardType,
     ScoringAlgorithm,
+    Achievements,
+    SubmissionCharts,
+    UNRANKED_CHARTS
 )
-from usecases.providers import ApiV2CredentialsError
+from usecases.providers import ApiV2CredentialsError, OsuDailyCredentialsError
+from datetime import datetime
 
 osu = APIRouter(
     prefix="/osu",
@@ -88,9 +90,7 @@ async def get_leaderboard(
     map_filename = urlparse.unquote(map_filename)
 
     if session.songs_folder is None:
-        await usecases.sessions.restart_client(
-            "Failed to retrieve songs folder. Relogging"
-        )
+        await usecases.sessions.silent_restart_client()
         return Response(
             OsuErrors.NON.value.encode(),
         )
@@ -247,30 +247,58 @@ async def osuSubmitModularSelector(
     fl_cheat_screenshot: bytes | None = File(None, alias="i"),
     profile: Profile = Depends(retrieve_profile(OsuErrors.NON)),
     session: Session = Depends(retrieve_session(OsuErrors.NON)),
+    server_settings: ServerSettings = Depends(retrieve_server_settings),
 ):
     if session.songs_folder is None:
-        await usecases.sessions.restart_client(
-            "Failed to retrieve songs folder. Relogging."
-        )
+        await usecases.sessions.silent_restart_client()
         return Response(
             OsuErrors.NON.value.encode(),
         )
 
-    score_parameters = usecases.score_submission.parse_form_data(
-        await request.form(),
-    )
+    if not await usecases.server_settings.credentials_exist():
+        await usecases.sessions.restart_client()
+        return Response(
+            OsuErrors.NON.value.encode(),
+        )
 
-    if score_parameters is None:
-        return Response(b"")
+    try:
+        score_parameters = usecases.score_submission.parse_form_data(
+            await request.form(),
+        )
 
-    score_data_b64, replay_file = score_parameters
+        if score_parameters is None:
+            raise ValueError("Invalid score form data")
 
-    score_data, client_hash_decoded = usecases.score_submission.decrypt_score_aes_data(
-        score_data_b64=score_data_b64,
-        client_hash_b64=client_hash_b64,
-        iv_b64=iv_b64,
-        osu_version=osu_version,
-    )
+        score_data_b64, replay_file = score_parameters
+
+        score_data, client_hash_decoded = usecases.score_submission.decrypt_score_aes_data(
+            score_data_b64=score_data_b64,
+            client_hash_b64=client_hash_b64,
+            iv_b64=iv_b64,
+            osu_version=osu_version,
+        )
+    except Exception as error:
+        app_logger.warning(f"Failed to parse submitted score payload: {error}")
+        await usecases.sessions.notify_client(
+            "Failed to parse submitted score. Please try again."
+        )
+        return Response(OsuErrors.NON.value.encode())
+
+    if score_data.username.lower() != session.profile_name.lower():
+        print(f"Score submission profile mismatch: score submitted for {score_data.username} but current session profile is {session.profile_name}")
+        await usecases.sessions.notify_client(
+            "Submitted score profile mismatch. Please relog and try again."
+        )
+        return Response(OsuErrors.NON.value.encode())
+
+    if not profile.settings.relax_submission and "RX" in score_data.mods:
+        await usecases.sessions.notify_client(
+            "Relax mod score submissions are not allowed on this server. Please disable relax and try again."
+        )
+        return Response(OsuErrors.NON.value.encode())
+
+    if not score_data.passed:
+        return Response(OsuErrors.NON.value.encode())
 
     beatmap = await usecases.beatmaps.from_score_submission_request(
         beatmap_md5=score_data.beatmap_md5,
@@ -285,18 +313,93 @@ async def osuSubmitModularSelector(
         return Response(
             OsuErrors.BEATMAP.value.encode(),
         )
+    
+    if not beatmap.status.has_leaderboard():
+        return Response(UNRANKED_CHARTS.serialize())
 
-    # build score object
-    score_id = await usecases.scores.generate_score_id()
+    try:
+        osu_file = await usecases.beatmaps.require_osu_file_for_beatmap(
+            beatmap=beatmap,
+            songs_folder=session.songs_folder,
+        )
+    except FileNotFoundError:
+        await usecases.sessions.notify_client(
+            "Failed to find .osu file for beatmap. Score may not have been saved, please relog and try again."
+        )
+        return Response(
+            OsuErrors.BEATMAP.value.encode(),
+        )
 
-    replay = ReplayFile.from_bytes(await replay_file.read(), pure_lzma=True)
-
-    _score = Score.from_score_submission(
-        score_id=score_id,
+    score = await usecases.score_submission.submit_score(
+        score_id=await usecases.scores.generate_score_id(),
+        map_file=osu_file,
         score_data=score_data,
-        replay_file=replay,
-        beatmap_md5=beatmap.md5,
+        replay_frames=await replay_file.read(),
         beatmap_max_combo=beatmap.max_combo,
+        beatmap_md5=beatmap.md5,
+        calc_pp=beatmap.status.ranked()
     )
 
-    # TODO: FINISH SCORE SUB
+    try:
+        current_profile = await usecases.profiles.recalculate_stats(
+            session.profile_name,
+            max_combo=score.combo,
+            game_mode=score.game_mode,
+            server_settings=server_settings,
+            scoring_algorithm=profile.settings.scoring_algorithm
+        )
+    except OsuDailyCredentialsError:
+        await usecases.sessions.silent_restart_client()
+        return Response(
+            OsuErrors.NON.value.encode(),
+        )
+    
+    # TODO: Support AP?
+    if "RX" in score.enabled_mods:
+        return Response(OsuErrors.NON.value.encode())
+
+    beatmap_ranking_chart, overall_ranking_chart = await usecases.scores.get_ranking_charts(
+        beatmap=beatmap,
+        old_profile=profile,
+        current_profile=current_profile,
+        new_score=score,
+        settings=profile.settings
+    )
+
+    # TODO: Port bancho achievements here!
+    # For now a test one for ya
+    unlocked_achievements = Achievements()
+
+    # unlocked_achievements.append(
+    #     Achievement(
+    #         image_url="https://cdn.discordapp.com/attachments/737236214062645338/908465184425795614/unknown.png?ex=69c104e2&is=69bfb362&hm=21fbd56213faf386632c0a9b9ce2d3a989c4e1220bda3f35f098f69ad71d4d46&",
+    #         title="Test Achievement",
+    #         description="This is a test achievement. Congrats on unlocking it!",
+    #     )
+    # )
+
+    submission_charts = SubmissionCharts(
+        beatmap_id=beatmap.id,
+        beatmap_set_id=beatmap.set_id,
+        beatmap_playcount=1, # TODO: Get this
+        beatmap_passcount=1, # TODO: Get this
+        last_update=datetime.now(), # TODO: Get this
+        score_id=score.id,
+        achievements=unlocked_achievements,
+        beatmap_chart=beatmap_ranking_chart,
+        overall_ranking_chart=overall_ranking_chart,
+    )
+
+    await usecases.sessions.update_current_session(
+        session,
+        update_client=True,
+    )
+
+    return Response(content=submission_charts.serialize())
+
+    
+    
+
+
+    
+

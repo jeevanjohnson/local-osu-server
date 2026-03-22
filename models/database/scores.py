@@ -1,10 +1,16 @@
+import base64
+from typing import TYPE_CHECKING
+
 from jays_tools import MigratableModel
-from osupyparser.osr.osr_parser import ReplayFile
 from pydantic import ConfigDict, Field, field_serializer, field_validator
 
+from models.domain.accuracy import UnitAccuracy
 from models.domain.gameplay import Mods
+from osuProtocol.client_web import ScoringAlgorithm
 from osuProtocol.server_packets import osuGameMode
-from usecases.score_submission import ScoreData
+
+if TYPE_CHECKING:
+    from usecases.score_submission import ScoreData
 
 EpochTime = int
 
@@ -12,7 +18,7 @@ EpochTime = int
 class ScoreV1(MigratableModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    score_id: int
+    id: int
     beatmap_md5: str
     game_mode: osuGameMode
     username: str
@@ -25,7 +31,7 @@ class ScoreV1(MigratableModel):
     perfect: bool
     time_set: EpochTime
     performance_points: int | None = Field(default=None)
-    replay: ReplayFile
+    replay_frames: bytes
 
     beatmap_max_combo: int
 
@@ -38,19 +44,31 @@ class ScoreV1(MigratableModel):
     def deserialize_mods(cls, value: list[str]) -> Mods:
         return Mods(value)
 
+    @field_serializer("replay_frames")
+    def serialize_replay_frames(self, value: bytes) -> str:
+        return base64.b64encode(value).decode("ascii")
+
+    @field_validator("replay_frames", mode="before")
+    @classmethod
+    def deserialize_replay_frames(cls, value: object) -> bytes:
+        if isinstance(value, bytes):
+            return value
+
+        assert isinstance(value, str), "Expected base64 replay frames payload"
+        return base64.b64decode(value.encode("ascii"))
+
     @classmethod
     def from_score_submission(
         cls,
         score_id: int,
-        score_data: ScoreData,
+        score_data: "ScoreData",
         beatmap_md5: str,
-        replay_file: ReplayFile,
+        replay_frames: bytes,
         beatmap_max_combo: int,
+        pp: int | None = None,
     ) -> "ScoreV1":
-        # This is where we would calculate the total score based on the score data and beatmap info.
-        # For now, we'll just set it to 0 and fill it in later.
         return cls(
-            score_id=score_id,  # This will be set when the score is saved to the database
+            id=score_id,  # This will be set when the score is saved to the database
             game_mode=score_data.game_mode,
             username=score_data.username,
             count50=score_data.count_50,
@@ -59,10 +77,10 @@ class ScoreV1(MigratableModel):
             count_miss=score_data.count_miss,
             combo=score_data.max_combo,
             enabled_mods=score_data.mods,
-            perfect=score_data.passed,
+            perfect=score_data.perfect,
             time_set=int(score_data.play_time.timestamp()),
-            performance_points=None,  # This will be calculated later based on the beatmap and mods
-            replay=replay_file,
+            performance_points=pp,
+            replay_frames=replay_frames,
             beatmap_md5=beatmap_md5,
             beatmap_max_combo=beatmap_max_combo,
         )
@@ -105,18 +123,76 @@ class ScoreV1(MigratableModel):
 
         return round(final_score)
 
+    @property
+    def accuracy(self) -> UnitAccuracy:
+        total_objects = self.count300 + self.count100 + self.count50 + self.count_miss
+        if total_objects == 0:
+            return 0.0
+
+        total_score = 300 * self.count300 + 100 * self.count100 + 50 * self.count50
+        max_score = 300 * total_objects
+        return total_score / max_score
 
 CurrentScore = ScoreV1
 
 BEATMAP_MD5 = str
 
+class MapScoresV1(MigratableModel):
+    beatmap_md5: BEATMAP_MD5
+    scores: list[CurrentScore] = Field(default_factory=list)
 
-class ScoresV1(MigratableModel):
-    scores: dict[BEATMAP_MD5, list[CurrentScore]] = Field(default_factory=dict)
+    def sort_by_pp(self) -> None:
+        self.scores.sort(
+            key=lambda s: (s.performance_points or 0, -s.time_set), reverse=True
+        )
+
+    def sort_by_score(self):
+        self.scores.sort(key=lambda s: (s.total_score, -s.time_set), reverse=True)
+
+    def sort(self, algorithm: "ScoringAlgorithm") -> None:
+        # Lazy import prevents circular import at module load time.
+        from osuProtocol.client_web import ScoringAlgorithm
+
+        if algorithm == ScoringAlgorithm.PP:
+            self.sort_by_pp()
+        elif algorithm == ScoringAlgorithm.LAZER:
+            self.sort_by_score()
+        else:
+            raise ValueError(f"Unsupported scoring algorithm: {algorithm}")
+        
+    def append(self, score: CurrentScore) -> None:
+        self.scores.append(score)
+
+CurrentMapScores = MapScoresV1
+
+class ScoresForProfileV1(MigratableModel):
+    scores: dict[BEATMAP_MD5, CurrentMapScores] = Field(default_factory=dict)
 
     @property
     def total_scores(self) -> int:
-        return sum(len(scores) for scores in self.scores.values())
+        return sum(len(map_scores.scores) for map_scores in self.scores.values())
 
+CurrentScoresForProfile = ScoresForProfileV1
+
+PROFILE_NAME = str
+
+class ScoresV1(MigratableModel):
+    """
+    Dual-indexed score storage for efficient O(1) access:
+    - profiles: Organizes scores by profile -> beatmap (for user stats)
+    - beatmap_leaderboards: Organizes scores by beatmap (for leaderboard views)
+    - score_counter: Atomic score ID allocation
+    """
+    profiles: dict[PROFILE_NAME, CurrentScoresForProfile] = Field(default_factory=dict)
+    beatmap_leaderboards: dict[BEATMAP_MD5, CurrentMapScores] = Field(default_factory=dict)
+    score_counter: int = Field(default=0)
+
+    @property
+    def total_scores(self) -> int:
+        """Aggregate total score count across all profiles"""
+        return sum(
+            profile_scores.total_scores
+            for profile_scores in self.profiles.values()
+        )
 
 CurrentScores = ScoresV1
