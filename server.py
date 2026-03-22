@@ -12,8 +12,8 @@ from constants import DATA_FOLDER
 from controllers.dependencies import ClientResponseException
 from controllers.subdomains.assets import assets
 from controllers.subdomains.avatar import avatar
-from controllers.subdomains.cho import bancho
 from controllers.subdomains.beatmaps import beatmaps
+from controllers.subdomains.cho import bancho
 from controllers.subdomains.osu import osu
 from controllers.subdomains.resources import resources
 

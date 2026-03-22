@@ -14,6 +14,7 @@ async def update_server_settings(updated_settings: ServerSettings) -> None:
 
     return
 
+
 async def credentials_exist() -> bool:
     server_settings_repo = ServerSettingsRepository(SERVER_SETTINGS_FILE)
     server_settings = await server_settings_repo.get_server_settings()

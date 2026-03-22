@@ -3,11 +3,10 @@ from pathlib import Path
 from typing import TypedDict
 
 from jays_tools import MigratableModel
-from pydantic import Field
+from pydantic import ConfigDict, Field
 
-from osuProtocol.client_web import osuMapStatus
 from models.domain.gameplay import osuGameMode
-from pydantic import ConfigDict
+from osuProtocol.client_web import osuMapStatus
 
 
 class BeatmapV1(MigratableModel):

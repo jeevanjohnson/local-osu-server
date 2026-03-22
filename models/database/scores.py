@@ -1,13 +1,10 @@
 from jays_tools import MigratableModel
-from pydantic import Field
-from pydantic import field_serializer
-from pydantic import field_validator
+from osupyparser.osr.osr_parser import ReplayFile
+from pydantic import ConfigDict, Field, field_serializer, field_validator
 
 from models.domain.gameplay import Mods
 from osuProtocol.server_packets import osuGameMode
-from osupyparser.osr.osr_parser import ReplayFile
 from usecases.score_submission import ScoreData
-from pydantic import ConfigDict
 
 EpochTime = int
 

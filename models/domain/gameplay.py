@@ -1,6 +1,4 @@
-from typing import Any
-from adapters.app_logger  import app_logger
-
+from adapters.app_logger import app_logger
 from osuProtocol.server_packets import osuGameMode, osuMods
 
 LAZER_MODS = list[str]

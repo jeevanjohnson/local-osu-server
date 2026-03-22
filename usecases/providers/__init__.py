@@ -8,6 +8,7 @@ from repositories.server_settings import ServerSettingsRepository
 class ApiV2CredentialsError(Exception):
     pass
 
+
 async def get_ossapi_async() -> OssapiAsync:
     """
     Reads credentials from ServerSettingsRepository and constructs OssapiAsync.

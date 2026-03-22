@@ -1,8 +1,8 @@
 from fastapi import APIRouter, status
 from fastapi.responses import FileResponse, JSONResponse
-from adapters.app_logger import app_logger
 
 import usecases.resources
+from adapters.app_logger import app_logger
 
 resources = APIRouter(
     prefix="/resources",

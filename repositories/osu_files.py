@@ -5,6 +5,8 @@ from jays_tools import JsonDatabase
 from adapters.app_logger import app_logger
 from models.database.osu_files import (
     CurrentOsuFileEntry as OsuFileEntry,
+)
+from models.database.osu_files import (
     CurrentOsuFiles as OsuFiles,
 )
 

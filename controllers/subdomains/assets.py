@@ -5,6 +5,7 @@ Purpose/Domain/Concept:
 
 from fastapi import APIRouter, status
 from fastapi.responses import RedirectResponse
+
 from adapters.app_logger import app_logger
 
 assets = APIRouter(

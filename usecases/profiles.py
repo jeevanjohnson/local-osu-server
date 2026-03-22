@@ -3,8 +3,8 @@ Purpose/Domain/Concept:
 - This file contains the logic related to user profiles.
 """
 
-from constants import PROFILES_FILE
 from adapters.app_logger import app_logger
+from constants import PROFILES_FILE
 from models.database.profiles import (
     CurrentProfile as Profile,
 )

@@ -10,5 +10,5 @@ app_logger = JaysLogger(
     save_on=["warning", "error"],
     log_file=Path(".data/runtime_logs.json"),
     save_backend="json_database",
-    suppress_success_below_s=0.250
+    suppress_success_below_s=0.250,
 )

@@ -765,7 +765,9 @@ class UserID(Packet):
             _id=ServerPackets.USER_ID, data={"user_id": osuIntSigned32Bit(user_id)}
         )
 
+
 LOGIN_FAILED = UserID(LoginFailureReason.AUTHENTICATION_FAILED)
+
 
 class Notification(Packet):
     def __init__(self, message: str) -> None:
@@ -900,10 +902,7 @@ class ClientRelog(Packet):
         )
 
 
-def LoginFailed(
-        reason: LoginFailureReason,
-        message: str | None = None
-    ) -> Packets:
+def LoginFailed(reason: LoginFailureReason, message: str | None = None) -> Packets:
     packets = Packets()
 
     packets += UserID(LoginFailureReason.AUTHENTICATION_FAILED)
@@ -912,11 +911,14 @@ def LoginFailed(
 
     return packets
 
+
 def LoginAuthFailed(message: str | None = None) -> Packets:
     return LoginFailed(LoginFailureReason.AUTHENTICATION_FAILED, message)
 
+
 def LoginError(message: str | None = None) -> Packets:
     return LoginFailed(LoginFailureReason.ERROR_OCCURRED, message)
+
 
 def _BanchoBot() -> Packets:
     packets = Packets()
@@ -951,7 +953,9 @@ def _BanchoBot() -> Packets:
 
     return packets
 
+
 BanchoBot = _BanchoBot()
+
 
 def Login(
     username: str,
@@ -1033,5 +1037,6 @@ def Relog(message: str | None = None) -> Packets:
     packets += ClientRelog(0)
 
     return packets
+
 
 SilentRelog = Relog()

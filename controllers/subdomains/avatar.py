@@ -7,9 +7,9 @@ from pathlib import Path
 
 from fastapi import APIRouter
 from fastapi.responses import FileResponse, RedirectResponse
-from adapters.app_logger import app_logger
 
 import usecases.avatar
+from adapters.app_logger import app_logger
 
 avatar = APIRouter(
     prefix="/a",

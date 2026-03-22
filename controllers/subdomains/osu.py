@@ -3,46 +3,46 @@ import urllib.parse as urlparse
 
 from fastapi import (
     APIRouter,
+    Depends,
+    File,
+    Form,
+    Header,
     Query,
+    Request,
     Response,
     status,
-    Header,
-    Form,
-    File,
-    Request,
-    Depends,
 )
 from fastapi.responses import RedirectResponse
-import usecases.scores
-from adapters.app_logger import app_logger
+from osupyparser.osr.osr_parser import ReplayFile
 
+import usecases.bancho_scores
+import usecases.beatmaps
+import usecases.profiles
+import usecases.score_submission
+import usecases.scores
+import usecases.sessions
+from adapters.app_logger import app_logger
+from constants import SEASONAL_BG_GIT_URL
+from controllers.dependencies import OsuErrors, retrieve_profile, retrieve_session
 from models.database.profiles import CurrentProfile as Profile
-from models.database.sessions import (
-    CurrentSession as Session,
-)
 from models.database.scores import (
     CurrentScore as Score,
 )
-import usecases.beatmaps
-import usecases.profiles
-import usecases.bancho_scores
-import usecases.sessions
-import usecases.score_submission
-from constants import SEASONAL_BG_GIT_URL
+from models.database.sessions import (
+    CurrentSession as Session,
+)
 from models.database.sessions import CurrentSessionBeatmapInfo as SessionBeatmapInfo
 from models.domain.gameplay import osuGameMode, osuMods
 from osuProtocol.client_web import (
     GRAVEYARD_LEADERBOARD,
-    UPDATE_BEATMAP_REQUEST_LEADERBOARD,
     NOT_SUBMITTED_LEADERBOARD,
+    UPDATE_BEATMAP_REQUEST_LEADERBOARD,
     Leaderboard,
     LeaderboardHeader,
     LeaderboardScore,
     LeaderboardType,
     ScoringAlgorithm,
 )
-from controllers.dependencies import retrive_profile, retrive_session, OsuErrors
-from osupyparser.osr.osr_parser import ReplayFile
 from usecases.providers import ApiV2CredentialsError
 
 osu = APIRouter(
@@ -82,8 +82,8 @@ async def get_leaderboard(
     mods_arg: int = Query(..., alias="mods"),
     map_package_hash: str = Query(..., alias="h"),
     aqn_files_found: bool = Query(..., alias="a"),
-    profile: Profile = Depends(retrive_profile(OsuErrors.NON)),
-    session: Session = Depends(retrive_session(OsuErrors.NON)),
+    profile: Profile = Depends(retrieve_profile(OsuErrors.NON)),
+    session: Session = Depends(retrieve_session(OsuErrors.NON)),
 ):
     map_filename = urlparse.unquote(map_filename)
 
@@ -114,9 +114,9 @@ async def get_leaderboard(
     except ApiV2CredentialsError:
         await usecases.sessions.silent_restart_client()
         return Response(
-             OsuErrors.NON.value.encode(),
-         )
-    
+            OsuErrors.NON.value.encode(),
+        )
+
     if beatmap is None:
         if not profile.settings.ignore_beatmap_updates:
             session.latest_beatmap = None
@@ -126,7 +126,7 @@ async def get_leaderboard(
             session.latest_beatmap = None
             await usecases.sessions.update_current_session(session)
             return Response(GRAVEYARD_LEADERBOARD)
-    
+
     if beatmap.id == 0:
         # practice/unsubmitted map, just return empty leaderboard but save the beatmap info in the session so it can be used for score submission
         session.latest_beatmap = None
@@ -201,20 +201,27 @@ async def get_leaderboard(
 
     return Response(content=leaderboard.serialize())
 
+
 @osu.get("/web/maps/{map_filename}")
 @app_logger.log(msg="router osu get map file")
 async def get_map_file(
     request: Request,
     map_filename: str,
     host: str = Header(...),
+    profile: Profile = Depends(retrieve_profile(status_code=status.HTTP_404_NOT_FOUND)),
+    session: Session = Depends(retrieve_session(status_code=status.HTTP_404_NOT_FOUND)),
 ):
     raw_path: str = request["raw_path"].decode()
-    raw_path = raw_path.removeprefix('/osu')
+    raw_path = raw_path.removeprefix("/osu")
+
+    if usecases.beatmaps.valid_difficulty_adjusted_beatmap_filename(map_filename):
+        return Response(b"", status_code=status.HTTP_404_NOT_FOUND)
 
     return RedirectResponse(
         url=f"https://osu.ppy.sh{raw_path}",
         status_code=status.HTTP_301_MOVED_PERMANENTLY,
     )
+
 
 @osu.post("/web/osu-submit-modular-selector.php")
 @app_logger.log(msg="router osu submit modular selector")
@@ -238,8 +245,8 @@ async def osuSubmitModularSelector(
     osu_version: str = Form(..., alias="osuver"),
     client_hash_b64: bytes = Form(..., alias="s"),
     fl_cheat_screenshot: bytes | None = File(None, alias="i"),
-    profile: Profile = Depends(retrive_profile(OsuErrors.NON)),
-    session: Session = Depends(retrive_session(OsuErrors.NON)),
+    profile: Profile = Depends(retrieve_profile(OsuErrors.NON)),
+    session: Session = Depends(retrieve_session(OsuErrors.NON)),
 ):
     if session.songs_folder is None:
         await usecases.sessions.restart_client(

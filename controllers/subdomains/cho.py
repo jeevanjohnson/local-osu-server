@@ -8,12 +8,12 @@ from typing import Any, Callable, Coroutine, Literal, TypeVar
 
 from fastapi import APIRouter, Header, Request, Response
 
-import usecases.cho
 import usecases.beatmaps
+import usecases.cho
 import usecases.gui
 import usecases.profiles
-import usecases.sessions
 import usecases.server_settings
+import usecases.sessions
 from adapters.app_logger import app_logger
 from models.domain.errors import ProfileNotFoundError, SessionNotFoundError
 from osuProtocol.client_packets import (
@@ -24,18 +24,18 @@ from osuProtocol.client_packets import (
     Packets,
     Ping,
 )
-from osuProtocol.server_packets import Packet as ServerPacket
-from osuProtocol.server_packets import Packets as ServerPackets
 from osuProtocol.server_packets import (
+    Login,
+    LoginAuthFailed,
+    LoginError,
     PlayerStats,
+    SilentRelog,
     osuAction,
     osuGameMode,
     osuMods,
-    SilentRelog,
-    LoginAuthFailed,
-    LoginError,
-    Login,
 )
+from osuProtocol.server_packets import Packet as ServerPacket
+from osuProtocol.server_packets import Packets as ServerPackets
 
 bancho = APIRouter()
 

@@ -3,8 +3,8 @@ Purpose/Domain/Concept:
 - This file contains the logic for handling/checking GUI-related operations.
 """
 
-from constants import PROFILES_FILE, SESSIONS_FILE
 from adapters.app_logger import app_logger
+from constants import PROFILES_FILE, SESSIONS_FILE
 from models.domain.errors import ProfileNotFoundError, SessionNotFoundError
 from repositories.profiles import ProfilesRepository
 from repositories.sessions import SessionRepository

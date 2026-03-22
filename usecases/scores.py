@@ -1,5 +1,5 @@
-from repositories.scores import ScoresRepository
 from constants import SCORES_FILE
+from repositories.scores import ScoresRepository
 
 
 async def generate_score_id() -> int:

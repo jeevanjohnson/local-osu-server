@@ -14,11 +14,9 @@ from constants import SERVER_SETTINGS_FILE, SESSIONS_FILE
 from models.database.sessions import CurrentSession as Session
 from models.domain.errors import ProfileNotFoundError, SessionNotFoundError
 from osuProtocol.server_packets import (
-    Packet,
-    Packets,
-    PlayerStats,
-    Notification,
     ClientRelog,
+    Notification,
+    PlayerStats,
 )
 from repositories.server_settings import ServerSettingsRepository
 from repositories.sessions import SessionRepository
@@ -121,6 +119,7 @@ async def notify_client(
 
     return
 
+
 async def kick_client(message: str) -> None:
     try:
         session = await require_current_session()
@@ -138,6 +137,7 @@ async def kick_client(message: str) -> None:
 
     return
 
+
 @app_logger.log(msg="usecase restart client")
 async def restart_client(message: str | None = None) -> None:
     try:
@@ -151,16 +151,18 @@ async def restart_client(message: str | None = None) -> None:
 
     if message is not None:
         session.packet_queue += Notification(message).build()
-    
+
     session.packet_queue += ClientRelog(millisecond_delay=0).build()
 
     await update_current_session(session)
 
     return
 
+
 @app_logger.log(msg="usecase silent restart client")
 async def silent_restart_client() -> None:
     await restart_client()
+
 
 @app_logger.log(msg="usecase clear packet queue")
 async def clear_packet_queue() -> Session | None:
@@ -176,6 +178,7 @@ async def clear_packet_queue() -> Session | None:
     await update_current_session(session)
 
     return session
+
 
 @app_logger.log(msg="usecase retrieve songs folder")
 async def retrieve_songs_folder() -> Path | None:

@@ -23,10 +23,10 @@ class osuMapStatus(IntEnum):
 
     def has_leaderboard(self) -> bool:
         return self in {
-            osuMapStatus.RANKED, 
-            osuMapStatus.APPROVED, 
-            osuMapStatus.QUALIFIED, 
-            osuMapStatus.LOVED
+            osuMapStatus.RANKED,
+            osuMapStatus.APPROVED,
+            osuMapStatus.QUALIFIED,
+            osuMapStatus.LOVED,
         }
 
     @classmethod
@@ -298,39 +298,53 @@ class _GraveyardLeaderboard(Leaderboard):
             [],
         )
 
+
 GRAVEYARD_LEADERBOARD = _GraveyardLeaderboard().serialize()
+
 
 class _UpdateBeatmapRequestLeaderboard(Leaderboard):
     """
     Represents a leaderboard for beatmaps that have been updated.
     """
+
     def __init__(self):
-        super().__init__(LeaderboardHeader(
-            beatmap_status=osuMapStatus.UPDATEAVALIABLE,
-            beatmap_id=0,
-            beatmap_set_id=0,
-            num_of_scores=0,
-            artist="",
-            title=""
-        ), [])
+        super().__init__(
+            LeaderboardHeader(
+                beatmap_status=osuMapStatus.UPDATEAVALIABLE,
+                beatmap_id=0,
+                beatmap_set_id=0,
+                num_of_scores=0,
+                artist="",
+                title="",
+            ),
+            [],
+        )
+
 
 UPDATE_BEATMAP_REQUEST_LEADERBOARD = _UpdateBeatmapRequestLeaderboard().serialize()
+
 
 class _NotSubmittedLeaderboard(Leaderboard):
     """
     Represents a leaderboard for beatmaps that have not been submitted.
     """
+
     def __init__(self):
-        super().__init__(LeaderboardHeader(
-            beatmap_status=osuMapStatus.NOTSUBMITTED,
-            beatmap_id=0,
-            beatmap_set_id=0,
-            num_of_scores=0,
-            artist="",
-            title=""
-        ), [])
+        super().__init__(
+            LeaderboardHeader(
+                beatmap_status=osuMapStatus.NOTSUBMITTED,
+                beatmap_id=0,
+                beatmap_set_id=0,
+                num_of_scores=0,
+                artist="",
+                title="",
+            ),
+            [],
+        )
+
 
 NOT_SUBMITTED_LEADERBOARD = _NotSubmittedLeaderboard().serialize()
+
 
 class ScoringAlgorithm(IntEnum):
     LAZER = 0

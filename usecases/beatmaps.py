@@ -7,11 +7,15 @@ from pathlib import Path
 
 import aiohttp
 import ossapi
+from osupyparser import HitObject
 
+from adapters import OsuFile
 from adapters.app_logger import app_logger
 from constants import BEATMAPS_FILE, OSU_FILES_FILE
 from models.database.beatmaps import (
     CurrentBeatmap as Beatmap,
+)
+from models.database.beatmaps import (
     CurrentBeatmapSet as BeatmapSet,
 )
 from models.database.osu_files import CurrentOsuFileEntry as OsuFileEntry
@@ -22,7 +26,6 @@ from osuProtocol.client_web import osuMapStatus
 from repositories.beatmaps import BeatmapsRepository
 from repositories.osu_files import OsuFilesRepository
 from usecases.providers import get_ossapi_async
-from adapters import OsuFile
 
 FILENAME_REGEX = re.compile(
     r"(?P<artist>.*) - (?P<song_name>.*) ((?P<mapper>.*) \[)(?P<diff_name>.*)\]\.osu"
@@ -108,6 +111,25 @@ def _cache_osu_file_path_by_set_and_filename(
         del _osu_file_path_by_set_and_filename[oldest_key]
 
     _osu_file_path_by_set_and_filename[cache_key] = osu_file_path
+
+
+@app_logger.log(msg="beatmap resolver validate diff adjusted filename")
+@functools.cache
+def valid_difficulty_adjusted_beatmap_filename(file_name: str) -> bool:
+    file_name_data = FILENAME_REGEX.search(file_name)
+    if not file_name_data:
+        return False
+
+    difficulty_name = file_name_data["diff_name"]
+    if not difficulty_name:
+        return False
+
+    has_rate_adjust = bool(DIFFICULTY_ADJUSTED_REGEX.search(difficulty_name))
+    has_attribute_adjust = bool(ATTRIBUTE_EDIT_REGEX.search(difficulty_name))
+
+    # Accept either type of adjustment: rate-only (e.g. 0.89x (240bpm))
+    # or explicit stat edits (AR/CS/HP/OD).
+    return has_rate_adjust or has_attribute_adjust
 
 
 class BeatmapResolver:
@@ -315,25 +337,6 @@ class BeatmapResolver:
                 return True
 
         return False
-
-    @staticmethod
-    @app_logger.log(msg="beatmap resolver validate diff adjusted filename")
-    @functools.cache
-    def valid_difficulty_adjusted_beatmap_filename(file_name: str) -> bool:
-        file_name_data = FILENAME_REGEX.search(file_name)
-        if not file_name_data:
-            return False
-
-        difficulty_name = file_name_data["diff_name"]
-        if not difficulty_name:
-            return False
-
-        has_rate_adjust = bool(DIFFICULTY_ADJUSTED_REGEX.search(difficulty_name))
-        has_attribute_adjust = bool(ATTRIBUTE_EDIT_REGEX.search(difficulty_name))
-
-        # Accept either type of adjustment: rate-only (e.g. 0.89x (240bpm))
-        # or explicit stat edits (AR/CS/HP/OD).
-        return has_rate_adjust or has_attribute_adjust
 
     @app_logger.log(msg="beatmap resolver get audio file in songs folder")
     def get_audio_file_in_songs_folder(self, beatmap_md5: str) -> Path | None:
@@ -696,18 +699,18 @@ class BeatmapResolver:
         artist = getattr(osu_file, "artist", "Unknown")
         if not artist:
             artist = "Unknown"
-        
+
         title = getattr(osu_file, "title", "Unknown")
         if not title:
             title = "Unknown"
-        
+
         version = getattr(osu_file, "version", "Unknown")
         if not version:
             version = "Unknown"
-        
+
         max_combo = getattr(osu_file, "max_combo", 0) or 0
         beatmap_id = getattr(osu_file, "beatmap_id", 0) or 0
-        
+
         return Beatmap(
             time_inserted=datetime.now(),
             id=beatmap_id,
@@ -721,6 +724,209 @@ class BeatmapResolver:
             mode=osuGameMode.STANDARD,
             difficulty_adjusted=False,
         )
+
+    @staticmethod
+    def get_explicit_beatmap_id_from_osu_file(osu_file: OsuFile) -> int | None:
+        """Return BeatmapID only when explicitly present in .osu text.
+
+        Some maps omit BeatmapID entirely; those should not be treated as BeatmapID=0.
+        """
+        raw_file = osu_file.get_raw_file()
+        text = raw_file.decode("utf-8-sig", errors="ignore")
+        match = re.search(r"^BeatmapID\s*:\s*(-?\d+)\s*$", text, flags=re.MULTILINE)
+        if match is None:
+            return None
+
+        return int(match.group(1))
+
+    @staticmethod
+    def _extract_filename_adjustments(
+        map_filename: str,
+    ) -> tuple[float, dict[str, float]]:
+        """Extract rate and AR/OD/HP/CS edits from osu-trainer style filename."""
+        rate = 1.0
+        attrs: dict[str, float] = {}
+
+        filename_data = FILENAME_REGEX.search(map_filename)
+        if filename_data is None:
+            return rate, attrs
+
+        difficulty_name = filename_data["diff_name"] or ""
+
+        rate_match = DIFFICULTY_ADJUSTED_REGEX.search(difficulty_name)
+        if rate_match is not None:
+            try:
+                rate = float(rate_match.group("rate")[:-1])
+            except ValueError:
+                rate = 1.0
+
+        for attr_match in re.finditer(
+            r"(HP|CS|AR|OD)([0-9]{1,2}(?:\.[0-9]{1,2})?)",
+            difficulty_name,
+        ):
+            attrs[attr_match.group(1)] = float(attr_match.group(2))
+
+        return rate, attrs
+
+    @staticmethod
+    def _ar_to_ms(ar: float) -> float:
+        if ar < 5.0:
+            return 1800.0 - 120.0 * ar
+        return 1200.0 - 150.0 * (ar - 5.0)
+
+    @staticmethod
+    def _ms_to_ar(ms: float) -> float:
+        if ms > 1200.0:
+            return (1800.0 - ms) / 120.0
+        return 5.0 + (1200.0 - ms) / 150.0
+
+    @staticmethod
+    def _effective_ar_with_rate(ar: float, rate: float) -> float:
+        if rate <= 0:
+            return ar
+        return BeatmapResolver._ms_to_ar(BeatmapResolver._ar_to_ms(ar) / rate)
+
+    @staticmethod
+    def _effective_od_with_rate(od: float, rate: float) -> float:
+        if rate <= 0:
+            return od
+        # osu!standard OD300 window formula.
+        od300_ms = 80.0 - 6.0 * od
+        return (80.0 - (od300_ms / rate)) / 6.0
+
+    @staticmethod
+    def _extract_map_difficulty_attrs(osu_file: OsuFile) -> dict[str, float]:
+        return {
+            "AR": float(getattr(osu_file, "ar", 0.0) or 0.0),
+            "OD": float(getattr(osu_file, "od", 0.0) or 0.0),
+            "CS": float(getattr(osu_file, "cs", 0.0) or 0.0),
+            "HP": float(getattr(osu_file, "hp", 0.0) or 0.0),
+        }
+
+    def get_osu_file_from_beatmap_id_and_set_id(
+        self,
+        beatmap_id: int,
+        beatmap_set_id: int,
+        exclude_md5: str | None = None,
+    ) -> OsuFile | None:
+        if beatmap_id <= 0:
+            return None
+
+        for set_folder in self.songs_folder.glob(f"{beatmap_set_id}*"):
+            if not set_folder.is_dir():
+                continue
+
+            for osu_path in set_folder.glob("*.osu"):
+                parsed = OsuFile.from_path(
+                    str(osu_path.absolute()),
+                    load_audio_file=False,
+                )
+                parsed_beatmap_id = getattr(parsed, "beatmap_id", None)
+                if parsed_beatmap_id != beatmap_id:
+                    continue
+
+                if exclude_md5 is not None and parsed.md5 == exclude_md5:
+                    continue
+
+                _cache_osu_file_path_by_md5(parsed.md5, osu_path)
+                _cache_osu_file_path_by_set_and_filename(
+                    beatmap_set_id=beatmap_set_id,
+                    map_filename=osu_path.name,
+                    osu_file_path=osu_path,
+                )
+                return parsed
+
+        return None
+
+    @staticmethod
+    def _hitobject_signature(hitobject: HitObject) -> tuple:
+        """Generate a signature for a hitobject that is invariant to trainer-style edits."""
+        return (
+            type(hitobject),
+            hitobject.pos.x,
+            hitobject.pos.y,
+        )
+
+    def difficulty_adjusted_map_was_modified(
+        self,
+        difficulty_adjusted_osu_file: OsuFile,
+        beatmap_set_id: int,
+        map_filename: str,
+    ) -> bool:
+        """True when adjusted map appears manually edited beyond trainer-style changes."""
+        original_beatmap_id = self.get_explicit_beatmap_id_from_osu_file(
+            difficulty_adjusted_osu_file
+        )
+        if original_beatmap_id is None or original_beatmap_id <= 0:
+            # Nothing reliable to compare against.
+            return False
+
+        original_osu_file = self.get_osu_file_from_beatmap_id_and_set_id(
+            beatmap_id=original_beatmap_id,
+            beatmap_set_id=beatmap_set_id,
+            exclude_md5=difficulty_adjusted_osu_file.md5,
+        )
+        if original_osu_file is None:
+            return False
+
+        adjusted_hitobjects = difficulty_adjusted_osu_file.hit_objects
+        original_hitobjects = original_osu_file.hit_objects
+
+        if len(adjusted_hitobjects) != len(original_hitobjects):
+            _debug(
+                "Difficulty-adjusted validation failed: hitobject count mismatch "
+                f"adjusted={len(adjusted_hitobjects)} original={len(original_hitobjects)}"
+            )
+            return True
+
+        for index, (adjusted_obj, original_obj) in enumerate(
+            zip(adjusted_hitobjects, original_hitobjects)
+        ):
+            if self._hitobject_signature(adjusted_obj) != self._hitobject_signature(
+                original_obj
+            ):
+                _debug(
+                    "Difficulty-adjusted validation failed: hitobject mismatch "
+                    f"at index={index}"
+                )
+                return True
+
+        rate, filename_attrs = self._extract_filename_adjustments(map_filename)
+        if not filename_attrs:
+            return False
+
+        adjusted_attrs = self._extract_map_difficulty_attrs(
+            difficulty_adjusted_osu_file
+        )
+        attr_tolerance = 0.11
+
+        for attr_name, expected_value in filename_attrs.items():
+            actual_value = adjusted_attrs.get(attr_name)
+            if actual_value is None:
+                continue
+
+            if attr_name in {"AR", "OD"} and expected_value > 10.0 and rate != 1.0:
+                effective_value = (
+                    self._effective_ar_with_rate(actual_value, rate)
+                    if attr_name == "AR"
+                    else self._effective_od_with_rate(actual_value, rate)
+                )
+                if abs(effective_value - expected_value) > attr_tolerance:
+                    _debug(
+                        "Difficulty-adjusted validation failed: effective attribute mismatch "
+                        f"attr={attr_name} expected={expected_value} effective={effective_value:.2f}"
+                    )
+                    return True
+                continue
+
+            if abs(actual_value - expected_value) > attr_tolerance:
+                _debug(
+                    "Difficulty-adjusted validation failed: attribute mismatch "
+                    f"attr={attr_name} expected={expected_value} actual={actual_value:.2f}"
+                )
+                return True
+
+        return False
 
     @app_logger.log(msg="beatmap resolver from leaderboard request")
     async def from_leaderboard_request(
@@ -761,7 +967,13 @@ class BeatmapResolver:
             if osu_file is None:
                 osu_file = self.get_osu_file_from_md5(beatmap_md5)
 
-            if osu_file is not None and osu_file.beatmap_id == 0:
+            explicit_beatmap_id = None
+            if osu_file is not None:
+                explicit_beatmap_id = self.get_explicit_beatmap_id_from_osu_file(
+                    osu_file
+                )
+
+            if explicit_beatmap_id == 0 and osu_file is not None:
                 _debug(
                     f"Detected practice/unsubmitted map beatmap_id=0 md5={beatmap_md5}, building from local .osu metadata"
                 )
@@ -834,8 +1046,8 @@ class BeatmapResolver:
 
         # Difficulty Adjusted Check
         if (
-            not self.current_settings.difficulty_adjusted_beatmaps.sync_rank_status_with_bancho or
-            not self.valid_difficulty_adjusted_beatmap_filename(map_filename)
+            not self.current_settings.difficulty_adjusted_beatmaps.sync_rank_status_with_bancho
+            or not valid_difficulty_adjusted_beatmap_filename(map_filename)
         ):
             return None
 
@@ -863,6 +1075,16 @@ class BeatmapResolver:
                 "Warning: difficulty-adjusted map not found in modified_mp3_list.txt "
                 f"for filename '{map_filename}', continuing via resolved .osu file"
             )
+
+        if self.difficulty_adjusted_map_was_modified(
+            difficulty_adjusted_osu_file=osu_file,
+            beatmap_set_id=beatmap_set_id,
+            map_filename=map_filename,
+        ):
+            app_logger.warning(
+                f"Warning: map with md5 {beatmap_md5} appears to be difficulty-adjusted but was modified after adjustment; "
+            )
+            return None
 
         original_beatmap = await self.from_db(beatmap_id=osu_file.beatmap_id)
         if original_beatmap is None:

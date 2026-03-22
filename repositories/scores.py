@@ -1,9 +1,12 @@
 from pathlib import Path
 
 from jays_tools import JsonDatabase
+
+from models.database.scores import (
+    CurrentScore as Score,
+)
 from models.database.scores import (
     CurrentScores as Scores,
-    CurrentScore as Score,
 )
 
 

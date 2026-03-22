@@ -1,13 +1,13 @@
 from base64 import b64decode
 from datetime import datetime
-from py3rijndael import Pkcs7Padding
-from py3rijndael import RijndaelCbc
 
 from fastapi.datastructures import FormData
+from py3rijndael import Pkcs7Padding, RijndaelCbc
+from pydantic import BaseModel, ConfigDict
 from starlette.datastructures import UploadFile as StarletteUploadFile
 
-from pydantic import BaseModel, ConfigDict, field_serializer, field_validator
 from models.domain.gameplay import Mods, osuGameMode
+
 
 def parse_form_data(form_data: FormData) -> tuple[bytes, StarletteUploadFile] | None:
     try:
@@ -18,16 +18,17 @@ def parse_form_data(form_data: FormData) -> tuple[bytes, StarletteUploadFile] | 
         assert isinstance(score_data_b64, str), "Expected score data to be a string"
 
         score_replay_file = score_parts[1]
-        assert isinstance(score_replay_file, StarletteUploadFile), "Expected score replay file to be an UploadFile"
+        assert isinstance(score_replay_file, StarletteUploadFile), (
+            "Expected score replay file to be an UploadFile"
+        )
 
         return score_data_b64.encode(), score_replay_file
     except (AssertionError, IndexError):
         return None
 
+
 class ScoreData(BaseModel):
-    model_config = ConfigDict(
-        arbitrary_types_allowed=True
-    )
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
     beatmap_md5: str
     username: str
