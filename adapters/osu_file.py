@@ -1,12 +1,17 @@
 import hashlib
 import os
+import struct
 import tempfile
+import zlib
 from pathlib import Path
 
 from osupyparser import OsuFile as BaseOsuFile
 from osupyparser.osu.constants import OSU_FILE_HEADER
 
-BOUNDARY = b"-----LOS2026-----"
+PACKED_MAGIC = b"LOS2"
+PACKED_HEADER = struct.Struct("<4sBII")
+PACKED_FLAG_AUDIO_COMPRESSED = 0b00000001
+PACKED_ZLIB_LEVEL = 6
 
 
 class OsuFile(BaseOsuFile):
@@ -113,22 +118,50 @@ class OsuFile(BaseOsuFile):
         return None
 
     def compress(self) -> bytes:
-        """Compresses the osu file & audio file into bytes for storage."""
+        """Compress osu payloads into a versioned compact binary format."""
+        raw_file = self.get_raw_file() or b""
+        raw_audio_file = self.raw_audio_file or b""
 
-        result = [
-            self.get_raw_file() or b"",
-            BOUNDARY,
-            self.raw_audio_file or b"",
-        ]
+        raw_blob = zlib.compress(raw_file, level=PACKED_ZLIB_LEVEL)
 
-        return b"\n".join(result)
+        # Most audio is already compressed (mp3/ogg). Only keep compressed bytes when useful.
+        audio_blob = raw_audio_file
+        flags = 0
+        if raw_audio_file:
+            compressed_audio = zlib.compress(raw_audio_file, level=1)
+            if len(compressed_audio) < len(raw_audio_file):
+                audio_blob = compressed_audio
+                flags |= PACKED_FLAG_AUDIO_COMPRESSED
+
+        header = PACKED_HEADER.pack(PACKED_MAGIC, flags, len(raw_blob), len(audio_blob))
+        return header + raw_blob + audio_blob
 
     @classmethod
     def decompress(cls, data: bytes) -> "OsuFile":
-        """Decompresses the data into an OsuFile object."""
+        """Decompress persisted data into an OsuFile object."""
+        if len(data) < PACKED_HEADER.size or data[:4] != PACKED_MAGIC:
+            raise ValueError("Invalid OsuFile packed payload format.")
+
+        magic, flags, raw_blob_len, audio_blob_len = PACKED_HEADER.unpack_from(data)
+        if magic != PACKED_MAGIC:
+            raise ValueError("Invalid OsuFile packed magic.")
+
+        payload = data[PACKED_HEADER.size :]
+        expected_size = raw_blob_len + audio_blob_len
+        if len(payload) != expected_size:
+            raise ValueError("Invalid OsuFile packed payload size.")
+
+        raw_blob = payload[:raw_blob_len]
+        audio_blob = payload[raw_blob_len:]
+
         try:
-            raw_file, raw_audio_file = data.split(BOUNDARY)
-        except ValueError:
-            raise ValueError("Invalid data format for OsuFile decompression.")
+            raw_file = zlib.decompress(raw_blob)
+            raw_audio_file = (
+                zlib.decompress(audio_blob)
+                if flags & PACKED_FLAG_AUDIO_COMPRESSED
+                else audio_blob
+            )
+        except zlib.error as exc:
+            raise ValueError("Invalid compressed OsuFile payload.") from exc
 
         return cls.from_raw(raw_file, raw_audio_file)
