@@ -193,13 +193,20 @@ async def get_leaderboard(
     else:
         personal_best_mods = None
 
-    personal_best = await usecases.scores.personal_best_for_beatmap(
-        beatmap=beatmap,
-        profile_name=session.profile_name,
-        game_mode=mode_arg,
-        mods=personal_best_mods,
-        scoring_algorithm=profile.settings.scoring_algorithm,
-    )
+    if leaderboard_type == LeaderboardType.FRIENDS:
+        # TODO: we can still show the personal best,
+        # but filtering and sorting the scores would have to happen
+        # earlier
+        personal_best = None
+    else:
+        personal_best = await usecases.scores.personal_best_for_beatmap(
+            beatmap=beatmap,
+            profile_name=session.profile_name,
+            game_mode=mode_arg,
+            mods=personal_best_mods,
+            scoring_algorithm=profile.settings.scoring_algorithm,
+        )
+    
     personal_best_row = None
     if personal_best:
         personal_best_position = usecases.scores.leaderboard_position(
