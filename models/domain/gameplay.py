@@ -8,6 +8,10 @@ _NON_SCORING_ATTRIBUTE_PREFIXES = ("AR", "OD", "HP", "CS")
 class Mods(list[str]):
     """A list of mods, represented as short names, e.g. ['HD', 'HR', 'DT']."""
 
+    def __int__(self) -> int:
+        stable_mods, _ = self.to_stable_mods()
+        return int(stable_mods)
+
     def are_same(self, other: "Mods", ignore: list[str] | None = None) -> bool:
         if ignore is None:
             ignore = []

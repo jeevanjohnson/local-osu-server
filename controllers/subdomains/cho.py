@@ -101,7 +101,7 @@ async def client_request_handler(
                 "can be inaccurate due to little data. For best results, please set up your credentials through the GUI."
             )
         else:
-                warning = None
+            warning = None
 
         rank = profile.performance[session.current_game_mode].rank
         ranked_score = profile.performance[session.current_game_mode].ranked_score

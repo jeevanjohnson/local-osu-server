@@ -1,5 +1,6 @@
 import functools
 import inspect
+import traceback
 from datetime import datetime
 
 from colorama import Fore, Style
@@ -16,7 +17,13 @@ def log_time(func):
         @functools.wraps(func)
         async def wrapper(*args, **kwargs):  # type: ignore
             start_time = datetime.now()
-            result = await func(*args, **kwargs)
+            try:
+                result = await func(*args, **kwargs)
+            except Exception as e:
+                error(f"An error occurred in {func.__qualname__}")
+                traceback.print_exc()
+                return
+
             end_time = datetime.now()
 
             try:
@@ -45,7 +52,12 @@ def log_time(func):
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
             start_time = datetime.now()
-            result = func(*args, **kwargs)
+            try:
+                result = func(*args, **kwargs)
+            except Exception as e:
+                traceback.print_exc()
+                error(f"An error occurred in {func.__qualname__}: {e}")
+                return
             end_time = datetime.now()
 
             try:

@@ -49,10 +49,6 @@ async def get_rank_for_pp(pp: int, game_mode: osuGameMode) -> int | None:
             "m": str(game_mode.value),
         }
 
-        print(
-            f"Requesting osu!daily rank: {url}?k={params['k']}&t=pp&v={params['v']}&m={params['m']}"
-        )
-
         async with ClientSession() as session:
             async with session.get(
                 url,

@@ -15,7 +15,7 @@ assets = APIRouter(
 
 @assets.get("/{full_path:path}")
 @log_time
-async def all(full_path: str):
+async def all_assets(full_path: str):
     return RedirectResponse(
         url=f"https://assets.ppy.sh/{full_path}",
         status_code=status.HTTP_301_MOVED_PERMANENTLY,

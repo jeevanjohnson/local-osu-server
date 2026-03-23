@@ -1,24 +1,29 @@
 import asyncio
 import time
+from enum import Enum
 from typing import Any
 
 import ossapi.enums
+import ossapi.models
 from ossapi import UserCompact
 
-import usecases.sessions
-from adapters import log, log_time
-from constants import PROFILES_FILE, SESSIONS_FILE
+import cache
+from adapters import log
 from models.bancho.scores import Combo, LazerScore, Mods, Scores, StableScore
 from models.database.beatmaps import (
     CurrentBeatmap as Beatmap,
 )
-from models.domain.errors import ProfileNotFoundError, SessionNotFoundError
-from models.domain.gameplay import osuGameMode, osuMods
+from models.domain.gameplay import osuGameMode
 from osuProtocol.client_web import LeaderboardType
 from osuProtocol.replay import extract_replay_frames_from_osr
-from repositories.profiles import ProfilesRepository
-from repositories.sessions import SessionRepository
 from usecases.providers import get_ossapi_async
+
+
+class AcceptedScores(Enum):
+    LAZER_ONLY = "lazer_only"
+    STABLE_ONLY = "stable_only"
+    BOTH = "both"
+
 
 _SCORE_HOT_CACHE_TTL_SECONDS = 300
 _SCORE_HOT_CACHE_MAX_SIZE = 1024
@@ -102,196 +107,252 @@ def parse_difficulty_adjustment_settings(mod_settings: dict[str, Any]) -> list[s
     return settings
 
 
-StableIDs = list[int]
+def api_is_score_lazer(score: ossapi.models.Score) -> bool:
+    return not score.legacy_score_id
 
 
-@log_time
-async def get_scores_for(
-    beatmap: Beatmap,
-    leaderboard_type: LeaderboardType,
-    game_mode: osuGameMode,
-    limit: int,
-    stable_only: bool,
-    friends_ids: list[int],
-    mods: Mods | None = None,
-) -> tuple[Scores, StableIDs]:
-    if mods is not None:
-        stable_mods, lazer_mods = mods.to_stable_mods()
+def api_to_mods(mods: list[ossapi.models.NonLegacyMod]) -> Mods:
+    score_mods = []
+    for mod in mods:
+        mod_settings: dict[str, Any] = mod.settings
+
+        if mod_settings:
+            try:
+                score_mods.append(mod.acronym)
+
+                if mod_settings.get("speed_change"):
+                    speed_change = mod_settings["speed_change"]
+                    if speed_change != 1.5 and speed_change != 0.75:
+                        score_mods.append(f"{speed_change}x")
+
+                if mod.acronym == "DA":
+                    score_mods.extend(
+                        parse_difficulty_adjustment_settings(mod_settings)
+                    )
+
+            except Exception as e:
+                log.warning(
+                    f"Error processing mod settings for mod {mod.acronym}: {e}\nMod settings: {mod.settings}"
+                )
+        else:
+            score_mods.append(mod.acronym)
+
+    return Mods(score_mods)
+
+
+def api_to_score_id(score: ossapi.models.Score) -> int:
+    if score.legacy_score_id:
+        if score.id is not None:
+            return score.id
+        else:
+            log.warning(
+                f"Score with legacy_score_id {score.legacy_score_id} is missing id field, defaulting score_id to 0"
+            )
+            return 0
     else:
-        stable_mods = None
+        return score.id or 0
 
-    show_lazer_only_if_score_v2 = False
-    lazer_only = False
 
-    profile_repo = ProfilesRepository(PROFILES_FILE)
-    session_repo = SessionRepository(SESSIONS_FILE)
+def api_to_score_model(
+    score: ossapi.models.Score,
+    beatmap_max_combo: int,
+    game_mode: osuGameMode,
+) -> StableScore | LazerScore:
+    user: UserCompact = score._ossapi_data["_user"]
 
-    ranking_type = ossapi.enums.RankingType.SCORE
+    if api_is_score_lazer(score):
+        score_model = LazerScore
+    else:
+        score_model = StableScore
 
-    try:
-        session = await session_repo.require_current_session()
-        profile = await profile_repo.require_profile(session.profile_name)
-        ranking_type = profile.settings.scoring_algorithm.to_api_v2()
-        show_lazer_only_if_score_v2 = (
-            profile.settings.score_v2_shows_lazer_only_leaderboard
-        )
-    except (SessionNotFoundError, ProfileNotFoundError):
-        pass
+    score_id = api_to_score_id(score)
+    score_mods = api_to_mods(score.mods)
+
+    if score.pp is None:
+        pp = 0
+    else:
+        pp = int(score.pp)
+
+    return score_model(
+        score_id=score_id,
+        username=user.username,
+        total_score_value=score.total_score,
+        combo=Combo(actual=score.max_combo, max=beatmap_max_combo),
+        count50=score.statistics.meh or 0,
+        count100=score.statistics.ok or 0,
+        count300=score.statistics.great or 0,
+        count_miss=score.statistics.miss or 0,
+        perfect=score.is_perfect_combo,
+        enabled_mods=Mods(score_mods),
+        user_id=user.id,
+        time_set=int(score.ended_at.timestamp()),
+        replay_available=score.has_replay,
+        performance_points=pp,
+        game_mode=game_mode,
+    )
+
+
+async def get_score_for_user_on_beatmap(
+    beatmap: Beatmap,
+    game_mode: osuGameMode,
+    user_id: int,
+    accepted_scores: AcceptedScores,
+) -> StableScore | LazerScore | None:
+    score = cache.score_for_user_on_beatmap_by_md5.get(beatmap.md5)
+    if score is not None:
+        return score
 
     osuApi = await get_ossapi_async()
 
-    # TODO: Implement self scores and friends scores leaderboards
-
-    # if score v2, show only lazer scores to kinda match the slider acc lbs.
-    # Some users might want to see score v2 scores on the all mods lb, even if they have score v1 scores.
-    if stable_mods and stable_mods & osuMods.SCOREV2 and show_lazer_only_if_score_v2:
-        stable_mods &= ~osuMods.SCOREV2
-        lazer_only = True
-        # Override limit to fetch more scores in case there is more lazer
-        limit = 100
-
-    if leaderboard_type == LeaderboardType.MODS and stable_mods is not None:
-        req_mods = int(stable_mods)
-        req_limit = limit
-    else:
-        req_mods = None
-        req_limit = limit
-
-    cache_key = _make_score_cache_key(
-        beatmap_id=beatmap.id,
-        game_mode=game_mode,
-        leaderboard_type=leaderboard_type,
-        stable_only=stable_only,
-        ranking_type=ranking_type,
-        req_mods=req_mods,
-        req_limit=req_limit,
-        lazer_only=lazer_only,
-    )
-
-    cached_scores = _get_cached_scores(cache_key)
-    if cached_scores is not None:
-        cached_score_list, cached_stable_ids = cached_scores
-        await usecases.sessions.update_stable_leaderboard_ids(cached_stable_ids)
-        return cached_score_list, cached_stable_ids
-
-    inflight_request = _score_inflight_requests.get(cache_key)
-    if inflight_request is not None:
-        return await asyncio.shield(inflight_request)
-
-    async def _resolve_scores() -> tuple[Scores, list[int]]:
-        stable_ids: list[int] = []
-
-        log.warning(
-            f"Fetching scores for beatmap {beatmap.id} with mods {mods} and leaderboard type {leaderboard_type.name}..."
-        )
-
-        try:
-            requested_scores = await osuApi.beatmap_scores(
-                beatmap_id=beatmap.id,
-                mode=game_mode.to_api_v2(),
-                mods=req_mods,
-                limit=req_limit,
-                legacy_only=stable_only,
-                type=ranking_type,
-            )
-        except ValueError as e:
-            log.error(f"Error fetching scores for beatmap {beatmap.id}: {e}")
-            return Scores(all_scores=[]), stable_ids
-
-        if not requested_scores:
-            return Scores(all_scores=[]), stable_ids
-
-        scores = Scores(all_scores=[])
-
-        for score in requested_scores.scores:
-            user: UserCompact = score._ossapi_data["_user"]
-
-            if score.legacy_score_id and lazer_only:
-                continue
-
-            if score.legacy_score_id:
-                score_model = StableScore
-                if score.id is not None:
-                    stable_score_id = int(score.id)
-                    stable_ids.append(stable_score_id)
-                    score_id = stable_score_id
-            else:
-                score_model = LazerScore
-                score_id = score.id or 0
-
-            score_mods = []  # https://github.com/ppy/osu-web/blob/master/database/mods.json
-            for mod in score.mods:
-                mod_settings: dict[str, Any] = mod.settings
-
-                if mod_settings:
-                    try:
-                        score_mods.append(mod.acronym)
-
-                        if mod_settings.get("speed_change"):
-                            speed_change = mod_settings["speed_change"]
-                            if speed_change != 1.5 and speed_change != 0.75:
-                                score_mods.append(f"{speed_change}x")
-
-                        if mod.acronym == "DA":
-                            score_mods.extend(
-                                parse_difficulty_adjustment_settings(mod_settings)
-                            )
-
-                    except Exception as e:
-                        log.warning(
-                            f"Error processing mod settings for mod {mod.acronym}: {e}\nMod settings: {mod.settings}"
-                        )
-                else:
-                    score_mods.append(mod.acronym)
-
-            perfect = bool(score.is_perfect_combo)
-
-            if score.pp is None:
-                pp = 0
-            else:
-                pp = int(score.pp)
-
-            parsed_score = score_model(
-                score_id=score_id,
-                username=user.username,
-                total_score_value=score.total_score,
-                combo=Combo(actual=score.max_combo, max=beatmap.max_combo),
-                count50=score.statistics.meh or 0,
-                count100=score.statistics.ok or 0,
-                count300=score.statistics.great or 0,
-                count_miss=score.statistics.miss or 0,
-                perfect=perfect,
-                enabled_mods=Mods(score_mods),
-                user_id=user.id,
-                time_set=int(score.ended_at.timestamp()),
-                replay_available=score.has_replay,
-                performance_points=pp,
-                game_mode=game_mode,
-            )
-
-            scores.all_scores.append(parsed_score)
-
-        _cache_scores(cache_key, scores, stable_ids)
-
-        await usecases.sessions.update_stable_leaderboard_ids(stable_ids)
-
-        return scores, stable_ids
-
-    inflight_task: asyncio.Task[tuple[Scores, list[int]]] = asyncio.create_task(
-        _resolve_scores()
-    )
-    _score_inflight_requests[cache_key] = inflight_task
+    if accepted_scores == AcceptedScores.STABLE_ONLY:
+        stable_only = True
+    elif accepted_scores == AcceptedScores.LAZER_ONLY:
+        stable_only = False
+    elif accepted_scores == AcceptedScores.BOTH:
+        stable_only = False
 
     try:
-        return await asyncio.shield(inflight_task)
-    finally:
-        if _score_inflight_requests.get(cache_key) is inflight_task:
-            _score_inflight_requests.pop(cache_key, None)
+        beatmap_user_score = await osuApi.beatmap_user_score(
+            beatmap_id=beatmap.id,
+            user_id=user_id,
+            mode=game_mode.to_api_v2(),
+            legacy_only=stable_only,
+        )
+    except Exception as e:
+        if "`None`" in str(e):
+            return None
+        else:
+            raise e
+
+    if beatmap_user_score is None:
+        log.info(f"No score found for user {user_id} on beatmap {beatmap.id}")
+        return None
+
+    score = beatmap_user_score.score
+
+    if score is None:
+        log.info(f"No score data found for user {user_id} on beatmap {beatmap.id}")
+        return None
+
+    score = api_to_score_model(score, beatmap.max_combo, game_mode)
+
+    cache.score_for_user_on_beatmap_by_md5.set(beatmap.md5, score)
+
+    return score
 
 
-async def get_replay_for_score(
-    score_id: int, beatmap_md5: str | None = None
-) -> bytes | None:
+async def get_friends_scores_for_beatmap(
+    beatmap: Beatmap,
+    game_mode: osuGameMode,
+    accepted_scores: AcceptedScores,
+    friends_user_ids: list[int],
+) -> Scores:
+    cached_scores = cache.friends_scores_for_beatmap_by_md5.get(beatmap.md5)
+    if cached_scores is not None:
+        return cached_scores
+
+    friends_scores: list[StableScore | LazerScore] = []
+
+    for user_id in friends_user_ids:
+        bancho = await get_score_for_user_on_beatmap(
+            beatmap=beatmap,
+            game_mode=game_mode,
+            user_id=user_id,
+            accepted_scores=accepted_scores,
+        )
+
+        if bancho is None:
+            continue
+
+        friends_scores.append(bancho)
+
+    scores = Scores(all_scores=friends_scores)
+
+    cache.friends_scores_for_beatmap_by_md5.set(beatmap.md5, scores)
+
+    return scores
+
+
+async def get_scores_for(
+    beatmap: Beatmap,
+    game_mode: osuGameMode,
+    ranking_type: ossapi.enums.RankingType,
+    accepted_scores: AcceptedScores,
+    mods: Mods | None = None,
+) -> Scores:
+
+    if accepted_scores == AcceptedScores.STABLE_ONLY:
+        stable_only = True
+    elif accepted_scores == AcceptedScores.LAZER_ONLY:
+        stable_only = False
+    elif accepted_scores == AcceptedScores.BOTH:
+        stable_only = False
+
+    if mods is not None:
+        requested_mods = int(mods)
+    else:
+        requested_mods = None
+
+    osuApi = await get_ossapi_async()
+
+    try:
+        requested_scores = await osuApi.beatmap_scores(
+            beatmap_id=beatmap.id,
+            mode=game_mode.to_api_v2(),
+            mods=requested_mods,
+            legacy_only=stable_only,
+            type=ranking_type,
+        )
+    except ValueError as e:
+        # log.error(f"Error fetching scores for beatmap {beatmap.id}: {e}")
+        return Scores(all_scores=[])
+
+    if not requested_scores:
+        # log.info(f"No scores found for beatmap {beatmap.id} with mods {mods} and ranking type {ranking_type}")
+        return Scores(all_scores=[])
+
+    scores = Scores(all_scores=[])
+
+    for score in requested_scores.scores:
+        # log.info(f"Fetched score with ID {score.id} for user {score._ossapi_data['_user'].username} with mods {[mod.acronym for mod in score.mods]}")
+
+        scores.append(api_to_score_model(score, beatmap.max_combo, game_mode))
+
+    return scores
+
+
+async def get_any_scores_for(
+    beatmap: Beatmap,
+    game_mode: osuGameMode,
+    accepted_scores: AcceptedScores,
+    ranking_type: ossapi.enums.RankingType,
+) -> Scores:
+    return await get_scores_for(
+        beatmap=beatmap,
+        game_mode=game_mode,
+        ranking_type=ranking_type,
+        accepted_scores=accepted_scores,
+        mods=None,
+    )
+
+
+async def get_mod_specific_scores_for(
+    beatmap: Beatmap,
+    game_mode: osuGameMode,
+    accepted_scores: AcceptedScores,
+    ranking_type: ossapi.enums.RankingType,
+    mods: Mods,
+) -> Scores:
+    return await get_scores_for(
+        beatmap=beatmap,
+        game_mode=game_mode,
+        ranking_type=ranking_type,
+        accepted_scores=accepted_scores,
+        mods=mods,
+    )
+
+
+async def get_replay(score_id: int, beatmap_md5: str | None = None) -> bytes | None:
     """Returns compatible stable replay frames for the given score ID or None if it doesn't match the conditions"""
     # Check if replay is available for this score & md5's match
     osuApi = await get_ossapi_async()
@@ -312,7 +373,7 @@ async def get_replay_for_score(
         replay_frames, replay_beatmap_md5 = extract_replay_frames_from_osr(replay_data)
 
         if beatmap_md5 and replay_beatmap_md5 != beatmap_md5:
-            print(
+            log.error(
                 f"Replay beatmap md5 {replay_beatmap_md5} does not match expected {beatmap_md5}"
             )
             return None

@@ -17,6 +17,7 @@ from fastapi.responses import RedirectResponse
 
 import usecases.bancho_scores
 import usecases.beatmaps
+import usecases.leaderboards
 import usecases.osu_files
 import usecases.profiles
 import usecases.score_submission
@@ -32,31 +33,23 @@ from controllers.dependencies import (
     retrieve_server_settings,
     retrieve_session,
 )
-from models.bancho.scores import (
-    Scores as BanchoScores,
-)
 from models.database.profiles import CurrentProfile as Profile
 from models.database.server_settings import CurrentServerSettings as ServerSettings
 from models.database.sessions import (
     CurrentSession as Session,
 )
 from models.database.sessions import CurrentSessionBeatmapInfo as SessionBeatmapInfo
-from models.domain.gameplay import Mods, osuGameMode, osuMods
+from models.domain.gameplay import Mods, osuGameMode
 from osuProtocol.client_web import (
     GRAVEYARD_LEADERBOARD,
     NOT_SUBMITTED_LEADERBOARD,
     UNRANKED_CHARTS,
     UPDATE_BEATMAP_REQUEST_LEADERBOARD,
     Achievements,
-    Leaderboard,
-    LeaderboardHeader,
-    LeaderboardScore,
     LeaderboardType,
-    ScoringAlgorithm,
     SubmissionCharts,
 )
 from usecases.providers import ApiV2CredentialsError, OsuDailyCredentialsError
-from usecases.scores import AllScores
 
 osu = APIRouter(
     prefix="/osu",
@@ -98,12 +91,8 @@ async def get_leaderboard(
     profile: Profile = Depends(retrieve_profile(OsuErrors.NON)),
     session: Session = Depends(retrieve_session(OsuErrors.NON)),
 ):
-    if mods_arg & osuMods.SCOREV2:
-        mods_arg &= ~osuMods.SCOREV2
-    if mods_arg & osuMods.AUTOPILOT:
-        mods_arg &= ~osuMods.AUTOPILOT
-    if mods_arg & osuMods.RELAX:
-        mods_arg &= ~osuMods.RELAX
+    mods = Mods.from_stable_mods(mods_arg)
+    game_mode = osuGameMode(mode_arg)
 
     map_filename = urlparse.unquote(map_filename)
 
@@ -135,18 +124,11 @@ async def get_leaderboard(
         )
 
     if beatmap is None:
-        if not profile.settings.ignore_beatmap_updates:
-            session.latest_beatmap = None
-            await usecases.sessions.update_current_session(session)
-            return Response(UPDATE_BEATMAP_REQUEST_LEADERBOARD)
-        else:
-            session.latest_beatmap = None
-            await usecases.sessions.update_current_session(session)
-            return Response(GRAVEYARD_LEADERBOARD)
+        session.latest_beatmap = None
+        await usecases.sessions.update_current_session(session)
+        return Response(UPDATE_BEATMAP_REQUEST_LEADERBOARD)
 
-    if beatmap.id == 0:
-        # practice/unsubmitted map, just return empty leaderboard but save the beatmap info in the
-        # session so it can be used for other requests
+    if beatmap.unsubmitted:
         session.latest_beatmap = None
         await usecases.sessions.update_current_session(session)
         return Response(NOT_SUBMITTED_LEADERBOARD)
@@ -165,138 +147,15 @@ async def get_leaderboard(
 
     mods = Mods.from_stable_mods(mods_arg)
 
-    if profile.settings.leaderboard.show_lazer_scores_on_leaderboard:
-        stable_only = False
-    else:
-        stable_only = True
-
-    if leaderboard_type != LeaderboardType.FRIENDS:
-        scores, stable_ids = await usecases.bancho_scores.get_scores_for(
-            beatmap=beatmap,
-            leaderboard_type=leaderboard_type,
-            game_mode=mode_arg,
-            mods=mods,
-            limit=profile.settings.leaderboard.leaderboard_score_limit,
-            stable_only=stable_only,
-            friends_ids=profile.friend_ids,
-        )
-    else:
-        scores = await usecases.scores.get_scores_for_beatmap(
-            beatmap=beatmap,
-            profile_name=session.profile_name,
-            game_mode=mode_arg,
-        )
-        stable_ids = []
-
-    if leaderboard_type == LeaderboardType.MODS:
-        personal_best_mods = mods
-    else:
-        personal_best_mods = None
-
-    if leaderboard_type == LeaderboardType.FRIENDS:
-        # TODO: we can still show the personal best,
-        # but filtering and sorting the scores would have to happen
-        # earlier
-        personal_best = None
-    else:
-        personal_best = await usecases.scores.personal_best_for_beatmap(
-            beatmap=beatmap,
-            profile_name=session.profile_name,
-            game_mode=mode_arg,
-            mods=personal_best_mods,
-            scoring_algorithm=profile.settings.scoring_algorithm,
-        )
-    
-    personal_best_row = None
-    if personal_best:
-        personal_best_position = usecases.scores.leaderboard_position(
-            personal_best=personal_best,
-            scores=scores,
-            settings=profile.settings,
-        )
-
-        if (
-            profile.settings.scoring_algorithm == ScoringAlgorithm.PP
-            and beatmap.can_display_pp
-        ):
-            personal_best_ingame_score = personal_best.performance_points or 0
-        else:
-            personal_best_ingame_score = personal_best.total_score
-
-        personal_best_row = LeaderboardScore.from_score(
-            score=personal_best,
-            position=personal_best_position,
-            ingame_score=personal_best_ingame_score,
-            from_difficulty_adjusted=beatmap.difficulty_adjusted,
-            truncate_username=profile.settings.leaderboard.truncate_user_names_on_leaderboard,
-        )
-
-    merged_scores = AllScores()
-
-    if isinstance(scores, BanchoScores):
-        merged_scores.extend(scores.all_scores)
-    else:
-        merged_scores.extend(scores.scores)
-
-    if personal_best:
-        merged_scores.append(personal_best)
-
-    total_scores = merged_scores.total if merged_scores else 0
-    leaderboard_header = LeaderboardHeader(
-        beatmap_status=beatmap.status,
-        beatmap_id=beatmap.id,
-        beatmap_set_id=beatmap.set_id,
-        num_of_scores=total_scores,
-        artist=beatmap.artist,
-        title=beatmap.title,
+    leaderboard = await usecases.leaderboards.from_request(
+        beatmap=beatmap,
+        leaderboard_type=leaderboard_type,
+        game_mode=game_mode,
+        mods=mods,
+        profile_name=session.profile_name,
+        settings=profile.settings,
+        profile=profile,
     )
-
-    leaderboard = Leaderboard(
-        header=leaderboard_header,
-        scores=[],
-        personal_best=personal_best_row,
-    )
-
-    if not scores and personal_best is None:
-        return Response(content=leaderboard.serialize())
-
-    leaderboard_scores = []
-    merged_scores.sort(profile.settings.scoring_algorithm)
-    merged_scores = merged_scores[
-        : profile.settings.leaderboard.leaderboard_score_limit
-    ]
-
-    seen_self = False
-    for index, score in enumerate(merged_scores):
-        if (
-            profile.settings.scoring_algorithm == ScoringAlgorithm.PP
-            and beatmap.can_display_pp
-        ):
-            ingame_score = score.performance_points or 0
-        else:
-            ingame_score = score.total_score
-        
-        if seen_self:
-            # For our friend leaderboard (all scores submitted by the player)
-            # osu! doesn't let your name pop up multiple times on a leaderboard
-            # to bypass we can add invisible characters at the end of the username 
-            # for it to be considered a unique name by osu! but it will look the same to the user
-            score.username += " " * (index + 1)
-        
-        if score.username == session.profile_name:
-            seen_self = True
-
-        leaderboard_score = LeaderboardScore.from_score(
-            score=score,
-            position=index + 1,
-            ingame_score=ingame_score,
-            from_difficulty_adjusted=beatmap.difficulty_adjusted,
-            truncate_username=profile.settings.leaderboard.truncate_user_names_on_leaderboard,
-        )
-        leaderboard_scores.append(leaderboard_score)
-
-    leaderboard.scores = leaderboard_scores
-
     return Response(content=leaderboard.serialize())
 
 
@@ -347,6 +206,10 @@ async def osuSubmitModularSelector(
     session: Session = Depends(retrieve_session(OsuErrors.NON)),
     server_settings: ServerSettings = Depends(retrieve_server_settings),
 ):
+    # TODO: The things that is preventing all modes from being supported atm
+    # Mod multiplers change across modes so implementing that
+    # for out linear interpolation func, we'd need data points for each mode
+
     if session.songs_folder is None:
         await usecases.sessions.silent_restart_client()
         return Response(
@@ -385,7 +248,7 @@ async def osuSubmitModularSelector(
         return Response(OsuErrors.NON.value.encode())
 
     if score_data.username.lower() != session.profile_name.lower():
-        print(
+        log.error(
             f"Score submission profile mismatch: score submitted for {score_data.username} but current session profile is {session.profile_name}"
         )
         await usecases.sessions.notify_client(
@@ -511,14 +374,6 @@ async def osuSubmitModularSelector(
 
     return Response(content=submission_charts.serialize())
 
-@osu.get("/web/osu-search.php/{full_path:path}")
-@log_time
-async def search_redirect(full_path: str):
-    print(f"Redirecting search request for {full_path}")
-    return RedirectResponse(
-        url=f"https://osu.gatari.pw/web/osu-search.php/{full_path}",
-        status_code=status.HTTP_301_MOVED_PERMANENTLY,
-    )
 
 @osu.get("/web/osu-getreplay.php")
 @log_time
@@ -548,14 +403,14 @@ async def get_replay(
             )
             return Response(OsuErrors.NON.value.encode())
 
-        if score_id not in session.latest_beatmap.stable_score_ids:
+        if score_id not in session.latest_beatmap.avaliable_replays:
             await usecases.sessions.notify_client(
                 "Replay data for this score is not available.\n"
                 "Ensure this score was set on stable in order to view it's replay"
             )
             return Response(OsuErrors.NON.value.encode())
 
-        replay_data = await usecases.bancho_scores.get_replay_for_score(
+        replay_data = await usecases.bancho_scores.get_replay(
             score_id=score_id,
             beatmap_md5=beatmap_md5,
         )
@@ -569,8 +424,12 @@ async def get_replay(
 
         return Response(content=replay_data)
 
+    # since we encode our score ids to negative to
+    # indicate a profile's score, so decode it
+    score_id = abs(score_id)
+
     replay_frames = await usecases.scores.get_replay_frames_for_score_id(
-        score_id=-score_id
+        score_id=score_id
     )
 
     if replay_frames is None:

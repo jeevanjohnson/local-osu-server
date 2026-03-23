@@ -11,6 +11,7 @@ import psutil
 import usecases.profiles
 from adapters import log, log_time
 from constants import SERVER_SETTINGS_FILE, SESSIONS_FILE
+from models.bancho.scores import Scores, StableScore
 from models.database.sessions import CurrentSession as Session
 from models.domain.errors import ProfileNotFoundError, SessionNotFoundError
 from osuProtocol.server_packets import (
@@ -235,19 +236,41 @@ async def retrieve_replays_folder() -> Path | None:
     return osu_path.parent / "Replays"
 
 
-async def update_stable_leaderboard_ids(stable_ids: list[int]) -> None:
+async def update_avaliable_stable_replay_ids_from_ids(ids: list[int]) -> None:
     try:
         session = await require_current_session()
     except SessionNotFoundError:
         log.warning(
-            "Attempted to update stable leaderboard IDs but no active session was found."
+            "Attempted to update available stable replay IDs but no active session was found."
         )
         return
 
     assert session.latest_beatmap is not None, (
-        "Cannot update stable leaderboard IDs without a latest beatmap in the session."
+        "Cannot update available stable replay IDs without a latest beatmap in the session."
     )
-    session.latest_beatmap.stable_score_ids = stable_ids
+    session.latest_beatmap.avaliable_replays = ids
     await update_current_session(session)
 
     return
+
+
+async def update_avaliable_stable_replay_ids_from_scores(scores: Scores) -> None:
+    try:
+        session = await require_current_session()
+    except SessionNotFoundError:
+        log.warning(
+            "Attempted to update available stable replay IDs but no active session was found."
+        )
+        return
+
+    if session.latest_beatmap is None:
+        log.warning(
+            "Cannot update available stable replay IDs without a latest beatmap in the session."
+        )
+        return
+
+    for score in scores.scores:
+        if isinstance(score, StableScore) and score.replay_available:
+            session.latest_beatmap.avaliable_replays.append(score.score_id)
+
+    await update_current_session(session)

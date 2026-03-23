@@ -1,4 +1,5 @@
 import usecases.bancho_scores
+from adapters.log import log_time
 from constants import SCORES_FILE
 from models.bancho.scores import (
     Score as BanchoScore,
@@ -19,13 +20,12 @@ from models.database.scores import (
     CurrentMapScores as MapScores,
 )
 from models.database.scores import (
-    CurrentScore as Score,
+    CurrentScore as ProfileScore,
 )
 from models.domain.accuracy import to_percentage
 from models.domain.gameplay import Mods, osuGameMode
 from osuProtocol.client_web import (
     Accuracy,
-    LeaderboardType,
     MaxCombo,
     PerformancePoints,
     Rank,
@@ -37,15 +37,18 @@ from osuProtocol.client_web import Beatmap as BeatmapChart
 from osuProtocol.client_web import OverallRanking as OverallRankingChart
 from osuProtocol.replay import extract_replay_frames_from_osr
 from repositories.scores import ScoresRepository
+from usecases.bancho_scores import AcceptedScores
 
 
-class AllScores(list[BanchoScore | Score]):
+class AllScores(list[BanchoScore | ProfileScore]):
     @property
     def total(self) -> int:
         return len(self)
 
     def position_of_score(
-        self, target_score: BanchoScore | Score, scoring_algorithm: ScoringAlgorithm
+        self,
+        target_score: BanchoScore | ProfileScore,
+        scoring_algorithm: ScoringAlgorithm,
     ) -> int:
         """Get the position of a score in the list when sorted by the given scoring algorithm."""
         temp_scores = AllScores(self)
@@ -66,14 +69,14 @@ class AllScores(list[BanchoScore | Score]):
 
     def sort_by_pp(self) -> None:
 
-        def pp_key(score: BanchoScore | Score) -> int:
+        def pp_key(score: BanchoScore | ProfileScore) -> int:
             return score.performance_points or 0
 
         super().sort(key=pp_key, reverse=True)
 
     def sort_by_score(self) -> None:
 
-        def score_key(score: BanchoScore | Score) -> int:
+        def score_key(score: BanchoScore | ProfileScore) -> int:
             return score.total_score or 0
 
         super().sort(key=score_key, reverse=True)
@@ -115,20 +118,22 @@ async def get_scores_for_beatmap(
     return map_scores
 
 
+@log_time
 async def score_rank(
-    score: Score,
+    score: ProfileScore,
     beatmap: Beatmap,
     settings: Settings,
 ) -> int:
-    stable_only = not settings.leaderboard.show_lazer_scores_on_leaderboard
+    if settings.leaderboard.show_lazer_scores_on_leaderboard:
+        accepted_scores = AcceptedScores.BOTH
+    else:
+        accepted_scores = AcceptedScores.STABLE_ONLY
 
-    bancho_scores, stable_ids = await usecases.bancho_scores.get_scores_for(
+    bancho_scores = await usecases.bancho_scores.get_any_scores_for(
         beatmap=beatmap,
-        leaderboard_type=LeaderboardType.TOP,
-        limit=100,
-        stable_only=stable_only,
         game_mode=score.game_mode,
-        friends_ids=[],
+        accepted_scores=accepted_scores,
+        ranking_type=settings.scoring_algorithm.to_api_v2(),
     )
 
     if not bancho_scores.all_scores:
@@ -141,11 +146,12 @@ async def score_rank(
     return all_scores.position_of_score(score, settings.scoring_algorithm)
 
 
+@log_time
 async def previous_best_score(
     beatmap: Beatmap,
-    new_score: Score,
+    new_score: ProfileScore,
     settings: Settings,
-) -> Score | None:
+) -> ProfileScore | None:
     """Get the previous best score for this user on this beatmap.
 
     This is called after submission, so the repository can already contain
@@ -170,11 +176,12 @@ async def previous_best_score(
     return temp_map.scores[0]
 
 
+@log_time
 async def get_ranking_charts(
     beatmap: Beatmap,
     old_profile: Profile,
     current_profile: Profile,
-    new_score: Score,
+    new_score: ProfileScore,
     settings: Settings,
 ) -> tuple[BeatmapChart, OverallRankingChart]:
     prev_best = await previous_best_score(
@@ -302,13 +309,14 @@ async def get_ranking_charts(
     return beatmap_chart, overall_ranking_chart
 
 
+@log_time
 async def personal_best_for_beatmap(
     beatmap: Beatmap,
     profile_name: str,
     game_mode: osuGameMode,
     scoring_algorithm: ScoringAlgorithm,
     mods: Mods | None = None,
-) -> Score | None:
+) -> ProfileScore | None:
     """Get the personal best score for a beatmap and profile."""
     scores_repo = ScoresRepository(SCORES_FILE)
 
@@ -335,8 +343,9 @@ async def personal_best_for_beatmap(
     return filtered_scores.scores[0]
 
 
+@log_time
 def leaderboard_position(
-    personal_best: Score,
+    personal_best: ProfileScore,
     scores: BanchoScores | MapScores,
     settings: Settings,
 ) -> int:
@@ -359,6 +368,7 @@ def leaderboard_position(
     return all_scores.index(personal_best) + 1
 
 
+@log_time
 async def get_replay_frames_for_score_id(score_id: int) -> bytes | None:
     """Get replay frames for a given score ID, if available."""
     scores_repo = ScoresRepository(SCORES_FILE)

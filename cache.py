@@ -35,6 +35,7 @@ class Cache(Generic[KEY, VALUE]):
 
 from pathlib import Path
 
+from models.bancho.scores import Score, Scores
 from models.database.beatmaps import CurrentBeatmap as Beatmap
 
 MD5 = str
@@ -54,3 +55,8 @@ beatmap_by_id = Cache[int, Beatmap](time_to_live=timedelta(minutes=30))
 osu_file_path_by_set_id_and_md5 = Cache[tuple[SET_ID, MD5], Path](
     time_to_live=timedelta(minutes=30)
 )
+score_for_user_on_beatmap_by_md5 = Cache[MD5, Score](time_to_live=timedelta(minutes=5))
+friends_scores_for_beatmap_by_md5 = Cache[MD5, Scores](
+    time_to_live=timedelta(minutes=5)
+)
+any_scores_by_beatmap_md5 = Cache[MD5, Scores](time_to_live=timedelta(minutes=5))

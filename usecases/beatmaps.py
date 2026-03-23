@@ -310,22 +310,13 @@ class BeatmapResolver:
             return beatmap
 
         # Phase 4: Check for unsubmitted map
-        check_for_beatmap_updates = not self.current_settings.ignore_beatmap_updates
-
-        if check_for_beatmap_updates:
-            unsubmitted_map = await self.find_unsubmitted_map(
-                beatmap_md5=beatmap_md5,
-                beatmap_set_id=beatmap_set_id,
-                map_filename=map_filename,
-            )
-            if unsubmitted_map is not None:
-                return unsubmitted_map
-        else:
-            log.warning("Skipping unsubmitted map phase due to user settings")
-
-        # TODO: Why did i need this?
-        # if not check_for_beatmap_updates:
-        #     return None
+        unsubmitted_map = await self.find_unsubmitted_map(
+            beatmap_md5=beatmap_md5,
+            beatmap_set_id=beatmap_set_id,
+            map_filename=map_filename,
+        )
+        if unsubmitted_map is not None:
+            return unsubmitted_map
 
         # Phase 5: Possible difficulty-adjusted Request
         if not self.current_settings.difficulty_adjusted_beatmaps.sync_rank_status_with_bancho:

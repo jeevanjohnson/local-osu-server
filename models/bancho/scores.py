@@ -113,6 +113,9 @@ class Scores(BaseModel):
     limit: int = Field(default=50)
     all_scores: list[Score]
 
+    def append(self, score: Score) -> None:
+        self.all_scores.append(score)
+
     @property
     def scores(self) -> list[Score]:
         return self.all_scores[: self.limit]

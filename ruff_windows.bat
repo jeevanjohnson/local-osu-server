@@ -1,0 +1,1 @@
+ruff check --select F401 --fix .; ruff check --select I --fix .; ruff format .
