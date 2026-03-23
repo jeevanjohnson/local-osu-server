@@ -5,7 +5,8 @@ from typing import Any
 import ossapi.enums
 from ossapi import UserCompact
 
-from adapters.app_logger import app_logger
+import usecases.sessions
+from adapters import log, log_time
 from constants import PROFILES_FILE, SESSIONS_FILE
 from models.bancho.scores import Combo, LazerScore, Mods, Scores, StableScore
 from models.database.beatmaps import (
@@ -14,11 +15,10 @@ from models.database.beatmaps import (
 from models.domain.errors import ProfileNotFoundError, SessionNotFoundError
 from models.domain.gameplay import osuGameMode, osuMods
 from osuProtocol.client_web import LeaderboardType
+from osuProtocol.replay import extract_replay_frames_from_osr
 from repositories.profiles import ProfilesRepository
 from repositories.sessions import SessionRepository
 from usecases.providers import get_ossapi_async
-from osuProtocol.replay import extract_replay_frames_from_osr
-import usecases.sessions
 
 _SCORE_HOT_CACHE_TTL_SECONDS = 300
 _SCORE_HOT_CACHE_MAX_SIZE = 1024
@@ -26,6 +26,7 @@ _score_hot_cache: dict[tuple[Any, ...], tuple[float, Scores, list[int]]] = {}
 _score_inflight_requests: dict[
     tuple[Any, ...], asyncio.Task[tuple[Scores, list[int]]]
 ] = {}
+
 
 def _make_score_cache_key(
     beatmap_id: int,
@@ -62,7 +63,9 @@ def _get_cached_scores(cache_key: tuple[Any, ...]) -> tuple[Scores, list[int]] |
     return cached_scores, list(cached_stable_ids)
 
 
-def _cache_scores(cache_key: tuple[Any, ...], scores: Scores, stable_ids: list[int]) -> None:
+def _cache_scores(
+    cache_key: tuple[Any, ...], scores: Scores, stable_ids: list[int]
+) -> None:
     if cache_key in _score_hot_cache:
         _score_hot_cache.pop(cache_key, None)
 
@@ -99,15 +102,19 @@ def parse_difficulty_adjustment_settings(mod_settings: dict[str, Any]) -> list[s
     return settings
 
 
-@app_logger.log(msg="usecase get scores for beatmap")
+StableIDs = list[int]
+
+
+@log_time
 async def get_scores_for(
     beatmap: Beatmap,
     leaderboard_type: LeaderboardType,
     game_mode: osuGameMode,
     limit: int,
     stable_only: bool,
+    friends_ids: list[int],
     mods: Mods | None = None,
-) -> tuple[Scores, list[int]]:
+) -> tuple[Scores, StableIDs]:
     if mods is not None:
         stable_mods, lazer_mods = mods.to_stable_mods()
     else:
@@ -174,7 +181,7 @@ async def get_scores_for(
     async def _resolve_scores() -> tuple[Scores, list[int]]:
         stable_ids: list[int] = []
 
-        app_logger.warning(
+        log.warning(
             f"Fetching scores for beatmap {beatmap.id} with mods {mods} and leaderboard type {leaderboard_type.name}..."
         )
 
@@ -188,7 +195,7 @@ async def get_scores_for(
                 type=ranking_type,
             )
         except ValueError as e:
-            app_logger.error(f"Error fetching scores for beatmap {beatmap.id}: {e}")
+            log.error(f"Error fetching scores for beatmap {beatmap.id}: {e}")
             return Scores(all_scores=[]), stable_ids
 
         if not requested_scores:
@@ -231,7 +238,7 @@ async def get_scores_for(
                             )
 
                     except Exception as e:
-                        app_logger.warning(
+                        log.warning(
                             f"Error processing mod settings for mod {mod.acronym}: {e}\nMod settings: {mod.settings}"
                         )
                 else:
@@ -270,7 +277,9 @@ async def get_scores_for(
 
         return scores, stable_ids
 
-    inflight_task: asyncio.Task[tuple[Scores, list[int]]] = asyncio.create_task(_resolve_scores())
+    inflight_task: asyncio.Task[tuple[Scores, list[int]]] = asyncio.create_task(
+        _resolve_scores()
+    )
     _score_inflight_requests[cache_key] = inflight_task
 
     try:
@@ -279,9 +288,9 @@ async def get_scores_for(
         if _score_inflight_requests.get(cache_key) is inflight_task:
             _score_inflight_requests.pop(cache_key, None)
 
+
 async def get_replay_for_score(
-    score_id: int,
-    beatmap_md5: str | None = None
+    score_id: int, beatmap_md5: str | None = None
 ) -> bytes | None:
     """Returns compatible stable replay frames for the given score ID or None if it doesn't match the conditions"""
     # Check if replay is available for this score & md5's match
@@ -295,17 +304,21 @@ async def get_replay_for_score(
         )
 
         assert replay_data is not None, "Expected replay data to be bytes"
-        assert isinstance(replay_data, bytes), f"Expected replay data to be bytes, got {type(replay_data)}"
+        assert isinstance(replay_data, bytes), (
+            f"Expected replay data to be bytes, got {type(replay_data)}"
+        )
 
         # Extract replay frames from .osr replay data
         replay_frames, replay_beatmap_md5 = extract_replay_frames_from_osr(replay_data)
 
         if beatmap_md5 and replay_beatmap_md5 != beatmap_md5:
-            print(f"Replay beatmap md5 {replay_beatmap_md5} does not match expected {beatmap_md5}")
+            print(
+                f"Replay beatmap md5 {replay_beatmap_md5} does not match expected {beatmap_md5}"
+            )
             return None
         else:
             return replay_frames
 
     except ValueError as e:
-        app_logger.error(f"Error fetching replay for score {score_id}: {e}")
-        raise 
+        log.error(f"Error fetching replay for score {score_id}: {e}")
+        raise

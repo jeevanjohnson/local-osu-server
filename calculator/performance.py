@@ -1,7 +1,7 @@
 import rosu_pp_py as rosu
-from adapters import OsuFile
+
+from adapters import OsuFile, log, log_time
 from models.domain.gameplay import Mods, osuGameMode, osuMods
-from adapters.app_logger import app_logger
 
 # Mapping from osuGameMode to rosu GameMode
 ROSU_GAME_MODE_MAP: dict[osuGameMode, rosu.GameMode] = {
@@ -11,25 +11,26 @@ ROSU_GAME_MODE_MAP: dict[osuGameMode, rosu.GameMode] = {
     osuGameMode.MANIA: rosu.GameMode.Mania,
 }
 
-@app_logger.log(msg="pp calculation started")
-def pp(
-        map_file: OsuFile,
-        game_mode: osuGameMode,
-        mods: Mods,
-        combo: int,
-        n300: int,
-        n100: int,
-        n50: int,
-        nmiss: int,
-) -> int:
-    assert map_file.raw_file is not None, "Map file content is required for pp calculation"
 
-    rosu_map = rosu.Beatmap(
-        content=map_file.raw_file
+@log_time
+def pp(
+    map_file: OsuFile,
+    game_mode: osuGameMode,
+    mods: Mods,
+    combo: int,
+    n300: int,
+    n100: int,
+    n50: int,
+    nmiss: int,
+) -> int:
+    assert map_file.raw_file is not None, (
+        "Map file content is required for pp calculation"
     )
 
+    rosu_map = rosu.Beatmap(content=map_file.raw_file)
+
     if rosu_map.is_suspicious():
-        app_logger.warning("Beatmap is marked as suspicious, pp calculation denied to 0")
+        log.warning("Beatmap is marked as suspicious, pp calculation denied to 0")
         return 0
 
     stable_mods, lazer_mods = mods.to_stable_mods()
@@ -40,7 +41,7 @@ def pp(
 
     rosu_map.convert(
         ROSU_GAME_MODE_MAP[game_mode],  # type: ignore # Convert osuGameMode to rosu GameMode
-        stable_mods, # type: ignore 
+        stable_mods,  # type: ignore
     )
 
     calculator = rosu.Performance(

@@ -1,3 +1,4 @@
+from models.domain.accuracy import UnitAccuracy, to_percentage, to_unit_accuracy
 from models.domain.errors import (
     BeatmapNotFoundError,
     BeatmapSetNotFoundError,
@@ -10,7 +11,6 @@ from models.domain.errors import (
     SessionAlreadyExistsError,
     SessionNotFoundError,
 )
-from models.domain.accuracy import UnitAccuracy, to_percentage, to_unit_accuracy
 from models.domain.gameplay import Mods, osuGameMode, osuMods
 
 __all__ = [

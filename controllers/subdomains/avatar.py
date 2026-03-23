@@ -9,7 +9,7 @@ from fastapi import APIRouter
 from fastapi.responses import FileResponse, RedirectResponse
 
 import usecases.avatar
-from adapters.app_logger import app_logger
+from adapters import log_time
 
 avatar = APIRouter(
     prefix="/a",
@@ -17,7 +17,7 @@ avatar = APIRouter(
 
 
 @avatar.get("/{user_id}")
-@app_logger.log(msg="router avatar get")
+@log_time
 async def get_avatar(user_id: int):
     if user_id != 2:
         return RedirectResponse(

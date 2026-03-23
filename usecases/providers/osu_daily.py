@@ -4,12 +4,14 @@ Follows the same pattern as OSS API provider.
 """
 
 from aiohttp import ClientSession
+
 from constants import SERVER_SETTINGS_FILE
 from repositories.server_settings import ServerSettingsRepository
 
 
 class OsuDailyCredentialsError(Exception):
     """Raised when osu!daily API key is missing or invalid."""
+
     pass
 
 

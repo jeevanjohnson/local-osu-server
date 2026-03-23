@@ -5,7 +5,6 @@ Purpose/Domain/Concept:
 
 from jays_tools.json_database import JsonDatabase
 
-from adapters.app_logger import app_logger
 from models.database.sessions import CurrentSession as Session
 from models.domain.errors import SessionAlreadyExistsError, SessionNotFoundError
 
@@ -14,7 +13,7 @@ class SessionRepository:
     def __init__(self, path):
         self.session = JsonDatabase(path, models=Session)
 
-    @app_logger.log(msg="repository require current session")
+    # @log_time
     async def require_current_session(self) -> Session:
         async with self.session as current_session:
             if not current_session.loaded:
@@ -22,14 +21,14 @@ class SessionRepository:
 
             return current_session
 
-    @app_logger.log(msg="repository maybe get current session")
+    # @log_time
     async def maybe_get_current_session(self) -> Session | None:
         try:
             return await self.require_current_session()
         except SessionNotFoundError:
             return None
 
-    @app_logger.log(msg="repository create session")
+    # @log_time
     async def create_session(self, profile_name: str) -> None:
         async with self.session as current_session:
             if current_session.loaded:
@@ -39,7 +38,7 @@ class SessionRepository:
 
             self.session.set(current_session)
 
-    @app_logger.log(msg="repository delete session")
+    # @log_time
     async def delete_current_session(self) -> None:
         async with self.session as current_session:
             if not current_session.loaded:
@@ -49,7 +48,7 @@ class SessionRepository:
 
             self.session.set(deleted_session)
 
-    @app_logger.log(msg="repository update current session")
+    # @log_time
     async def update_current_session(self, updated_session: Session) -> None:
         async with self.session as current_session:
             if not current_session.loaded:

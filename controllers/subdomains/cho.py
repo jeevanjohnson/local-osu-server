@@ -14,7 +14,7 @@ import usecases.gui
 import usecases.profiles
 import usecases.server_settings
 import usecases.sessions
-from adapters.app_logger import app_logger
+from adapters import log, log_time
 from models.domain.errors import ProfileNotFoundError, SessionNotFoundError
 from osuProtocol.client_packets import (
     ChangeAction,
@@ -41,7 +41,7 @@ bancho = APIRouter()
 
 
 @bancho.post("/")
-@app_logger.log(msg="router bancho client request")
+@log_time
 async def client_request_handler(
     request: Request,
     osu_token: str | None = Header(None),
@@ -145,7 +145,7 @@ async def client_request_handler(
 
     for packet in incoming_packets:
         if packet._id not in PACKET_HANDLERS:
-            app_logger.warning(
+            log.warning(
                 f"Received packet with ID {ClientPackets(packet._id).name} but no handler is registered for this packet type."
             )
             continue
@@ -194,13 +194,13 @@ def register_packet_handler(packet_id: ClientPackets, packet_type: type[PacketTy
 
 
 @register_packet_handler(ClientPackets.PING, packet_type=Ping)
-@app_logger.log(msg="bancho handle ping")
+@log_time
 async def handle_ping(packet: Ping) -> ServerPackets | ServerPacket | None:
     return
 
 
 @register_packet_handler(ClientPackets.CHANGE_ACTION, packet_type=ChangeAction)
-@app_logger.log(msg="bancho handle action change")
+@log_time
 async def on_action_change(packet: ChangeAction) -> ServerPackets | ServerPacket | None:
     # This should be taken care of via the decorater to remove redundancy
     # and be passed in as a parameter along with the packet
@@ -258,7 +258,7 @@ async def on_action_change(packet: ChangeAction) -> ServerPackets | ServerPacket
 
 
 @register_packet_handler(ClientPackets.LOGOUT, packet_type=LogOut)
-@app_logger.log(msg="bancho handle logout")
+@log_time
 async def on_logout(packet: LogOut):
     try:
         session = await usecases.sessions.require_current_session()

@@ -4,12 +4,12 @@ from typing import Awaitable, Callable
 from fastapi import Depends
 
 import usecases.profiles
-import usecases.sessions
 import usecases.server_settings
+import usecases.sessions
 from models.database.profiles import CurrentProfile as Profile
+from models.database.server_settings import CurrentServerSettings as ServerSettings
 from models.database.sessions import CurrentSession as Session
 from models.domain.errors import ProfileNotFoundError, SessionNotFoundError
-from models.database.server_settings import CurrentServerSettings as ServerSettings
 
 
 class OsuErrors(Enum):
@@ -83,6 +83,7 @@ def retrieve_profile(
         return profile
 
     return _retrieve_profile
+
 
 async def retrieve_server_settings() -> ServerSettings:
     server_settings = await usecases.server_settings.get_server_settings()

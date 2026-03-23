@@ -10,7 +10,7 @@ from enum import IntEnum, unique
 from pprint import pformat
 from typing import Callable, Type, TypedDict, TypeVar, get_type_hints
 
-from adapters.app_logger import app_logger
+from adapters import log
 from osuProtocol.osuTypes import (
     osuBaseType,
     osuIntSigned32Bit,
@@ -279,14 +279,12 @@ class Packets(list[Packet]):
             try:
                 packet_id = ClientPackets(packet_id_raw)
             except ValueError:
-                app_logger.warning(f"Skipping unknown packet ID: {packet_id_raw}")
+                log.warning(f"Skipping unknown packet ID: {packet_id_raw}")
                 self.offset += packet_length
                 continue
 
             if packet_id not in READABLE_PACKETS:
-                app_logger.warning(
-                    f"Skipping unimplemented packet with ID: {packet_id.name}"
-                )
+                log.warning(f"Skipping unimplemented packet with ID: {packet_id.name}")
                 self.offset += packet_length
                 continue
 

@@ -1,4 +1,4 @@
-from adapters.app_logger import app_logger
+from adapters import log
 from osuProtocol.server_packets import osuGameMode, osuMods
 
 LAZER_MODS = list[str]
@@ -85,7 +85,7 @@ class Mods(list[str]):
         if game_mode == osuGameMode.STANDARD:
             return self.mod_multiplier_standard()
 
-        app_logger.warning(
+        log.warning(
             f"Mod multiplier for game mode {game_mode} not implemented, defaulting to 1.0"
         )
         return 1.0
@@ -166,7 +166,7 @@ class Mods(list[str]):
                 # DA settings like AR10.5/OD8/HP6/CS4 affect map attributes, not score multiplier.
                 continue
             else:
-                app_logger.warning(
+                log.warning(
                     f"Unknown mod {mod} with no defined multiplier, ignoring in score calculation"
                 )
 

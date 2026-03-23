@@ -26,7 +26,6 @@ from osuProtocol.osuTypes import (
 )
 
 
-
 def bytes_to_string(b: bytes) -> str:
     return base64.b64encode(b).decode("ascii")
 
@@ -437,7 +436,8 @@ class osuMods(IntFlag):
                 "MR": cls.MIRROR,
             }[acronym.strip().upper()]
         except KeyError:
-            raise ValueError(f"Invalid mod acronym: {acronym}")        
+            raise ValueError(f"Invalid mod acronym: {acronym}")
+
 
 @unique
 class osuCountryCode(IntEnum):

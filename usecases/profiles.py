@@ -3,9 +3,8 @@ Purpose/Domain/Concept:
 - This file contains the logic related to user profiles.
 """
 
-from adapters.app_logger import app_logger
-from osuProtocol.client_web import ScoringAlgorithm
-from repositories.scores import ScoresRepository
+import calculator
+from adapters import log_time
 from constants import PROFILES_FILE, SCORES_FILE
 from models.database.profiles import (
     CurrentProfile as Profile,
@@ -16,14 +15,14 @@ from models.database.profiles import (
 from models.database.server_settings import (
     CurrentServerSettings as ServerSettings,
 )
-
 from models.domain.errors import ProfileNotFoundError, ProfilesNotFoundError
+from osuProtocol.client_web import ScoringAlgorithm
 from osuProtocol.server_packets import osuGameMode
 from repositories.profiles import ProfilesRepository
-import calculator
+from repositories.scores import ScoresRepository
 
 
-@app_logger.log(msg="usecase get profiles")
+@log_time
 async def get_profiles() -> Profiles | None:
     profiles_repo = ProfilesRepository(PROFILES_FILE)
     try:
@@ -32,7 +31,7 @@ async def get_profiles() -> Profiles | None:
         return None
 
 
-@app_logger.log(msg="usecase get profile")
+@log_time
 async def get_profile(profile_name: str) -> Profile | None:
     profiles_repo = ProfilesRepository(PROFILES_FILE)
 
@@ -42,14 +41,14 @@ async def get_profile(profile_name: str) -> Profile | None:
         return None
 
 
-@app_logger.log(msg="usecase require profile")
+@log_time
 async def require_profile(profile_name: str) -> Profile:
     profiles_repo = ProfilesRepository(PROFILES_FILE)
 
     return await profiles_repo.require_profile(profile_name)
 
 
-@app_logger.log(msg="usecase create profile")
+@log_time
 async def create_profile(profile_name: str) -> None:
     profiles_repo = ProfilesRepository(PROFILES_FILE)
 
@@ -58,7 +57,7 @@ async def create_profile(profile_name: str) -> None:
     return
 
 
-@app_logger.log(msg="usecase delete profile")
+@log_time
 async def delete_profile(profile_name: str) -> None:
     profiles_repo = ProfilesRepository(PROFILES_FILE)
 
@@ -67,7 +66,7 @@ async def delete_profile(profile_name: str) -> None:
     return
 
 
-@app_logger.log(msg="usecase update profile")
+@log_time
 async def update_profile(profile_name: str, updated_profile: Profile) -> None:
     profiles_repo = ProfilesRepository(PROFILES_FILE)
 
@@ -75,22 +74,23 @@ async def update_profile(profile_name: str, updated_profile: Profile) -> None:
 
     return
 
+
 async def recalculate_stats(
     profile_name: str,
     max_combo: int,
     game_mode: osuGameMode,
     scoring_algorithm: ScoringAlgorithm,
-    server_settings: ServerSettings
+    server_settings: ServerSettings,
 ) -> Profile:
     """Old code which worked
-    
-        scores.sort(key = lambda s: s['pp'], reverse = True)
-        top_scores = utils.filter_top_scores(scores[:100])
-        top_scores.sort(key = lambda s: s['pp'], reverse = True)
 
-        pp = sum([s['pp'] * 0.95 ** i for i, s in enumerate(top_scores)])
-        pp += 416.6667 * (1 - (0.9994 ** len(scores)))
-        self.pp = round(pp)
+    scores.sort(key = lambda s: s['pp'], reverse = True)
+    top_scores = utils.filter_top_scores(scores[:100])
+    top_scores.sort(key = lambda s: s['pp'], reverse = True)
+
+    pp = sum([s['pp'] * 0.95 ** i for i, s in enumerate(top_scores)])
+    pp += 416.6667 * (1 - (0.9994 ** len(scores)))
+    self.pp = round(pp)
     """
 
     profile_repo = ProfilesRepository(PROFILES_FILE)
@@ -101,7 +101,7 @@ async def recalculate_stats(
 
     # O(1) lookup: get all scores for this profile only
     profile_scores = await scores_repo.get_scores_for_profile(profile_name)
-    
+
     if profile_scores is None:
         # No scores yet for this profile
         profile_stats.playcount += 1
@@ -156,8 +156,7 @@ async def recalculate_stats(
             for score, weight in zip(top_scores, weights)
         )
         weighted_acc = sum(
-            score.accuracy * weight
-            for score, weight in zip(top_scores, weights)
+            score.accuracy * weight for score, weight in zip(top_scores, weights)
         )
         weight_total = sum(weights)
 
@@ -166,17 +165,17 @@ async def recalculate_stats(
     else:
         weighted_pp = 0.0
         profile_stats.accuracy = 0.0
-    
+
     profile_stats.playcount += 1
     profile_stats.total_score = total_score
     profile_stats.ranked_score = ranked_score
-    
-    bonus_pp = 416.6667 * (1 - 0.9994 ** score_count) if score_count else 0.0
+
+    bonus_pp = 416.6667 * (1 - 0.9994**score_count) if score_count else 0.0
     profile_stats.performance_points = round(weighted_pp + bonus_pp)
 
     if max_combo > profile_stats.max_combo:
         profile_stats.max_combo = max_combo
-    
+
     profile_stats.rank = await calculator.rank_for_pp(
         profile_stats.performance_points,
         game_mode,

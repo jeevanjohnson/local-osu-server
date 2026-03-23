@@ -2,7 +2,7 @@ from pathlib import Path
 
 from jays_tools import JsonDatabase
 
-from adapters.app_logger import app_logger
+from adapters import log_time
 from models.database.beatmaps import CurrentBeatmap as Beatmap
 from models.database.beatmaps import CurrentBeatmaps as Beatmaps
 from models.database.beatmaps import CurrentBeatmapSet as BeatmapSet
@@ -14,14 +14,14 @@ class BeatmapsRepository:
     def __init__(self, path: Path) -> None:
         self.beatmaps = JsonDatabase(path=path, models=Beatmaps)
 
-    @app_logger.log(msg="repository get beatmap by md5")
+    @log_time
     async def get_by_md5(self, md5: str) -> Beatmap | None:
         try:
             return await self.require_by_md5(md5)
         except BeatmapNotFoundError:
             return None
 
-    @app_logger.log(msg="repository require beatmap by md5")
+    @log_time
     async def require_by_md5(self, md5: str) -> Beatmap:
         async with self.beatmaps as beatmaps:
             if md5 not in beatmaps.all["by_md5"]:
@@ -29,14 +29,14 @@ class BeatmapsRepository:
 
             return beatmaps.all["by_md5"][md5]
 
-    @app_logger.log(msg="repository get beatmap by id")
+    @log_time
     async def get_by_id(self, id: int) -> Beatmap | None:
         try:
             return await self.require_by_id(id)
         except BeatmapNotFoundError:
             return None
 
-    @app_logger.log(msg="repository require beatmap by id")
+    @log_time
     async def require_by_id(self, id: int) -> Beatmap:
         async with self.beatmaps as beatmaps:
             if id not in beatmaps.all["by_id"]:
@@ -44,14 +44,14 @@ class BeatmapsRepository:
 
             return beatmaps.all["by_id"][id]
 
-    @app_logger.log(msg="repository get beatmap set by id")
+    @log_time
     async def get_by_set_id(self, set_id: int) -> BeatmapSet | None:
         try:
             return await self.require_by_set_id(set_id)
         except BeatmapSetNotFoundError:
             return None
 
-    @app_logger.log(msg="repository require beatmap set by id")
+    @log_time
     async def require_by_set_id(self, set_id: int) -> BeatmapSet:
         async with self.beatmaps as beatmaps:
             if set_id not in beatmaps.all["by_set_id"]:
@@ -61,7 +61,7 @@ class BeatmapsRepository:
 
             return beatmaps.all["by_set_id"][set_id]
 
-    @app_logger.log(msg="repository insert beatmap")
+    @log_time
     async def insert_beatmap(self, bmap: Beatmap) -> None:
         async with self.beatmaps as beatmaps:
             beatmaps.all["by_id"][bmap.id] = bmap
@@ -69,7 +69,7 @@ class BeatmapsRepository:
 
             self.beatmaps.set(beatmaps)
 
-    @app_logger.log(msg="repository insert beatmap set")
+    @log_time
     async def insert_beatmap_set(self, beatmap_set: BeatmapSet) -> None:
         async with self.beatmaps as beatmaps:
             beatmaps.all["by_set_id"][beatmap_set.id] = beatmap_set
@@ -80,7 +80,7 @@ class BeatmapsRepository:
 
             self.beatmaps.set(beatmaps)
 
-    @app_logger.log(msg="repository delete beatmap")
+    @log_time
     async def delete_beatmap(self, beatmap: Beatmap) -> None:
         async with self.beatmaps as beatmaps:
             beatmaps.all["by_id"].pop(beatmap.id, None)

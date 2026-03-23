@@ -7,7 +7,7 @@ from pathlib import Path
 
 from jays_tools.json_database import JsonDatabase
 
-from adapters.app_logger import app_logger
+from adapters import log_time
 from models.database.profiles import CurrentProfile as Profile
 from models.database.profiles import CurrentProfiles as Profiles
 from models.domain.errors import (
@@ -21,7 +21,7 @@ class ProfilesRepository:
     def __init__(self, path: Path):
         self.profiles = JsonDatabase(path, models=Profiles)
 
-    @app_logger.log(msg="repository require profiles")
+    @log_time
     async def require_profiles(self) -> Profiles:
         async with self.profiles as profiles:
             if not profiles.all:
@@ -29,14 +29,14 @@ class ProfilesRepository:
 
             return profiles
 
-    @app_logger.log(msg="repository get profiles")
+    @log_time
     async def get_profiles(self) -> Profiles | None:
         try:
             return await self.require_profiles()
         except ProfilesNotFoundError:
             return None
 
-    @app_logger.log(msg="repository require profile")
+    @log_time
     async def require_profile(self, profile_name: str) -> Profile:
         async with self.profiles as profiles:
             if profile_name not in profiles.all:
@@ -44,14 +44,14 @@ class ProfilesRepository:
 
             return profiles.all[profile_name]
 
-    @app_logger.log(msg="repository get profile")
+    @log_time
     async def get_profile(self, profile_name: str) -> Profile | None:
         try:
             return await self.require_profile(profile_name)
         except ProfileNotFoundError:
             return None
 
-    @app_logger.log(msg="repository create new profile")
+    @log_time
     async def create_new_profile(self, profile_name: str) -> None:
         async with self.profiles as profiles:
             if profile_name in profiles.all:
@@ -61,13 +61,13 @@ class ProfilesRepository:
 
             self.profiles.set(profiles)
 
-    @app_logger.log(msg="repository create profile")
+    @log_time
     async def create_profile(self, profile_name: str, profile_data: Profile) -> None:
         async with self.profiles as profiles:
             profiles.all[profile_name] = profile_data
             self.profiles.set(profiles)
 
-    @app_logger.log(msg="repository delete profile")
+    @log_time
     async def delete_profile(self, profile_name: str) -> None:
         async with self.profiles as profiles:
             if profile_name in profiles.all:
@@ -77,7 +77,7 @@ class ProfilesRepository:
 
             self.profiles.set(profiles)
 
-    @app_logger.log(msg="repository update profile")
+    @log_time
     async def update_profile(self, profile_name: str, profile: Profile) -> None:
         async with self.profiles as profiles:
             if profile_name in profiles.all:

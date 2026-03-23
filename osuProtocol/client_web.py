@@ -5,10 +5,10 @@ from enum import IntEnum, unique
 import ossapi.enums
 
 from models.bancho.scores import LazerScore, Score, StableScore
-from models.domain.gameplay import osuMods
 from models.database.scores import (
     CurrentScore as ProfileScore,
 )
+from models.domain.gameplay import osuMods
 
 
 @unique
@@ -24,6 +24,14 @@ class osuMapStatus(IntEnum):
     APPROVED = 3
     QUALIFIED = 4
     LOVED = 5
+
+    @property
+    def permanent(self) -> bool:
+        return self in {
+            osuMapStatus.RANKED,
+            osuMapStatus.APPROVED,
+            osuMapStatus.LOVED,
+        }
 
     def ranked(self) -> bool:
         return self in {
@@ -206,13 +214,13 @@ class LeaderboardScore:
             score_id = score.score_id
             max_combo = score.combo.actual
             replay_available = score.replay_available
-        
+
         if not stable_mods & osuMods.SCOREV2:
             # This allows watching replays
-            # and playing w/ score v2 making the 
+            # and playing w/ score v2 making the
             # ranking up the map feel with the lb on more
             # realistic to bancho/lazer
-            stable_mods |= osuMods.SCOREV2  
+            stable_mods |= osuMods.SCOREV2
 
         return cls(
             score_id=score_id,
@@ -391,6 +399,7 @@ class ScoringAlgorithm(IntEnum):
             ScoringAlgorithm.PP: ossapi.enums.RankingType.PERFORMANCE,
         }[self]
 
+
 @dataclass
 class Achievement:
     image_url: str
@@ -399,10 +408,12 @@ class Achievement:
 
     def serialize(self) -> str:
         return f"{self.image_url}+{self.title}+{self.description}"
-    
+
+
 class Achievements(list[Achievement]):
     def serialize(self) -> str:
         return "/".join(achievement.serialize() for achievement in self)
+
 
 @dataclass
 class ChartColumn:
@@ -411,31 +422,40 @@ class ChartColumn:
     after: float | None = None
 
     def serialize(self) -> str:
-        return f"{self.name}Before:{self.before or ''}|{self.name}After:{self.after or ''}"
+        return (
+            f"{self.name}Before:{self.before or ''}|{self.name}After:{self.after or ''}"
+        )
+
 
 @dataclass
-class Rank(ChartColumn): 
+class Rank(ChartColumn):
     name: str = "rank"
 
+
 @dataclass
-class RankedScore(ChartColumn): 
+class RankedScore(ChartColumn):
     name: str = "rankedScore"
 
+
 @dataclass
-class TotalScore(ChartColumn): 
+class TotalScore(ChartColumn):
     name: str = "totalScore"
 
+
 @dataclass
-class MaxCombo(ChartColumn): 
+class MaxCombo(ChartColumn):
     name: str = "maxCombo"
 
-@dataclass
-class Accuracy(ChartColumn): 
-    name: str = "accuracy"
 
 @dataclass
-class PerformancePoints(ChartColumn): 
+class Accuracy(ChartColumn):
+    name: str = "accuracy"
+
+
+@dataclass
+class PerformancePoints(ChartColumn):
     name: str = "pp"
+
 
 @dataclass
 class Chart:
@@ -456,11 +476,14 @@ class Chart:
             self.pp.serialize(),
         ]
 
+
 class Beatmap(Chart):
     pass
 
+
 class OverallRanking(Chart):
     pass
+
 
 @dataclass
 class SubmissionCharts:
@@ -477,12 +500,12 @@ class SubmissionCharts:
     @property
     def beatmap_url(self) -> str:
         return f"https://osu.ppy.sh/b/{self.beatmap_id}"
-    
+
     @property
     def chart_url(self) -> str:
         # TODO: Redirect to GUI?
         return "https://osu.ppy.sh/u/2"
-    
+
     def serialize(self) -> bytes:
         submission_charts = [
             f"beatmapId:{self.beatmap_id}",
@@ -496,7 +519,7 @@ class SubmissionCharts:
             f"chartUrl:{self.beatmap_url}",
             "chartName:Beatmap Ranking",
             *self.beatmap_chart.serialize(),
-            f"onlineScoreId:{self.score_id}", 
+            f"onlineScoreId:{self.score_id}",
             "\n",
             # overall ranking chart
             "chartId:overall",
@@ -507,7 +530,8 @@ class SubmissionCharts:
         ]
 
         return "|".join(submission_charts).encode()
-    
+
+
 UNRANKED_CHARTS = SubmissionCharts(
     beatmap_id=0,
     beatmap_set_id=0,

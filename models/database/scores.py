@@ -133,10 +133,12 @@ class ScoreV1(MigratableModel):
         max_score = 300 * total_objects
         return total_score / max_score
 
+
 CurrentScore = ScoreV1
 
 BEATMAP_MD5 = str
 IGNORED_MODS_IN_FILTER = ["SV2", "RX"]
+
 
 class MapScoresV1(MigratableModel):
     beatmap_md5: BEATMAP_MD5
@@ -160,15 +162,13 @@ class MapScoresV1(MigratableModel):
             self.sort_by_score()
         else:
             raise ValueError(f"Unsupported scoring algorithm: {algorithm}")
-        
+
     def append(self, score: CurrentScore) -> None:
         self.scores.append(score)
 
     def filter_by(
-            self, 
-            game_mode: osuGameMode | None = None,
-            mods: Mods | None = None
-        ) -> "MapScoresV1":
+        self, game_mode: osuGameMode | None = None, mods: Mods | None = None
+    ) -> "MapScoresV1":
         filtered_scores = []
 
         for score in self.scores:
@@ -180,12 +180,14 @@ class MapScoresV1(MigratableModel):
                 ignore=IGNORED_MODS_IN_FILTER,
             ):
                 continue
-           
+
             filtered_scores.append(score)
 
         return MapScoresV1(beatmap_md5=self.beatmap_md5, scores=filtered_scores)
 
+
 CurrentMapScores = MapScoresV1
+
 
 class ScoresForProfileV1(MigratableModel):
     scores: dict[BEATMAP_MD5, CurrentMapScores] = Field(default_factory=dict)
@@ -194,9 +196,11 @@ class ScoresForProfileV1(MigratableModel):
     def total_scores(self) -> int:
         return sum(len(map_scores.scores) for map_scores in self.scores.values())
 
+
 CurrentScoresForProfile = ScoresForProfileV1
 
 PROFILE_NAME = str
+
 
 class ScoresV1(MigratableModel):
     """
@@ -205,16 +209,19 @@ class ScoresV1(MigratableModel):
     - beatmap_leaderboards: Organizes scores by beatmap (for leaderboard views)
     - score_counter: Atomic score ID allocation
     """
+
     profiles: dict[PROFILE_NAME, CurrentScoresForProfile] = Field(default_factory=dict)
-    beatmap_leaderboards: dict[BEATMAP_MD5, CurrentMapScores] = Field(default_factory=dict)
+    beatmap_leaderboards: dict[BEATMAP_MD5, CurrentMapScores] = Field(
+        default_factory=dict
+    )
     score_counter: int = Field(default=0)
 
     @property
     def total_scores(self) -> int:
         """Aggregate total score count across all profiles"""
         return sum(
-            profile_scores.total_scores
-            for profile_scores in self.profiles.values()
+            profile_scores.total_scores for profile_scores in self.profiles.values()
         )
+
 
 CurrentScores = ScoresV1

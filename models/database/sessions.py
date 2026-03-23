@@ -32,6 +32,7 @@ class SessionBeatmapInfoV1(MigratableModel):
     is_difficulty_adjusted: bool = Field(default=False)
     stable_score_ids: list[int] = Field(default_factory=list)
 
+
 CurrentSessionBeatmapInfo = SessionBeatmapInfoV1
 
 

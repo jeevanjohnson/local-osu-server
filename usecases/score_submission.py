@@ -6,16 +6,16 @@ from py3rijndael import Pkcs7Padding, RijndaelCbc
 from pydantic import BaseModel, ConfigDict
 from starlette.datastructures import UploadFile as StarletteUploadFile
 
-from adapters.osu_file import OsuFile
-from models.domain.gameplay import Mods, osuGameMode
-from models.database.scores import (
-    CurrentScore as Score
-)
 import calculator
-from repositories.scores import ScoresRepository
+from adapters import log_time
+from adapters.osu_file import OsuFile
 from constants import SCORES_FILE
-from adapters.app_logger import app_logger
+from models.database.scores import CurrentScore as Score
+from models.domain.gameplay import Mods, osuGameMode
+from repositories.scores import ScoresRepository
 
+
+# TODO: This should be in osu! Protocol
 def parse_form_data(form_data: FormData) -> tuple[bytes, StarletteUploadFile] | None:
     try:
         score_parts = form_data.getlist("score")
@@ -112,7 +112,11 @@ def decrypt_score_aes_data(
     # score data is delimited by colons (:).
     return parsed_score_data, client_hash_decoded
 
-@app_logger.log(msg="building score")
+
+# TODO: This should be in osu! Protocol ^
+
+
+@log_time
 async def build_score(
     score_id: int,
     map_file: OsuFile,
@@ -145,7 +149,8 @@ async def build_score(
         pp=pp,
     )
 
-@app_logger.log(msg="submitting score")
+
+@log_time
 async def submit_score(
     score_id: int,
     map_file: OsuFile,
@@ -170,6 +175,3 @@ async def submit_score(
     await score_repo.save_score(score, profile_name=score_data.username)
 
     return score
-
-
-

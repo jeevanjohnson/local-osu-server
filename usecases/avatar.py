@@ -7,11 +7,11 @@ from pathlib import Path
 
 import usecases.profiles
 import usecases.sessions
-from adapters.app_logger import app_logger
+from adapters import log_time
 from models.domain.errors import ProfileNotFoundError, SessionNotFoundError
 
 
-@app_logger.log(msg="usecase get session avatar")
+@log_time
 async def get_session_avatar() -> str | Path | None:
     try:
         session = await usecases.sessions.require_current_session()

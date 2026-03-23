@@ -17,6 +17,7 @@ def _read_uleb128(data: bytes, offset: int) -> tuple[int, int]:
 
     return value, offset
 
+
 def _read_osr_string(data: bytes, offset: int) -> tuple[str, int]:
     if offset >= len(data):
         raise ValueError("Unexpected end of data while reading string marker")
@@ -36,6 +37,7 @@ def _read_osr_string(data: bytes, offset: int) -> tuple[str, int]:
         raise ValueError("Unexpected end of data while reading string body")
 
     return data[offset:end].decode(errors="ignore"), end
+
 
 def extract_replay_frames_from_osr(osr_data: bytes) -> tuple[bytes, str]:
     """Extract the LZMA replay-frame section from a full .osr payload."""
@@ -61,7 +63,7 @@ def extract_replay_frames_from_osr(osr_data: bytes) -> tuple[bytes, str]:
     if offset + 4 > len(osr_data):
         raise ValueError("Unexpected end of data while reading replay length")
 
-    replay_length = int.from_bytes(osr_data[offset:offset + 4], "little", signed=True)
+    replay_length = int.from_bytes(osr_data[offset : offset + 4], "little", signed=True)
     offset += 4
 
     if replay_length < 0:

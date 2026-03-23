@@ -1,36 +1,52 @@
+import usecases.bancho_scores
 from constants import SCORES_FILE
-from models.database.profiles import (
-    CurrentSettings as Settings,
-    CurrentProfile as Profile,
-)
-from models.database.scores import (
-    CurrentScore as Score,
-    CurrentMapScores as MapScores,
-)
-from models.domain.accuracy import to_percentage
-from models.domain.gameplay import Mods, osuGameMode
 from models.bancho.scores import (
     Score as BanchoScore,
+)
+from models.bancho.scores import (
     Scores as BanchoScores,
 )
 from models.database.beatmaps import (
     CurrentBeatmap as Beatmap,
 )
-from repositories.scores import ScoresRepository
-from osuProtocol.client_web import (
-    Beatmap as BeatmapChart,
-    OverallRanking as OverallRankingChart,
-    LeaderboardType,
-    Rank, RankedScore,
-    ScoringAlgorithm, TotalScore, 
-    MaxCombo, Accuracy, PerformancePoints
+from models.database.profiles import (
+    CurrentProfile as Profile,
 )
-import usecases.bancho_scores
+from models.database.profiles import (
+    CurrentSettings as Settings,
+)
+from models.database.scores import (
+    CurrentMapScores as MapScores,
+)
+from models.database.scores import (
+    CurrentScore as Score,
+)
+from models.domain.accuracy import to_percentage
+from models.domain.gameplay import Mods, osuGameMode
+from osuProtocol.client_web import (
+    Accuracy,
+    LeaderboardType,
+    MaxCombo,
+    PerformancePoints,
+    Rank,
+    RankedScore,
+    ScoringAlgorithm,
+    TotalScore,
+)
+from osuProtocol.client_web import Beatmap as BeatmapChart
+from osuProtocol.client_web import OverallRanking as OverallRankingChart
 from osuProtocol.replay import extract_replay_frames_from_osr
+from repositories.scores import ScoresRepository
+
 
 class AllScores(list[BanchoScore | Score]):
+    @property
+    def total(self) -> int:
+        return len(self)
 
-    def position_of_score(self, target_score: BanchoScore | Score, scoring_algorithm: ScoringAlgorithm) -> int:
+    def position_of_score(
+        self, target_score: BanchoScore | Score, scoring_algorithm: ScoringAlgorithm
+    ) -> int:
         """Get the position of a score in the list when sorted by the given scoring algorithm."""
         temp_scores = AllScores(self)
         temp_scores.sort(scoring_algorithm)
@@ -56,27 +72,48 @@ class AllScores(list[BanchoScore | Score]):
         super().sort(key=pp_key, reverse=True)
 
     def sort_by_score(self) -> None:
-        
+
         def score_key(score: BanchoScore | Score) -> int:
             return score.total_score or 0
 
         super().sort(key=score_key, reverse=True)
+
 
 async def generate_score_id() -> int:
     """Atomically allocate next score ID"""
     scores_repo = ScoresRepository(SCORES_FILE)
     return await scores_repo.allocate_score_id()
 
-async def get_scores_for_beatmap(beatmap_md5: str, profile_name: str | None = None) -> MapScores:
+
+async def get_scores_for_beatmap_from(
+    beatmap_md5: str, profile_name: str | None = None
+) -> MapScores:
     """Get scores for beatmap. If profile_name provided, get only that profile's scores."""
     scores_repo = ScoresRepository(SCORES_FILE)
 
     if profile_name:
-        map_scores = await scores_repo.get_scores_by_profile_and_beatmap_md5(profile_name, beatmap_md5)
+        map_scores = await scores_repo.get_scores_by_profile_and_beatmap_md5(
+            profile_name, beatmap_md5
+        )
     else:
         map_scores = await scores_repo.get_leaderboard_for_beatmap(beatmap_md5)
 
     return map_scores
+
+
+async def get_scores_for_beatmap(
+    beatmap: Beatmap,
+    profile_name: str | None = None,
+    game_mode: osuGameMode | None = None,
+) -> MapScores:
+    """Get scores for beatmap. If profile_name provided, get only that profile's scores."""
+    map_scores = await get_scores_for_beatmap_from(beatmap.md5, profile_name)
+
+    if game_mode is not None:
+        map_scores = map_scores.filter_by(game_mode=game_mode)
+
+    return map_scores
+
 
 async def score_rank(
     score: Score,
@@ -91,16 +128,18 @@ async def score_rank(
         limit=100,
         stable_only=stable_only,
         game_mode=score.game_mode,
+        friends_ids=[],
     )
 
     if not bancho_scores.all_scores:
         return 1
-    
+
     all_scores = AllScores()
     all_scores.extend(bancho_scores.all_scores)
     all_scores.append(score)
 
     return all_scores.position_of_score(score, settings.scoring_algorithm)
+
 
 async def previous_best_score(
     beatmap: Beatmap,
@@ -113,7 +152,11 @@ async def previous_best_score(
     new_score. We must exclude it, otherwise the first-ever play is treated as
     if it had a previous score.
     """
-    map_scores = await get_scores_for_beatmap(beatmap.md5, profile_name=new_score.username)
+    map_scores = await get_scores_for_beatmap(
+        beatmap=beatmap,
+        profile_name=new_score.username,
+        game_mode=new_score.game_mode,
+    )
 
     if not map_scores.scores:
         return None
@@ -126,12 +169,13 @@ async def previous_best_score(
     temp_map.sort(settings.scoring_algorithm)
     return temp_map.scores[0]
 
+
 async def get_ranking_charts(
-    beatmap: Beatmap, 
+    beatmap: Beatmap,
     old_profile: Profile,
     current_profile: Profile,
     new_score: Score,
-    settings: Settings
+    settings: Settings,
 ) -> tuple[BeatmapChart, OverallRankingChart]:
     prev_best = await previous_best_score(
         beatmap=beatmap,
@@ -174,38 +218,38 @@ async def get_ranking_charts(
             after=new_score.performance_points,
         )
     else:
-            _score_rank = await score_rank(new_score, beatmap, settings)
-            _prev_score_rank = await score_rank(prev_best, beatmap, settings)
-    
-            rank_entry = Rank(
-                before=_prev_score_rank,
-                after=_score_rank,
-            )
-    
-            ranked_score_entry = RankedScore(
-                before=prev_best.total_score,
-                after=new_score.total_score,
-            )
-    
-            total_score_entry = TotalScore(
-                before=prev_best.total_score,
-                after=new_score.total_score,
-            )
-    
-            max_combo_entry = MaxCombo(
-                before=prev_best.combo,
-                after=new_score.combo,
-            )
-    
-            accuracy_entry = Accuracy(
-                before=to_percentage(prev_best.accuracy),
-                after=to_percentage(new_score.accuracy),
-            )
-    
-            pp_entry = PerformancePoints(
-                before=prev_best.performance_points,
-                after=new_score.performance_points,
-            )
+        _score_rank = await score_rank(new_score, beatmap, settings)
+        _prev_score_rank = await score_rank(prev_best, beatmap, settings)
+
+        rank_entry = Rank(
+            before=_prev_score_rank,
+            after=_score_rank,
+        )
+
+        ranked_score_entry = RankedScore(
+            before=prev_best.total_score,
+            after=new_score.total_score,
+        )
+
+        total_score_entry = TotalScore(
+            before=prev_best.total_score,
+            after=new_score.total_score,
+        )
+
+        max_combo_entry = MaxCombo(
+            before=prev_best.combo,
+            after=new_score.combo,
+        )
+
+        accuracy_entry = Accuracy(
+            before=to_percentage(prev_best.accuracy),
+            after=to_percentage(new_score.accuracy),
+        )
+
+        pp_entry = PerformancePoints(
+            before=prev_best.performance_points,
+            after=new_score.performance_points,
+        )
 
     beatmap_chart = BeatmapChart(
         rank=rank_entry,
@@ -257,17 +301,20 @@ async def get_ranking_charts(
 
     return beatmap_chart, overall_ranking_chart
 
+
 async def personal_best_for_beatmap(
-        beatmap: Beatmap,
-        profile_name: str,
-        game_mode: osuGameMode,
-        scoring_algorithm: ScoringAlgorithm,
-        mods: Mods | None = None,
+    beatmap: Beatmap,
+    profile_name: str,
+    game_mode: osuGameMode,
+    scoring_algorithm: ScoringAlgorithm,
+    mods: Mods | None = None,
 ) -> Score | None:
     """Get the personal best score for a beatmap and profile."""
     scores_repo = ScoresRepository(SCORES_FILE)
 
-    map_scores = await scores_repo.get_scores_by_profile_and_beatmap_md5(profile_name, beatmap.md5)
+    map_scores = await scores_repo.get_scores_by_profile_and_beatmap_md5(
+        profile_name, beatmap.md5
+    )
 
     if not map_scores:
         return None
@@ -276,42 +323,49 @@ async def personal_best_for_beatmap(
         game_mode=game_mode,
         mods=mods,
     )
-    
+
     if not filtered_scores:
         return None
-    
+
     if not filtered_scores.scores:
         return None
 
-    filtered_scores.sort(
-        scoring_algorithm
-    )
+    filtered_scores.sort(scoring_algorithm)
 
     return filtered_scores.scores[0]
 
+
 def leaderboard_position(
     personal_best: Score,
-    scores: BanchoScores,
+    scores: BanchoScores | MapScores,
     settings: Settings,
 ) -> int:
     """Calculate the leaderboard position of a score given the current leaderboard scores.
 
     This is used to determine whether to show the "New #X on the leaderboard!" message after a score submission.
     """
-    
+
     all_scores = AllScores()
-    all_scores.extend(scores.all_scores)
+
+    if isinstance(scores, BanchoScores):
+        all_scores.extend(scores.all_scores)
+    else:
+        all_scores.extend(scores.scores)
+
     all_scores.append(personal_best)
 
     all_scores.sort(settings.scoring_algorithm)
 
     return all_scores.index(personal_best) + 1
 
+
 async def get_replay_frames_for_score_id(score_id: int) -> bytes | None:
     """Get replay frames for a given score ID, if available."""
     scores_repo = ScoresRepository(SCORES_FILE)
 
-    score = await scores_repo.get_score_by_id(score_id)  # Ensure score exists; raises if not found
+    score = await scores_repo.get_score_by_id(
+        score_id
+    )  # Ensure score exists; raises if not found
 
     if score is None:
         return None

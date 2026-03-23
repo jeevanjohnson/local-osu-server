@@ -9,7 +9,7 @@ from pathlib import Path
 import psutil
 
 import usecases.profiles
-from adapters.app_logger import app_logger
+from adapters import log, log_time
 from constants import SERVER_SETTINGS_FILE, SESSIONS_FILE
 from models.database.sessions import CurrentSession as Session
 from models.domain.errors import ProfileNotFoundError, SessionNotFoundError
@@ -22,7 +22,7 @@ from repositories.server_settings import ServerSettingsRepository
 from repositories.sessions import SessionRepository
 
 
-@app_logger.log(msg="usecase delete current session")
+# @log_time
 async def delete_current_session() -> None:
     sessions_repo = SessionRepository(SESSIONS_FILE)
     await sessions_repo.delete_current_session()
@@ -30,7 +30,7 @@ async def delete_current_session() -> None:
     return
 
 
-@app_logger.log(msg="usecase create session")
+# @log_time
 async def create_session(profile_name: str) -> None:
     sessions_repo = SessionRepository(SESSIONS_FILE)
     await sessions_repo.create_session(profile_name)
@@ -38,26 +38,26 @@ async def create_session(profile_name: str) -> None:
     return
 
 
-@app_logger.log(msg="usecase check session exists")
+# @log_time
 async def session_exists() -> bool:
     return await maybe_get_current_session() is not None
 
 
-@app_logger.log(msg="usecase require current session")
+# @log_time
 async def require_current_session() -> Session:
     sessions_repo = SessionRepository(SESSIONS_FILE)
 
     return await sessions_repo.require_current_session()
 
 
-@app_logger.log(msg="usecase maybe get current session")
+# @log_time
 async def maybe_get_current_session() -> Session | None:
     sessions_repo = SessionRepository(SESSIONS_FILE)
 
     return await sessions_repo.maybe_get_current_session()
 
 
-@app_logger.log(msg="usecase update current session")
+@log_time
 async def update_current_session(session: Session, update_client: bool = False) -> None:
     sessions_repo = SessionRepository(SESSIONS_FILE)
 
@@ -65,7 +65,7 @@ async def update_current_session(session: Session, update_client: bool = False) 
         try:
             profile = await usecases.profiles.require_profile(session.profile_name)
         except ProfileNotFoundError:
-            app_logger.warning(
+            log.warning(
                 "Attempted to update current session but the associated profile was not found."
             )
             return
@@ -100,14 +100,14 @@ async def update_current_session(session: Session, update_client: bool = False) 
     return
 
 
-@app_logger.log(msg="usecase notify client")
+@log_time
 async def notify_client(
     message: str,
 ) -> None:
     try:
         session = await require_current_session()
     except SessionNotFoundError:
-        app_logger.warning(
+        log.warning(
             "Attempted to notify client but no active session was found. Message was: "
             + message
         )
@@ -120,30 +120,12 @@ async def notify_client(
     return
 
 
-async def kick_client(message: str) -> None:
-    try:
-        session = await require_current_session()
-    except SessionNotFoundError:
-        app_logger.warning(
-            "Attempted to kick client but no active session was found. Message was: "
-            + message
-        )
-        return
-
-    session.packet_queue += Notification(message).build()
-    session.packet_queue += ClientRelog(millisecond_delay=500).build()
-
-    await update_current_session(session)
-
-    return
-
-
-@app_logger.log(msg="usecase restart client")
+@log_time
 async def restart_client(message: str | None = None) -> None:
     try:
         session = await require_current_session()
     except SessionNotFoundError:
-        app_logger.warning(
+        log.warning(
             "Attempted to restart client but no active session was found. Message was: "
             + (message or "None")
         )
@@ -159,19 +141,17 @@ async def restart_client(message: str | None = None) -> None:
     return
 
 
-@app_logger.log(msg="usecase silent restart client")
+@log_time
 async def silent_restart_client() -> None:
     await restart_client()
 
 
-@app_logger.log(msg="usecase clear packet queue")
+@log_time
 async def clear_packet_queue() -> Session | None:
     try:
         session = await require_current_session()
     except SessionNotFoundError:
-        app_logger.warning(
-            "Attempted to clear packet queue but no active session was found."
-        )
+        log.warning("Attempted to clear packet queue but no active session was found.")
         return
 
     session.packet_queue = b""
@@ -180,7 +160,7 @@ async def clear_packet_queue() -> Session | None:
     return session
 
 
-@app_logger.log(msg="usecase retrieve songs folder")
+@log_time
 async def retrieve_songs_folder() -> Path | None:
     server_settings_repo = ServerSettingsRepository(SERVER_SETTINGS_FILE)
     settings = await server_settings_repo.get_server_settings()
@@ -193,7 +173,7 @@ async def retrieve_songs_folder() -> Path | None:
     ]
 
     if not processes:
-        app_logger.warning(
+        log.warning(
             "Attempted to retrieve songs folder but osu! process was not found."
         )
         return None  # raise error that osu! process was not found, cannot retrieve songs folder
@@ -207,7 +187,7 @@ async def retrieve_songs_folder() -> Path | None:
             break
 
     if cfg_path is None:
-        app_logger.warning(
+        log.warning(
             "Attempted to retrieve songs folder but osu! cfg file was not found."
         )
         return None  # raise error that osu! cfg file was not found, cannot retrieve songs folder
@@ -222,7 +202,7 @@ async def retrieve_songs_folder() -> Path | None:
             break
 
     if songs_folder is None:
-        app_logger.warning(
+        log.warning(
             "Attempted to retrieve songs folder but songs folder path was not found in osu! cfg file."
         )
         return None  # raise error that songs folder path was not found in cfg file, cannot retrieve songs folder
@@ -233,7 +213,7 @@ async def retrieve_songs_folder() -> Path | None:
         return osu_path.parent / songs_folder
 
 
-@app_logger.log(msg="usecase retrieve replays folder")
+@log_time
 async def retrieve_replays_folder() -> Path | None:
     server_settings_repo = ServerSettingsRepository(SERVER_SETTINGS_FILE)
     settings = await server_settings_repo.get_server_settings()
@@ -246,7 +226,7 @@ async def retrieve_replays_folder() -> Path | None:
     ]
 
     if not processes:
-        app_logger.warning(
+        log.warning(
             "Attempted to retrieve replays folder but osu! process was not found."
         )
         return None  # raise error that osu! process was not found, cannot retrieve replays folder
@@ -254,16 +234,19 @@ async def retrieve_replays_folder() -> Path | None:
     osu_path = Path(processes[0].exe())
     return osu_path.parent / "Replays"
 
+
 async def update_stable_leaderboard_ids(stable_ids: list[int]) -> None:
     try:
         session = await require_current_session()
     except SessionNotFoundError:
-        app_logger.warning(
+        log.warning(
             "Attempted to update stable leaderboard IDs but no active session was found."
         )
         return
 
-    assert session.latest_beatmap is not None, "Cannot update stable leaderboard IDs without a latest beatmap in the session."
+    assert session.latest_beatmap is not None, (
+        "Cannot update stable leaderboard IDs without a latest beatmap in the session."
+    )
     session.latest_beatmap.stable_score_ids = stable_ids
     await update_current_session(session)
 

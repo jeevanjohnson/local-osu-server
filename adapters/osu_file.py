@@ -14,20 +14,31 @@ PACKED_FLAG_AUDIO_COMPRESSED = 0b00000001
 PACKED_ZLIB_LEVEL = 6
 
 
+# TODO: Clean this up?
 class OsuFile(BaseOsuFile):
     def __init__(
         self,
-        file_path: str,
+        file_path: str | Path,
         raw_audio_file: bytes | None = None,
     ):
         self.raw_audio_file: bytes | None = raw_audio_file
         self.raw_file: bytes | None = None
-        super().__init__(file_path)
+
+        if isinstance(file_path, str):
+            self.file_name = file_path
+            super().__init__(file_path)
+        else:
+            self.file_name = file_path.name
+            super().__init__(str(file_path.absolute()))
+
+    @property
+    def unsubmitted(self) -> bool:
+        return self.beatmap_id == 0
 
     @classmethod
     def from_path(
         cls,
-        file_path: str,
+        file_path: str | Path,
         raw_audio_file: bytes | None = None,
         load_audio_file: bool = True,
     ) -> "OsuFile":
