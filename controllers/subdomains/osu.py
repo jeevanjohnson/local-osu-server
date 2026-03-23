@@ -231,9 +231,10 @@ async def get_leaderboard(
     else:
         merged_scores.extend(scores.scores)
 
-    merged_scores.append(personal_best) if personal_best else None
+    if personal_best:
+        merged_scores.append(personal_best)
 
-    total_scores = merged_scores.total if scores else 0
+    total_scores = merged_scores.total if merged_scores else 0
     leaderboard_header = LeaderboardHeader(
         beatmap_status=beatmap.status,
         beatmap_id=beatmap.id,
@@ -258,6 +259,7 @@ async def get_leaderboard(
         : profile.settings.leaderboard.leaderboard_score_limit
     ]
 
+    seen_self = False
     for index, score in enumerate(merged_scores):
         if (
             profile.settings.scoring_algorithm == ScoringAlgorithm.PP
@@ -266,6 +268,16 @@ async def get_leaderboard(
             ingame_score = score.performance_points or 0
         else:
             ingame_score = score.total_score
+        
+        if seen_self:
+            # For our friend leaderboard (all scores submitted by the player)
+            # osu! doesn't let your name pop up multiple times on a leaderboard
+            # to bypass we can add invisible characters at the end of the username 
+            # for it to be considered a unique name by osu! but it will look the same to the user
+            score.username += " " * (index + 1)
+        
+        if score.username == session.profile_name:
+            seen_self = True
 
         leaderboard_score = LeaderboardScore.from_score(
             score=score,
@@ -492,6 +504,14 @@ async def osuSubmitModularSelector(
 
     return Response(content=submission_charts.serialize())
 
+@osu.get("/web/osu-search.php/{full_path:path}")
+@log_time
+async def search_redirect(full_path: str):
+    print(f"Redirecting search request for {full_path}")
+    return RedirectResponse(
+        url=f"https://osu.gatari.pw/web/osu-search.php/{full_path}",
+        status_code=status.HTTP_301_MOVED_PERMANENTLY,
+    )
 
 @osu.get("/web/osu-getreplay.php")
 @log_time

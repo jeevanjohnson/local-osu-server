@@ -23,5 +23,13 @@ async def credentials_exist() -> bool:
         server_settings.osu_api_v2_client_id is not None
         and server_settings.osu_api_v2_client_secret is not None
         and server_settings.osu_api_v2_client_id.isdecimal()
-        and server_settings.osu_daily_api_key is not None
+        # and server_settings.osu_daily_api_key is not None
+    )
+
+async def osu_daily_credentials_exist() -> bool:
+    server_settings_repo = ServerSettingsRepository(SERVER_SETTINGS_FILE)
+    server_settings = await server_settings_repo.get_server_settings()
+
+    return (
+        server_settings.osu_daily_api_key is not None
     )

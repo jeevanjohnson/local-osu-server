@@ -971,6 +971,7 @@ def Login(
     play_count: int,
     total_score: int,
     performance_points: int,
+    warning: str | None = None,
 ) -> Packets:
     packets = Packets()
 
@@ -980,6 +981,8 @@ def Login(
     packets += UserPrivileges(ALL_PRIVILEGES)
 
     packets += Notification(f"Welcome to LOS!, {username} ʕ•̫͡•ʔ")
+    if warning is not None:
+        packets += Notification(warning)
 
     for channel in ["#osu", "#nothing"]:
         packets += ChannelInfo(

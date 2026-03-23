@@ -41,7 +41,6 @@ bancho = APIRouter()
 
 
 @bancho.post("/")
-@log_time
 async def client_request_handler(
     request: Request,
     osu_token: str | None = Header(None),
@@ -96,6 +95,14 @@ async def client_request_handler(
                 headers={"cho-token": "api-v2-credentials-missing"},
             )
 
+        if not await usecases.server_settings.osu_daily_credentials_exist():
+            warning = (
+                "osu!daily API credentials not found. Using local linear interpolation for calculating ranking, "
+                "can be inaccurate due to little data. For best results, please set up your credentials through the GUI."
+            )
+        else:
+                warning = None
+
         rank = profile.performance[session.current_game_mode].rank
         ranked_score = profile.performance[session.current_game_mode].ranked_score
         accuracy = profile.performance[session.current_game_mode].accuracy
@@ -119,6 +126,7 @@ async def client_request_handler(
             play_count=play_count,
             total_score=total_score,
             performance_points=performance_points,
+            warning=warning,
         )
 
         session.osu_client.opened = True
@@ -194,7 +202,6 @@ def register_packet_handler(packet_id: ClientPackets, packet_type: type[PacketTy
 
 
 @register_packet_handler(ClientPackets.PING, packet_type=Ping)
-@log_time
 async def handle_ping(packet: Ping) -> ServerPackets | ServerPacket | None:
     return
 
