@@ -90,6 +90,10 @@ async def get_leaderboard(
 ):
     if mods_arg & osuMods.SCOREV2:
         mods_arg &= ~osuMods.SCOREV2
+    if mods_arg & osuMods.AUTOPILOT:
+        mods_arg &= ~osuMods.AUTOPILOT
+    if mods_arg & osuMods.RELAX:
+        mods_arg &= ~osuMods.RELAX
     
     map_filename = urlparse.unquote(map_filename)
 
@@ -188,7 +192,7 @@ async def get_leaderboard(
             settings=profile.settings,
         )
 
-        if profile.settings.scoring_algorithm == ScoringAlgorithm.PP:
+        if profile.settings.scoring_algorithm == ScoringAlgorithm.PP and beatmap.can_display_pp:
             personal_best_ingame_score = personal_best.performance_points or 0
         else:
             personal_best_ingame_score = personal_best.total_score
@@ -231,7 +235,7 @@ async def get_leaderboard(
     merged_scores = merged_scores[:profile.settings.leaderboard.leaderboard_score_limit]
 
     for index, score in enumerate(merged_scores):
-        if profile.settings.scoring_algorithm == ScoringAlgorithm.PP:
+        if profile.settings.scoring_algorithm == ScoringAlgorithm.PP and beatmap.can_display_pp:
             ingame_score = score.performance_points or 0
         else:
             ingame_score = score.total_score
@@ -404,6 +408,10 @@ async def osuSubmitModularSelector(
     
     # TODO: Support AP?
     if "RX" in score.enabled_mods:
+        await usecases.sessions.update_current_session(
+            session,
+            update_client=True,
+        )
         return Response(OsuErrors.NON.value.encode())
 
     beatmap_ranking_chart, overall_ranking_chart = await usecases.scores.get_ranking_charts(

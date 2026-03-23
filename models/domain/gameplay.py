@@ -16,7 +16,7 @@ class Mods(list[str]):
         other_mods = [mod for mod in other if mod not in ignore]
 
         return self_mods == other_mods
-    
+
     # Keep equality order-insensitive without mutating either operand.
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, Mods):
@@ -100,6 +100,7 @@ class Mods(list[str]):
             "DC": 0.30,
             "RX": 1.00,
             "AP": 1.00,
+            "SV2": 1.00,
             "HR": 1.06,
             "SD": 1.00,
             "PF": 1.00,
