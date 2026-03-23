@@ -117,10 +117,10 @@ class OsuFile(BaseOsuFile):
 
         return None
 
-    def compress(self) -> bytes:
+    def compress(self, include_audio: bool = True) -> bytes:
         """Compress osu payloads into a versioned compact binary format."""
         raw_file = self.get_raw_file() or b""
-        raw_audio_file = self.raw_audio_file or b""
+        raw_audio_file = (self.raw_audio_file or b"") if include_audio else b""
 
         raw_blob = zlib.compress(raw_file, level=PACKED_ZLIB_LEVEL)
 

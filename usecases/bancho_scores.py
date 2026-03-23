@@ -18,11 +18,14 @@ from repositories.profiles import ProfilesRepository
 from repositories.sessions import SessionRepository
 from usecases.providers import get_ossapi_async
 from osuProtocol.replay import extract_replay_frames_from_osr
+import usecases.sessions
 
 _SCORE_HOT_CACHE_TTL_SECONDS = 300
 _SCORE_HOT_CACHE_MAX_SIZE = 1024
-_score_hot_cache: dict[tuple[Any, ...], tuple[float, Scores]] = {}
-_score_inflight_requests: dict[tuple[Any, ...], asyncio.Task[Scores | None]] = {}
+_score_hot_cache: dict[tuple[Any, ...], tuple[float, Scores, list[int]]] = {}
+_score_inflight_requests: dict[
+    tuple[Any, ...], asyncio.Task[tuple[Scores, list[int]]]
+] = {}
 
 def _make_score_cache_key(
     beatmap_id: int,
@@ -46,20 +49,20 @@ def _make_score_cache_key(
     )
 
 
-def _get_cached_scores(cache_key: tuple[Any, ...]) -> Scores | None:
+def _get_cached_scores(cache_key: tuple[Any, ...]) -> tuple[Scores, list[int]] | None:
     cached = _score_hot_cache.get(cache_key)
     if cached is None:
         return None
 
-    cached_at, cached_scores = cached
+    cached_at, cached_scores, cached_stable_ids = cached
     if time.monotonic() - cached_at > _SCORE_HOT_CACHE_TTL_SECONDS:
         _score_hot_cache.pop(cache_key, None)
         return None
 
-    return cached_scores
+    return cached_scores, list(cached_stable_ids)
 
 
-def _cache_scores(cache_key: tuple[Any, ...], scores: Scores) -> None:
+def _cache_scores(cache_key: tuple[Any, ...], scores: Scores, stable_ids: list[int]) -> None:
     if cache_key in _score_hot_cache:
         _score_hot_cache.pop(cache_key, None)
 
@@ -67,7 +70,7 @@ def _cache_scores(cache_key: tuple[Any, ...], scores: Scores) -> None:
         oldest_key = next(iter(_score_hot_cache))
         _score_hot_cache.pop(oldest_key, None)
 
-    _score_hot_cache[cache_key] = (time.monotonic(), scores)
+    _score_hot_cache[cache_key] = (time.monotonic(), scores, list(stable_ids))
 
 
 class ScoresResolver: ...
@@ -104,8 +107,7 @@ async def get_scores_for(
     limit: int,
     stable_only: bool,
     mods: Mods | None = None,
-) -> Scores:
-    
+) -> tuple[Scores, list[int]]:
     if mods is not None:
         stable_mods, lazer_mods = mods.to_stable_mods()
     else:
@@ -161,13 +163,17 @@ async def get_scores_for(
 
     cached_scores = _get_cached_scores(cache_key)
     if cached_scores is not None:
-        return cached_scores
+        cached_score_list, cached_stable_ids = cached_scores
+        await usecases.sessions.update_stable_leaderboard_ids(cached_stable_ids)
+        return cached_score_list, cached_stable_ids
 
     inflight_request = _score_inflight_requests.get(cache_key)
     if inflight_request is not None:
         return await asyncio.shield(inflight_request)
 
-    async def _resolve_scores() -> Scores:
+    async def _resolve_scores() -> tuple[Scores, list[int]]:
+        stable_ids: list[int] = []
+
         app_logger.warning(
             f"Fetching scores for beatmap {beatmap.id} with mods {mods} and leaderboard type {leaderboard_type.name}..."
         )
@@ -183,10 +189,10 @@ async def get_scores_for(
             )
         except ValueError as e:
             app_logger.error(f"Error fetching scores for beatmap {beatmap.id}: {e}")
-            return Scores(all_scores=[])
+            return Scores(all_scores=[]), stable_ids
 
         if not requested_scores:
-            return Scores(all_scores=[])
+            return Scores(all_scores=[]), stable_ids
 
         scores = Scores(all_scores=[])
 
@@ -198,8 +204,13 @@ async def get_scores_for(
 
             if score.legacy_score_id:
                 score_model = StableScore
+                if score.id is not None:
+                    stable_score_id = int(score.id)
+                    stable_ids.append(stable_score_id)
+                    score_id = stable_score_id
             else:
                 score_model = LazerScore
+                score_id = score.id or 0
 
             score_mods = []  # https://github.com/ppy/osu-web/blob/master/database/mods.json
             for mod in score.mods:
@@ -234,7 +245,7 @@ async def get_scores_for(
                 pp = int(score.pp)
 
             parsed_score = score_model(
-                score_id=score.id or 0,
+                score_id=score_id,
                 username=user.username,
                 total_score_value=score.total_score,
                 combo=Combo(actual=score.max_combo, max=beatmap.max_combo),
@@ -253,11 +264,13 @@ async def get_scores_for(
 
             scores.all_scores.append(parsed_score)
 
-        _cache_scores(cache_key, scores)
+        _cache_scores(cache_key, scores, stable_ids)
 
-        return scores
+        await usecases.sessions.update_stable_leaderboard_ids(stable_ids)
 
-    inflight_task: asyncio.Task[Scores | None] = asyncio.create_task(_resolve_scores())
+        return scores, stable_ids
+
+    inflight_task: asyncio.Task[tuple[Scores, list[int]]] = asyncio.create_task(_resolve_scores())
     _score_inflight_requests[cache_key] = inflight_task
 
     try:

@@ -85,7 +85,7 @@ async def score_rank(
 ) -> int:
     stable_only = not settings.leaderboard.show_lazer_scores_on_leaderboard
 
-    bancho_scores = await usecases.bancho_scores.get_scores_for(
+    bancho_scores, stable_ids = await usecases.bancho_scores.get_scores_for(
         beatmap=beatmap,
         leaderboard_type=LeaderboardType.TOP,
         limit=100,
@@ -93,7 +93,7 @@ async def score_rank(
         game_mode=score.game_mode,
     )
 
-    if not bancho_scores:
+    if not bancho_scores.all_scores:
         return 1
     
     all_scores = AllScores()
@@ -141,6 +141,8 @@ async def get_ranking_charts(
 
     if prev_best is None:
         _score_rank = await score_rank(new_score, beatmap, settings)
+        if _score_rank == 101:
+            _score_rank = None
 
         rank_entry = Rank(
             before=None,
@@ -269,7 +271,7 @@ async def personal_best_for_beatmap(
 
     if not map_scores:
         return None
-    
+
     filtered_scores = map_scores.filter_by(
         game_mode=game_mode,
         mods=mods,

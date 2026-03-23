@@ -253,3 +253,18 @@ async def retrieve_replays_folder() -> Path | None:
 
     osu_path = Path(processes[0].exe())
     return osu_path.parent / "Replays"
+
+async def update_stable_leaderboard_ids(stable_ids: list[int]) -> None:
+    try:
+        session = await require_current_session()
+    except SessionNotFoundError:
+        app_logger.warning(
+            "Attempted to update stable leaderboard IDs but no active session was found."
+        )
+        return
+
+    assert session.latest_beatmap is not None, "Cannot update stable leaderboard IDs without a latest beatmap in the session."
+    session.latest_beatmap.stable_score_ids = stable_ids
+    await update_current_session(session)
+
+    return

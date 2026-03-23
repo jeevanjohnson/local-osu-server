@@ -8,6 +8,22 @@ _NON_SCORING_ATTRIBUTE_PREFIXES = ("AR", "OD", "HP", "CS")
 class Mods(list[str]):
     """A list of mods, represented as short names, e.g. ['HD', 'HR', 'DT']."""
 
+    def are_same(self, other: "Mods", ignore: list[str] | None = None) -> bool:
+        if ignore is None:
+            ignore = []
+
+        self_mods = [mod for mod in self if mod not in ignore]
+        other_mods = [mod for mod in other if mod not in ignore]
+
+        return self_mods == other_mods
+    
+    # Keep equality order-insensitive without mutating either operand.
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Mods):
+            return NotImplemented
+
+        return sorted(self) == sorted(other)
+
     @classmethod
     def from_stable_mods(
         cls, stable_mods: osuMods | int, lazer_mods: LAZER_MODS | None = None

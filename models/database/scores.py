@@ -136,6 +136,7 @@ class ScoreV1(MigratableModel):
 CurrentScore = ScoreV1
 
 BEATMAP_MD5 = str
+IGNORED_MODS_IN_FILTER = ["SV2", "RX"]
 
 class MapScoresV1(MigratableModel):
     beatmap_md5: BEATMAP_MD5
@@ -174,7 +175,10 @@ class MapScoresV1(MigratableModel):
             if game_mode is not None and score.game_mode != game_mode:
                 continue
 
-            if mods is not None and score.enabled_mods != mods:
+            if mods is not None and not score.enabled_mods.are_same(
+                mods,
+                ignore=IGNORED_MODS_IN_FILTER,
+            ):
                 continue
            
             filtered_scores.append(score)

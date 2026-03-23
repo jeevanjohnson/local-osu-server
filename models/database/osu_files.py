@@ -16,7 +16,8 @@ class OsuFileEntryV1(MigratableModel):
     def osu_file_to_json(self, value: OsuFile) -> str:
         assert value.raw_file is not None, "OsuFile must have raw_file to be serialized"
 
-        compressed_osu_file = value.compress()
+        # Persist only map data; audio payloads make cache writes extremely large.
+        compressed_osu_file = value.compress(include_audio=False)
 
         return base64.b64encode(compressed_osu_file).decode("ascii")
 

@@ -159,7 +159,7 @@ async def get_leaderboard(
     else:
         stable_only = True
 
-    scores = await usecases.bancho_scores.get_scores_for(
+    scores, stable_ids = await usecases.bancho_scores.get_scores_for(
         beatmap=beatmap,
         leaderboard_type=leaderboard_type,
         game_mode=mode_arg,
@@ -462,6 +462,20 @@ async def get_replay(
                 "Replays for difficulty adjusted scores are not available."
             )
             return Response(OsuErrors.NON.value.encode())
+        
+        if session.latest_beatmap is None:
+            await usecases.sessions.notify_client(
+                "No beatmap information found for replay request. Ensure you have recently accessed the beatmap's leaderboard and try again."
+            )
+            return Response(OsuErrors.NON.value.encode())
+
+        if score_id not in session.latest_beatmap.stable_score_ids:
+            await usecases.sessions.notify_client(
+                "Replay data for this score is not available.\n"
+                "Ensure this score was set on stable in order to view it's replay"
+            )
+            return Response(OsuErrors.NON.value.encode())
+
 
         replay_data = await usecases.bancho_scores.get_replay_for_score(
             score_id=score_id,

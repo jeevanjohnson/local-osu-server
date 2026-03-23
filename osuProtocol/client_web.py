@@ -206,6 +206,13 @@ class LeaderboardScore:
             score_id = score.score_id
             max_combo = score.combo.actual
             replay_available = score.replay_available
+        
+        if not stable_mods & osuMods.SCOREV2:
+            # This allows watching replays
+            # and playing w/ score v2 making the 
+            # ranking up the map feel with the lb on more
+            # realistic to bancho/lazer
+            stable_mods |= osuMods.SCOREV2  
 
         return cls(
             score_id=score_id,
