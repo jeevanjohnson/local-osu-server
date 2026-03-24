@@ -1,5 +1,6 @@
 import rosu_pp_py as rosu
 
+import cache
 from adapters import OsuFile, log, log_time
 from models.domain.gameplay import Mods, osuGameMode, osuMods
 
@@ -13,6 +14,7 @@ ROSU_GAME_MODE_MAP: dict[osuGameMode, rosu.GameMode] = {
 
 
 @log_time
+@cache.pp.function
 def pp(
     map_file: OsuFile,
     game_mode: osuGameMode,
@@ -23,6 +25,10 @@ def pp(
     n50: int,
     nmiss: int,
 ) -> int:
+    if "WU" in mods or "WD" in mods:
+        log.warning("Score has WU or WD mods, pp calculation denied to 0")
+        return 0
+
     assert map_file.raw_file is not None, (
         "Map file content is required for pp calculation"
     )
@@ -44,17 +50,38 @@ def pp(
         stable_mods,  # type: ignore
     )
 
-    calculator = rosu.Performance(
-        mods=stable_mods,
-        combo=combo,
-        # acc=score.acc,
-        n300=n300,
-        n100=n100,
-        n50=n50,
-        # n_geki=score.ngeki,
-        # n_katu=score.nkatu,
-        misses=nmiss,
-    )
+    kwargs = {
+        "mods": stable_mods,
+        "combo": combo,
+        "n300": n300,
+        "n100": n100,
+        "n50": n50,
+        "misses": nmiss,
+    }
+
+    if mods.lazer_rate:
+        kwargs["clock_rate"] = mods.rate()
+
+    if "DA" in mods:
+        adjustments = mods.difficulty_adjustments()
+
+        if adjustments["approach_rate"] is not None:
+            kwargs["ar"] = adjustments["approach_rate"]
+            kwargs["ar_with_mods"] = True
+
+        if adjustments["overall_difficulty"] is not None:
+            kwargs["od"] = adjustments["overall_difficulty"]
+            kwargs["od_with_mods"] = True
+
+        if adjustments["drain_rate"] is not None:
+            kwargs["hp"] = adjustments["drain_rate"]
+            kwargs["hp_with_mods"] = True
+
+        if adjustments["cs_change"] is not None:
+            kwargs["cs"] = adjustments["cs_change"]
+            kwargs["cs_with_mods"] = True
+
+    calculator = rosu.Performance(**kwargs)
 
     result = calculator.calculate(rosu_map)
 

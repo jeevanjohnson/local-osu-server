@@ -1,11 +1,11 @@
 from enum import Enum
-from typing import Any
 
 import ossapi.enums
 import ossapi.models
 from ossapi import UserCompact
 
 import cache
+import usecases.performance
 from adapters import log
 from models.bancho.scores import Combo, LazerScore, Mods, Scores, StableScore
 from models.database.beatmaps import (
@@ -22,60 +22,8 @@ class AcceptedScores(Enum):
     BOTH = "both"
 
 
-def parse_difficulty_adjustment_settings(mod_settings: dict[str, Any]) -> list[str]:
-    settings = []
-
-    modifications = [
-        ("cs_change", "CS"),
-        ("approach_rate", "AR"),
-        ("drain_rate", "HP"),
-        ("overall_difficulty", "OD"),
-    ]
-
-    for setting_key, setting_prefix in modifications:
-        setting_value = mod_settings.get(setting_key)
-        if setting_value is not None:
-            setting_value_length = len(str(setting_value))
-
-            if setting_value_length > 4:
-                setting_value = round(setting_value, 2)
-
-            settings.append(f"{setting_prefix}{setting_value}")
-
-    return settings
-
-
 def api_is_score_lazer(score: ossapi.models.Score) -> bool:
     return not score.legacy_score_id
-
-
-def api_to_mods(mods: list[ossapi.models.NonLegacyMod]) -> Mods:
-    score_mods = []
-    for mod in mods:
-        mod_settings: dict[str, Any] = mod.settings
-
-        if mod_settings:
-            try:
-                score_mods.append(mod.acronym)
-
-                if mod_settings.get("speed_change"):
-                    speed_change = mod_settings["speed_change"]
-                    if speed_change != 1.5 and speed_change != 0.75:
-                        score_mods.append(f"{speed_change}x")
-
-                if mod.acronym == "DA":
-                    score_mods.extend(
-                        parse_difficulty_adjustment_settings(mod_settings)
-                    )
-
-            except Exception as e:
-                log.warning(
-                    f"Error processing mod settings for mod {mod.acronym}: {e}\nMod settings: {mod.settings}"
-                )
-        else:
-            score_mods.append(mod.acronym)
-
-    return Mods(score_mods)
 
 
 def api_to_score_id(score: ossapi.models.Score) -> int:
@@ -91,9 +39,9 @@ def api_to_score_id(score: ossapi.models.Score) -> int:
         return score.id or 0
 
 
-def api_to_score_model(
+async def api_to_score_model(
     score: ossapi.models.Score,
-    beatmap_max_combo: int,
+    beatmap: Beatmap,
     game_mode: osuGameMode,
 ) -> StableScore | LazerScore:
     user: UserCompact = score._ossapi_data["_user"]
@@ -104,10 +52,15 @@ def api_to_score_model(
         score_model = StableScore
 
     score_id = api_to_score_id(score)
-    score_mods = api_to_mods(score.mods)
+    score_mods = Mods.from_api_v2(score.mods)
 
     if score.pp is None:
-        pp = 0
+        pp = await usecases.performance.calc_pp_for_api_score(
+            score=score,
+            beatmap_id=beatmap.id,
+            beatmap_md5=beatmap.md5,
+            game_mode=game_mode,
+        )
     else:
         pp = int(score.pp)
 
@@ -115,7 +68,7 @@ def api_to_score_model(
         score_id=score_id,
         username=user.username,
         total_score_value=score.total_score,
-        combo=Combo(actual=score.max_combo, max=beatmap_max_combo),
+        combo=Combo(actual=score.max_combo, max=beatmap.max_combo),
         count50=score.statistics.meh or 0,
         count100=score.statistics.ok or 0,
         count300=score.statistics.great or 0,
@@ -173,7 +126,7 @@ async def get_score_for_user_on_beatmap(
         log.info(f"No score data found for user {user_id} on beatmap {beatmap.id}")
         return None
 
-    score = api_to_score_model(score, beatmap.max_combo, game_mode)
+    score = await api_to_score_model(score, beatmap, game_mode)
 
     cache.score_for_user_on_beatmap_by_md5.set(beatmap.md5, score)
 
@@ -255,8 +208,13 @@ async def get_scores_for(
     scores = Scores(all_scores=[])
 
     for score in requested_scores.scores:
+        if accepted_scores == AcceptedScores.LAZER_ONLY and not api_is_score_lazer(
+            score
+        ):
+            continue
+
         if mods is not None:
-            score_mods = api_to_mods(score.mods)
+            score_mods = Mods.from_api_v2(score.mods)
 
             if "NC" in mods and "NC" not in score_mods:
                 continue
@@ -264,7 +222,7 @@ async def get_scores_for(
             if "DT" in mods and "NC" in score_mods:
                 continue
 
-        scores.append(api_to_score_model(score, beatmap.max_combo, game_mode))
+        scores.append(await api_to_score_model(score, beatmap, game_mode))
 
     return scores
 

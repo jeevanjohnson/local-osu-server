@@ -21,6 +21,7 @@ import usecases.direct
 import usecases.leaderboards
 import usecases.osu_files
 import usecases.profiles
+import usecases.replay
 import usecases.score_submission
 import usecases.scores
 import usecases.server_settings
@@ -433,10 +434,13 @@ async def get_replay(
             )
             return Response(OsuErrors.NON.value.encode())
 
-        if score_id not in session.latest_beatmap.avaliable_replays:
+        lazer_score = score_id not in session.latest_beatmap.avaliable_replays
+        if lazer_score:
+            usecases.replay.open_lazer_score(
+                score_id=score_id,
+            )
             await usecases.sessions.notify_client(
-                "Replay data for this score is not available.\n"
-                "Ensure this score was set on stable in order to view it's replay"
+                "Successfully opened lazer score in browser!"
             )
             return Response(OsuErrors.NON.value.encode())
 

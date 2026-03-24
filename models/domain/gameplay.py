@@ -1,4 +1,6 @@
-from typing import Iterable
+from typing import Any, Iterable, TypedDict
+
+import ossapi.models
 
 import calculator
 from adapters import log
@@ -12,6 +14,38 @@ ACRONYMS = list[str]
 RATE = float
 MULTIPLER = float
 
+STABLE_RATES = (0.75, 1.0, 1.5)
+
+
+def parse_difficulty_adjustment_settings(mod_settings: dict[str, Any]) -> list[str]:
+    settings = []
+
+    modifications = [
+        ("cs_change", "CS"),
+        ("approach_rate", "AR"),
+        ("drain_rate", "HP"),
+        ("overall_difficulty", "OD"),
+    ]
+
+    for setting_key, setting_prefix in modifications:
+        setting_value = mod_settings.get(setting_key)
+        if setting_value is not None:
+            setting_value_length = len(str(setting_value))
+
+            if setting_value_length > 4:
+                setting_value = round(setting_value, 2)
+
+            settings.append(f"{setting_prefix}{setting_value}")
+
+    return settings
+
+
+class AttributeModifiers(TypedDict):
+    approach_rate: float | None
+    overall_difficulty: float | None
+    drain_rate: float | None
+    cs_change: float | None
+
 
 class Mods(ACRONYMS):
     """A list of mods, represented as short names, e.g. ['HD', 'HR', 'DT']."""
@@ -19,6 +53,56 @@ class Mods(ACRONYMS):
     def __init__(self, iterable: Iterable[str]) -> None:
         super().__init__(iterable)
         self.post_init()
+
+    def difficulty_adjustments(self) -> AttributeModifiers:
+        if "DA" not in self:
+            return {
+                "approach_rate": None,
+                "overall_difficulty": None,
+                "drain_rate": None,
+                "cs_change": None,
+            }
+
+        modifiers: AttributeModifiers = {
+            "approach_rate": None,
+            "overall_difficulty": None,
+            "drain_rate": None,
+            "cs_change": None,
+        }
+
+        for mod in self:
+            if mod.startswith(_NON_SCORING_ATTRIBUTE_PREFIXES):
+                if mod.startswith("AR"):
+                    modifiers["approach_rate"] = float(mod[2:])
+                elif mod.startswith("OD"):
+                    modifiers["overall_difficulty"] = float(mod[2:])
+                elif mod.startswith("HP"):
+                    modifiers["drain_rate"] = float(mod[2:])
+                elif mod.startswith("CS"):
+                    modifiers["cs_change"] = float(mod[2:])
+
+        return modifiers
+
+    @property
+    def lazer_rate(self) -> bool:
+        return self.rate() not in STABLE_RATES
+
+    def rate(self) -> RATE:
+        for mod in self:
+            if mod.endswith("x"):
+                try:
+                    return float(mod[:-1])
+                except ValueError:
+                    log.warning(f"Invalid rate change mod format: {mod}")
+                    continue
+
+        if "DT" in self or "NC" in self:
+            return 1.5
+
+        if "HT" in self or "DC" in self:
+            return 0.75
+
+        return 1.0
 
     def post_init(self):
         if "NC" in self and "DT" in self:
@@ -184,3 +268,32 @@ class Mods(ACRONYMS):
                 )
 
         return multiplier
+
+    @classmethod
+    def from_api_v2(cls, mods: list[ossapi.models.NonLegacyMod]) -> "Mods":
+        score_mods = []
+        for mod in mods:
+            mod_settings: dict[str, Any] = mod.settings
+
+            if mod_settings:
+                try:
+                    score_mods.append(mod.acronym)
+
+                    if mod_settings.get("speed_change"):
+                        speed_change = mod_settings["speed_change"]
+                        if speed_change != 1.5 and speed_change != 0.75:
+                            score_mods.append(f"{speed_change}x")
+
+                    if mod.acronym == "DA":
+                        score_mods.extend(
+                            parse_difficulty_adjustment_settings(mod_settings)
+                        )
+
+                except Exception as e:
+                    log.warning(
+                        f"Error processing mod settings for mod {mod.acronym}: {e}\nMod settings: {mod.settings}"
+                    )
+            else:
+                score_mods.append(mod.acronym)
+
+        return cls(score_mods)

@@ -85,7 +85,10 @@ class Leaderboard:
         if self.personal_best is None:
             return None
 
-        if self.scoring_algorithm == ScoringAlgorithm.PP:
+        if (
+            self.scoring_algorithm == ScoringAlgorithm.PP
+            and self.beatmap.can_display_pp
+        ):
             ingame_score = self.personal_best.performance_points or 0
         else:
             ingame_score = self.personal_best.total_score
@@ -117,7 +120,10 @@ class Leaderboard:
 
         seen_self = False
         for index, score in enumerate(self.scores[: self.limit]):
-            if self.scoring_algorithm == ScoringAlgorithm.PP:
+            if (
+                self.scoring_algorithm == ScoringAlgorithm.PP
+                and self.beatmap.can_display_pp
+            ):
                 ingame_score = score.performance_points or 0
             else:
                 ingame_score = score.total_score
@@ -154,6 +160,7 @@ NO_LEADERBOARD_LIMIT = 1000000
 
 class LeaderboardResolver:
     def __init__(self, profile_name: str, scoring_algorithm: ScoringAlgorithm) -> None:
+
         self.leaderboard: Leaderboard | None = None
         self.scoring_algorithm = scoring_algorithm
         self.profile_name = profile_name

@@ -11,8 +11,11 @@ F = TypeVar("F", bound=Callable[..., Any])
 
 
 class Cache(Generic[KEY, VALUE]):
-    def __init__(self, time_to_live: timedelta):
+    """A simple in-memory cache with time-based expiration."""
+
+    def __init__(self, time_to_live: timedelta, save_on_none: bool = True) -> None:
         self.time_to_live = time_to_live
+        self.save_on_none = save_on_none
         self.store: dict[KEY, tuple[VALUE, datetime]] = {}
 
     def get(self, key: KEY) -> VALUE | None:
@@ -59,6 +62,8 @@ def _make_hashable(obj: Any) -> Any:
 
 
 class CacheFunction(Cache[Any, F]):
+    """A decorator class that caches the results of function calls based on their arguments."""
+
     def function(self, func: F) -> F:
 
         if inspect.iscoroutinefunction(func):
@@ -74,7 +79,7 @@ class CacheFunction(Cache[Any, F]):
                 cache_key = (hashable_args, hashable_kwargs)
 
                 cached = self.get(cache_key)
-                if cached is not None:
+                if not self.save_on_none or cached is not None:
                     return cached
 
                 result = await func(*args, **kwargs)
@@ -94,7 +99,7 @@ class CacheFunction(Cache[Any, F]):
                 cache_key = (hashable_args, hashable_kwargs)
 
                 cached = self.get(cache_key)
-                if cached is not None:
+                if not self.save_on_none or cached is not None:
                     return cached
 
                 result = func(*args, **kwargs)
@@ -138,6 +143,10 @@ get_replay = CacheFunction(time_to_live=timedelta(minutes=30))
 get_scores_for = CacheFunction(time_to_live=timedelta(minutes=10))
 get_friends_scores_for_beatmap = CacheFunction(time_to_live=timedelta(minutes=10))
 get_score_for_user_on_beatmap = CacheFunction(time_to_live=timedelta(minutes=5))
-rank_for_pp = CacheFunction(time_to_live=timedelta(minutes=60))
-position_for_score = CacheFunction(time_to_live=timedelta(minutes=60))
-get_replay_frames_for_score_id = CacheFunction(time_to_live=timedelta(minutes=60))
+rank_for_pp = CacheFunction(time_to_live=timedelta(hours=1))
+position_for_score = CacheFunction(time_to_live=timedelta(hours=1))
+get_replay_frames_for_score_id = CacheFunction(time_to_live=timedelta(hours=1))
+retrive_osu_file = CacheFunction(time_to_live=timedelta(hours=1))
+retrive_osu_file_from_web = CacheFunction(time_to_live=timedelta(hours=1))
+osu_file_get_by_md5 = CacheFunction(time_to_live=timedelta(hours=1))
+pp = CacheFunction(time_to_live=timedelta(hours=1))

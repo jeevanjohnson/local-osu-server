@@ -1,6 +1,21 @@
+import cache
 from adapters import OsuFile, log
 from constants import OSU_FILES_FILE
 from repositories.osu_files import OsuFilesRepository
+
+
+@cache.osu_file_get_by_md5.function
+async def get_by_md5(md5: str) -> OsuFile | None:
+    osu_files_repo = OsuFilesRepository(OSU_FILES_FILE)
+    osu_file = await osu_files_repo.get_by_md5(md5)
+
+    if osu_file is None:
+        log.info(f"No osu! file found for MD5 {md5}")
+        return
+
+    log.success(f"Found osu! file for MD5 {md5}")
+
+    return osu_file.file
 
 
 async def store(osu_file: OsuFile, store_audio: bool = False) -> None:

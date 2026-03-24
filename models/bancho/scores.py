@@ -48,8 +48,8 @@ class BaseScore(BaseModel):
     time_set: EpochTime
     replay_available: bool
 
+    performance_points: int
     lazer: bool = Field(default=False)
-    performance_points: int | None = Field(default=None)
 
     @field_serializer("enabled_mods")
     def serialize_mods(self, value: Mods) -> list[str]:
