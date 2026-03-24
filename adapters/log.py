@@ -21,7 +21,8 @@ def log_time(func):
                 result = await func(*args, **kwargs)
             except Exception as e:
                 error(f"An error occurred in {func.__qualname__}")
-                traceback.print_exc()
+                error(traceback.format_exc())
+                # TODO: save in file
                 return
 
             end_time = datetime.now()
@@ -55,7 +56,7 @@ def log_time(func):
             try:
                 result = func(*args, **kwargs)
             except Exception as e:
-                traceback.print_exc()
+                error(traceback.format_exc())
                 error(f"An error occurred in {func.__qualname__}: {e}")
                 return
             end_time = datetime.now()

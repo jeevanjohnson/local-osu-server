@@ -1,14 +1,12 @@
 import random
 
+import cache
 import calculator
 import usecases.bancho_scores
 from adapters.log import log_time
 from constants import SCORES_FILE
 from models.bancho.scores import LazerScore, StableScore
 from models.bancho.scores import Score as BanchoScore
-from models.bancho.scores import (
-    Scores as BanchoScores,
-)
 from models.database.beatmaps import (
     CurrentBeatmap as Beatmap,
 )
@@ -384,31 +382,7 @@ async def personal_best_for_beatmap(
 
 
 @log_time
-def leaderboard_position(
-    personal_best: ProfileScore,
-    scores: BanchoScores | MapScores,
-    settings: Settings,
-) -> int:
-    """Calculate the leaderboard position of a score given the current leaderboard scores.
-
-    This is used to determine whether to show the "New #X on the leaderboard!" message after a score submission.
-    """
-
-    all_scores = AllScores()
-
-    if isinstance(scores, BanchoScores):
-        all_scores.extend(scores.all_scores)
-    else:
-        all_scores.extend(scores.scores)
-
-    all_scores.append(personal_best)
-
-    all_scores.sort(settings.scoring_algorithm)
-
-    return all_scores.index(personal_best) + 1
-
-
-@log_time
+@cache.get_replay_frames_for_score_id.function
 async def get_replay_frames_for_score_id(score_id: int) -> bytes | None:
     """Get replay frames for a given score ID, if available."""
     scores_repo = ScoresRepository(SCORES_FILE)

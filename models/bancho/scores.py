@@ -1,3 +1,4 @@
+import functools
 from typing import TYPE_CHECKING, Annotated, Literal
 
 from pydantic import (
@@ -61,7 +62,7 @@ class BaseScore(BaseModel):
 
     # Self calc scores regardless of whether it's lazer or stable
     # this allows more accurate score sorting for leaderboards
-    @property
+    @functools.cached_property
     def total_score(self) -> int:
         # Note: bonus_points only comes from spinner over-spin (not implemented here)
         bonus_points: float = 0.0

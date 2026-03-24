@@ -1,5 +1,3 @@
-import asyncio
-import time
 from enum import Enum
 from typing import Any
 
@@ -14,7 +12,6 @@ from models.database.beatmaps import (
     CurrentBeatmap as Beatmap,
 )
 from models.domain.gameplay import osuGameMode
-from osuProtocol.client_web import LeaderboardType
 from osuProtocol.replay import extract_replay_frames_from_osr
 from usecases.providers import get_ossapi_async
 
@@ -23,65 +20,6 @@ class AcceptedScores(Enum):
     LAZER_ONLY = "lazer_only"
     STABLE_ONLY = "stable_only"
     BOTH = "both"
-
-
-_SCORE_HOT_CACHE_TTL_SECONDS = 300
-_SCORE_HOT_CACHE_MAX_SIZE = 1024
-_score_hot_cache: dict[tuple[Any, ...], tuple[float, Scores, list[int]]] = {}
-_score_inflight_requests: dict[
-    tuple[Any, ...], asyncio.Task[tuple[Scores, list[int]]]
-] = {}
-
-
-def _make_score_cache_key(
-    beatmap_id: int,
-    game_mode: osuGameMode,
-    leaderboard_type: LeaderboardType,
-    stable_only: bool,
-    ranking_type: ossapi.enums.RankingType,
-    req_mods: int | None,
-    req_limit: int,
-    lazer_only: bool,
-) -> tuple[Any, ...]:
-    return (
-        beatmap_id,
-        int(game_mode),
-        int(leaderboard_type),
-        stable_only,
-        str(ranking_type),
-        req_mods,
-        req_limit,
-        lazer_only,
-    )
-
-
-def _get_cached_scores(cache_key: tuple[Any, ...]) -> tuple[Scores, list[int]] | None:
-    cached = _score_hot_cache.get(cache_key)
-    if cached is None:
-        return None
-
-    cached_at, cached_scores, cached_stable_ids = cached
-    if time.monotonic() - cached_at > _SCORE_HOT_CACHE_TTL_SECONDS:
-        _score_hot_cache.pop(cache_key, None)
-        return None
-
-    return cached_scores, list(cached_stable_ids)
-
-
-def _cache_scores(
-    cache_key: tuple[Any, ...], scores: Scores, stable_ids: list[int]
-) -> None:
-    if cache_key in _score_hot_cache:
-        _score_hot_cache.pop(cache_key, None)
-
-    if len(_score_hot_cache) >= _SCORE_HOT_CACHE_MAX_SIZE:
-        oldest_key = next(iter(_score_hot_cache))
-        _score_hot_cache.pop(oldest_key, None)
-
-    _score_hot_cache[cache_key] = (time.monotonic(), scores, list(stable_ids))
-
-
-class ScoresResolver: ...
 
 
 def parse_difficulty_adjustment_settings(mod_settings: dict[str, Any]) -> list[str]:
@@ -192,6 +130,7 @@ def api_to_score_model(
     )
 
 
+@cache.get_score_for_user_on_beatmap.function
 async def get_score_for_user_on_beatmap(
     beatmap: Beatmap,
     game_mode: osuGameMode,
@@ -241,6 +180,7 @@ async def get_score_for_user_on_beatmap(
     return score
 
 
+@cache.get_friends_scores_for_beatmap.function
 async def get_friends_scores_for_beatmap(
     beatmap: Beatmap,
     game_mode: osuGameMode,
@@ -273,6 +213,7 @@ async def get_friends_scores_for_beatmap(
     return scores
 
 
+@cache.get_scores_for.function
 async def get_scores_for(
     beatmap: Beatmap,
     game_mode: osuGameMode,
@@ -321,6 +262,7 @@ async def get_scores_for(
     return scores
 
 
+@cache.get_any_scores_for.function
 async def get_any_scores_for(
     beatmap: Beatmap,
     game_mode: osuGameMode,
@@ -336,6 +278,7 @@ async def get_any_scores_for(
     )
 
 
+@cache.get_mod_specific_scores_for.function
 async def get_mod_specific_scores_for(
     beatmap: Beatmap,
     game_mode: osuGameMode,
@@ -352,6 +295,7 @@ async def get_mod_specific_scores_for(
     )
 
 
+@cache.get_replay.function
 async def get_replay(score_id: int, beatmap_md5: str | None = None) -> bytes | None:
     """Returns compatible stable replay frames for the given score ID or None if it doesn't match the conditions"""
     # Check if replay is available for this score & md5's match
