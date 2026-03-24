@@ -491,7 +491,7 @@ class SubmissionCharts:
     beatmap_set_id: int
     beatmap_playcount: int
     beatmap_passcount: int
-    last_update: datetime
+    last_updated: datetime
     score_id: int
     beatmap_chart: Beatmap
     overall_ranking_chart: OverallRanking
@@ -512,7 +512,7 @@ class SubmissionCharts:
             f"beatmapSetId:{self.beatmap_set_id}",
             f"beatmapPlaycount:{self.beatmap_playcount}",
             f"beatmapPasscount:{self.beatmap_passcount}",
-            f"approvedDate:{self.last_update}",
+            f"approvedDate:{self.last_updated}",
             "\n",
             # beatmap ranking chart
             "chartId:beatmap",
@@ -537,7 +537,7 @@ UNRANKED_CHARTS = SubmissionCharts(
     beatmap_set_id=0,
     beatmap_playcount=0,
     beatmap_passcount=0,
-    last_update=datetime.now(),
+    last_updated=datetime.now(),
     score_id=0,
     beatmap_chart=Beatmap(
         rank=Rank(name="rank"),

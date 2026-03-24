@@ -87,3 +87,42 @@ async def rank_for_pp(pp: PP, game_mode: osuGameMode) -> RANK:
     )
 
     return local_rank_for_pp_mode(pp, game_mode)
+
+
+Position = int
+TotalScore = int
+
+
+def position_for_score(
+    scores_total_score: TotalScore, data_points: list[tuple[Position, TotalScore]]
+) -> Position:
+    if not data_points:
+        raise ValueError("data_points cannot be empty")
+
+    # Sort by total score (second element) to enable interpolation
+    sorted_points = sorted(data_points, key=lambda p: p[1])
+
+    # Extract sorted positions and scores
+    positions = [p[0] for p in sorted_points]
+    scores = [p[1] for p in sorted_points]
+
+    # Handle out-of-range scores by clamping to endpoints
+    if scores_total_score <= scores[0]:
+        return positions[0]
+    if scores_total_score >= scores[-1]:
+        return positions[-1]
+
+    # Find the interval containing the target score
+    for i in range(len(scores) - 1):
+        if scores[i] <= scores_total_score <= scores[i + 1]:
+            # Linear interpolation
+            x1, y1 = scores[i], positions[i]
+            x2, y2 = scores[i + 1], positions[i + 1]
+            # Avoid division by zero (should not happen if scores are distinct)
+            if x2 == x1:
+                return round((y1 + y2) / 2)
+            position = y1 + (scores_total_score - x1) * (y2 - y1) / (x2 - x1)
+            return round(position)
+
+    # Should never reach here if the loop covers all cases
+    raise RuntimeError("Unexpected error during interpolation")

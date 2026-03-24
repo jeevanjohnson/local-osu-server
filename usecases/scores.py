@@ -1,9 +1,11 @@
+import random
+
+import calculator
 import usecases.bancho_scores
 from adapters.log import log_time
 from constants import SCORES_FILE
-from models.bancho.scores import (
-    Score as BanchoScore,
-)
+from models.bancho.scores import LazerScore, StableScore
+from models.bancho.scores import Score as BanchoScore
 from models.bancho.scores import (
     Scores as BanchoScores,
 )
@@ -39,6 +41,12 @@ from osuProtocol.replay import extract_replay_frames_from_osr
 from repositories.scores import ScoresRepository
 from usecases.bancho_scores import AcceptedScores
 
+# Avoid importing types from `calculator.rank` at module import time to prevent
+# circular imports (calculator.rank imports `usecases.scores`). Use local
+# aliases for the simple int-based types the calculator expects.
+Position = int
+GamePlayTotalScore = int
+
 
 class AllScores(list[BanchoScore | ProfileScore]):
     @property
@@ -49,15 +57,49 @@ class AllScores(list[BanchoScore | ProfileScore]):
         self,
         target_score: BanchoScore | ProfileScore,
         scoring_algorithm: ScoringAlgorithm,
+        beatmap_pass_count: int,
     ) -> int:
         """Get the position of a score in the list when sorted by the given scoring algorithm."""
         temp_scores = AllScores(self)
         temp_scores.sort(scoring_algorithm)
 
         try:
-            return temp_scores.index(target_score) + 1
+            position = temp_scores.index(target_score) + 1
+            last_position = self.total
+            if position != last_position:
+                print(f"Found target score at position {position} in sorted scores.")
+                return position
         except ValueError:
-            return -1
+            if isinstance(target_score, (StableScore, LazerScore)):
+                raise ValueError(
+                    "Target score not found in the list of scores. This should not happen since the target score should be included in the list."
+                )
+
+        data_points: list[tuple[Position, GamePlayTotalScore]] = []
+
+        for index, score in enumerate(temp_scores):
+            if score == target_score:
+                continue  # Skip the target score itself
+
+            if scoring_algorithm == ScoringAlgorithm.PP:
+                ingame_score = score.performance_points or 0
+            else:
+                ingame_score = score.total_score
+
+            data_points.append((index + 1, ingame_score))
+
+        # usually the lowest scores on maps typically be around
+        # 0 - 20 % acc equalling around 0 - 9500 score
+        if scoring_algorithm == ScoringAlgorithm.LAZER:
+            data_points.append((beatmap_pass_count, random.randint(0, 9500)))
+        else:
+            # play just worth nothing
+            data_points.append((beatmap_pass_count, 0))
+
+        return calculator.position_for_score(
+            scores_total_score=target_score.total_score,
+            data_points=data_points,
+        )
 
     def sort(self, scoring_algorithm: ScoringAlgorithm) -> None:
         if scoring_algorithm == ScoringAlgorithm.PP:
@@ -143,7 +185,9 @@ async def score_rank(
     all_scores.extend(bancho_scores.all_scores)
     all_scores.append(score)
 
-    return all_scores.position_of_score(score, settings.scoring_algorithm)
+    return all_scores.position_of_score(
+        score, settings.scoring_algorithm, beatmap_pass_count=beatmap.pass_count
+    )
 
 
 @log_time
@@ -191,13 +235,9 @@ async def get_ranking_charts(
     )
 
     if prev_best is None:
-        _score_rank = await score_rank(new_score, beatmap, settings)
-        if _score_rank == 101:
-            _score_rank = None
-
         rank_entry = Rank(
             before=None,
-            after=_score_rank,
+            after=await score_rank(new_score, beatmap, settings),
         )
 
         ranked_score_entry = RankedScore(

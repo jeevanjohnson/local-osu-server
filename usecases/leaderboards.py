@@ -27,6 +27,9 @@ from osuProtocol.client_web import LeaderboardType, ScoringAlgorithm
 from usecases.bancho_scores import AcceptedScores
 from usecases.scores import AllScores
 
+Position = int
+TotalScore = int
+
 
 class Leaderboard:
     # @log_time
@@ -55,19 +58,32 @@ class Leaderboard:
         self.scores.sort(self.scoring_algorithm)
 
     @property
-    def personal_best_position(self) -> int | None:
-        if self.personal_best is None:
-            return None
+    def play_count(self) -> int:
+        return self.beatmap.play_count
 
-        return self.scores.index(self.personal_best) + 1
+    @property
+    def pass_count(self) -> int:
+        if self.beatmap.pass_count < 1:
+            return 1
+
+        return self.beatmap.pass_count
+
+    def personal_best_position(self) -> int:
+        if self.personal_best is None:
+            return 0
+
+        if self.personal_best in self.scores[: self.limit]:
+            return self.scores.index(self.personal_best) + 1
+        else:
+            return self.scores.position_of_score(
+                self.personal_best,
+                self.scoring_algorithm,
+                beatmap_pass_count=self.beatmap.pass_count,
+            )
 
     def serialize_personal_best(self) -> LeaderboardScore | None:
         if self.personal_best is None:
             return None
-
-        assert self.personal_best_position is not None, (
-            "Personal best position should not be None if personal best exists."
-        )
 
         if self.scoring_algorithm == ScoringAlgorithm.PP:
             ingame_score = self.personal_best.performance_points or 0
@@ -76,7 +92,7 @@ class Leaderboard:
 
         return LeaderboardScore.from_score(
             score=self.personal_best,
-            position=self.personal_best_position,
+            position=self.personal_best_position(),
             ingame_score=ingame_score,
             from_difficulty_adjusted=self.difficulty_adjusted,
             truncate_username=self.truncate_usernames,
@@ -87,7 +103,7 @@ class Leaderboard:
             beatmap_status=self.beatmap.status,
             beatmap_id=self.beatmap.id,
             beatmap_set_id=self.beatmap.set_id,
-            num_of_scores=self.scores.total,
+            num_of_scores=self.beatmap.pass_count,
             artist=self.beatmap.artist,
             title=self.beatmap.title,
         )
@@ -120,6 +136,11 @@ class Leaderboard:
                 truncate_username=self.truncate_usernames,
             )
             leaderboard_scores.append(leaderboard_score)
+
+        if not seen_self and leaderboard.personal_best:
+            # if personal best not in top scores, calc its position
+            # using interpolation
+            leaderboard.personal_best.position = self.personal_best_position()
 
         leaderboard.scores = leaderboard_scores
 

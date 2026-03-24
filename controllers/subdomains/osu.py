@@ -1,6 +1,5 @@
 import json
 import urllib.parse as urlparse
-from datetime import datetime
 
 from fastapi import (
     APIRouter,
@@ -344,23 +343,14 @@ async def osuSubmitModularSelector(
     )
 
     # TODO: Port bancho achievements here!
-    # For now a test one for ya
     unlocked_achievements = Achievements()
-
-    # unlocked_achievements.append(
-    #     Achievement(
-    #         image_url="https://cdn.discordapp.com/attachments/737236214062645338/908465184425795614/unknown.png?ex=69c104e2&is=69bfb362&hm=21fbd56213faf386632c0a9b9ce2d3a989c4e1220bda3f35f098f69ad71d4d46&",
-    #         title="Test Achievement",
-    #         description="This is a test achievement. Congrats on unlocking it!",
-    #     )
-    # )
 
     submission_charts = SubmissionCharts(
         beatmap_id=beatmap.id,
         beatmap_set_id=beatmap.set_id,
-        beatmap_playcount=1,  # TODO: Get this
-        beatmap_passcount=1,  # TODO: Get this
-        last_update=datetime.now(),  # TODO: Get this
+        beatmap_playcount=beatmap.play_count,
+        beatmap_passcount=beatmap.pass_count,
+        last_updated=beatmap.last_updated,
         score_id=score.id,
         achievements=unlocked_achievements,
         beatmap_chart=beatmap_ranking_chart,

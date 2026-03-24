@@ -137,6 +137,9 @@ class BeatmapResolver:
             status=osuMapStatus.from_api_v2(api_beatmap.status),
             mode=osuGameMode.from_api_v2(api_beatmap.mode),
             difficulty_adjusted=False,
+            play_count=api_beatmap.playcount,
+            pass_count=api_beatmap.passcount,
+            last_updated=api_beatmap.last_updated,
         )
 
         cache.beatmap_by_md5.set(beatmap_md5, bmap)
@@ -186,6 +189,9 @@ class BeatmapResolver:
             title=beatmap_set.title,
             difficulty_name=api_beatmap.version,
             max_combo=api_beatmap.max_combo or 0,
+            play_count=api_beatmap.playcount,
+            pass_count=api_beatmap.passcount,
+            last_updated=api_beatmap.last_updated,
             status=osuMapStatus.from_api_v2(api_beatmap.status),
             mode=osuGameMode.from_api_v2(api_beatmap.mode),
             difficulty_adjusted=False,
@@ -232,6 +238,9 @@ class BeatmapResolver:
                 status=osuMapStatus.PENDING,
                 mode=osuGameMode.STANDARD,
                 difficulty_adjusted=False,
+                play_count=0,
+                pass_count=0,
+                last_updated=datetime.now(),
             )
 
             if unsubmitted_beatmap.status.permanent:
@@ -279,6 +288,9 @@ class BeatmapResolver:
             status=original_beatmap.status,
             mode=original_beatmap.mode,
             difficulty_adjusted=True,
+            play_count=original_beatmap.play_count,
+            pass_count=original_beatmap.pass_count,
+            last_updated=original_beatmap.last_updated,
         )
 
         if difficulty_adjusted_beatmap.status.permanent:
