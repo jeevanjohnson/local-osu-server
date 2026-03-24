@@ -5,6 +5,8 @@ from typing import Any
 from ossapi import OssapiAsync as BaseOssapiAsync
 from ossapi.mod import Mod
 
+import usecases.sessions
+
 
 # https://osu.ppy.sh/community/forums/topics/1257747?n=5
 class OssapiAsync(BaseOssapiAsync):
@@ -42,12 +44,16 @@ class OssapiAsync(BaseOssapiAsync):
         params = self._normalize_query_values(params)
         data = self._normalize_query_values(data)
 
-        if (
-            isinstance(params, dict)
-            and "mods" in params
-            and isinstance(params["mods"], int)
-        ):
-            params = params.copy()
-            params["mods"] = self._mods_int_to_array(params["mods"])
+        if isinstance(params, dict):
+            if "mods" in params and isinstance(params["mods"], int):
+                # mod int to ?mods[]=EZ&mods[]=HD
+                params["mods"] = self._mods_int_to_array(params["mods"])
+
+            if "cursor" in params and "cursor_string" not in params:
+                del params["cursor"]
+
+                # Retrive cursor_string from session
+                session = await usecases.sessions.require_current_session()
+                params["cursor_string"] = session.osu_client.direct_cursor_string
 
         return await super()._request(type_, method, url, params=params, data=data)

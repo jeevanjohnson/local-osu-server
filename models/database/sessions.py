@@ -7,6 +7,7 @@ import base64
 from datetime import datetime
 from pathlib import Path
 
+import ossapi.enums
 from jays_tools.json_database import MigratableModel
 from pydantic import Field, field_serializer, field_validator
 
@@ -19,6 +20,14 @@ class SessionOsuClientActivityV1(MigratableModel):
     logged_in_at: datetime = Field(default_factory=datetime.now)
     status: osuAction = Field(default=osuAction.Idle)
     status_message: str = Field(default="")
+    direct_cursor_string: str | None = Field(default=None)
+    previous_direct_search: list[
+        tuple[
+            str,
+            ossapi.enums.BeatmapsetSearchMode,
+            ossapi.enums.BeatmapsetSearchCategory,
+        ]
+    ] = Field(default_factory=list)
 
 
 CurrentSessionOsuClientActivity = SessionOsuClientActivityV1

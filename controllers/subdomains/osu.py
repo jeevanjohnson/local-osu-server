@@ -7,6 +7,7 @@ from fastapi import (
     File,
     Form,
     Header,
+    Path,
     Query,
     Request,
     Response,
@@ -16,6 +17,7 @@ from fastapi.responses import RedirectResponse
 
 import usecases.bancho_scores
 import usecases.beatmaps
+import usecases.direct
 import usecases.leaderboards
 import usecases.osu_files
 import usecases.profiles
@@ -47,6 +49,8 @@ from osuProtocol.client_web import (
     Achievements,
     LeaderboardType,
     SubmissionCharts,
+    osu_direct_mode_to_osu_api_v2,
+    osu_direct_ranked_status_to_osu_api_v2,
 )
 from usecases.providers import ApiV2CredentialsError, OsuDailyCredentialsError
 
@@ -62,11 +66,11 @@ async def get_seasonal_backgrounds():
     return Response(content=json.dumps([SEASONAL_BG_GIT_URL]))
 
 
-@osu.get("/beatmaps/{full_path:path}")
+@osu.get("/beatmap{full_path:path}")
 @log_time
 async def get_beatmap(full_path: str):
     return RedirectResponse(
-        url=f"https://osu.ppy.sh/beatmaps/{full_path}",
+        url=f"https://osu.ppy.sh/beatmap{full_path}",
         status_code=status.HTTP_301_MOVED_PERMANENTLY,
     )
 
@@ -90,6 +94,11 @@ async def get_leaderboard(
     profile: Profile = Depends(retrieve_profile(OsuErrors.NON)),
     session: Session = Depends(retrieve_session(OsuErrors.NON)),
 ):
+    # if we are on the leaderboard, make sure our direct search history is cleared since it's not relevant anymore
+    session.osu_client.previous_direct_search = []
+    session.osu_client.direct_cursor_string = None
+    await usecases.sessions.update_current_session(session)
+
     mods = Mods.from_stable_mods(mods_arg)
     game_mode = osuGameMode(mode_arg)
 
@@ -461,3 +470,70 @@ async def get_replay(
         return Response(OsuErrors.NON.value.encode())
 
     return Response(content=replay_frames)
+
+
+@osu.get("/web/osu-search.php")
+@log_time
+async def osu_direct(
+    q: str = Query(..., alias="q"),
+    mode: int = Query(..., alias="m"),
+    ranked_status: int = Query(..., alias="r"),
+    page_num: int = Query(..., alias="p"),
+    session: Session = Depends(retrieve_session(OsuErrors.NON)),
+):
+    # TODO: current pagination process can be a lil broken cause
+    # you could go scroll down in search
+    # go to menu and then go back and the pagination wouldn't reset
+    query = urlparse.unquote(q)
+    if query in ("Newest", "Top+Rated", "Most+Played"):
+        query = ""
+
+    page_mode = osu_direct_mode_to_osu_api_v2(mode)
+    status_type = osu_direct_ranked_status_to_osu_api_v2(ranked_status)
+
+    if (query, page_mode, status_type) not in session.osu_client.previous_direct_search:
+        session.osu_client.previous_direct_search = [(query, page_mode, status_type)]
+        session.osu_client.direct_cursor_string = None
+        await usecases.sessions.update_current_session(session)
+
+    direct_response = await usecases.direct.page(
+        query=query,
+        status_type=status_type,
+        mode=page_mode,
+    )
+
+    if direct_response is None:
+        return Response(
+            b"-1\nFailed to retrieve search results. Please try again later."
+        )
+
+    return Response(content=direct_response.serialize())
+
+
+@osu.get("/d/{map_set_id}")
+async def get_osz(
+    map_set_id: str = Path(...),
+) -> Response:
+    # TODO: Figure out how to support video downloads
+    # use playwrite and osu! credentials to get direct
+    # download link for the osz file ?
+    return RedirectResponse(
+        url=f"https://osu.gatari.pw/d/{map_set_id}",
+        status_code=status.HTTP_301_MOVED_PERMANENTLY,
+    )
+
+
+# Handles stuff like: osu://s/218851
+@osu.get("/web/osu-search-set.php")
+async def osu_scheme(
+    map_set_id: int | None = Query(None, alias="s"),
+    map_id: int | None = Query(None, alias="b"),
+    checksum: str | None = Query(None, alias="c"),
+):
+    scheme_response = await usecases.direct.scheme(
+        map_set_id=map_set_id,
+        map_id=map_id,
+        checksum=checksum,
+    )
+
+    return Response(content=scheme_response.serialize())

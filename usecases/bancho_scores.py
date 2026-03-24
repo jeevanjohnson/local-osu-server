@@ -255,7 +255,14 @@ async def get_scores_for(
     scores = Scores(all_scores=[])
 
     for score in requested_scores.scores:
-        # log.info(f"Fetched score with ID {score.id} for user {score._ossapi_data['_user'].username} with mods {[mod.acronym for mod in score.mods]}")
+        if mods is not None:
+            score_mods = api_to_mods(score.mods)
+
+            if "NC" in mods and "NC" not in score_mods:
+                continue
+
+            if "DT" in mods and "NC" in score_mods:
+                continue
 
         scores.append(api_to_score_model(score, beatmap.max_combo, game_mode))
 

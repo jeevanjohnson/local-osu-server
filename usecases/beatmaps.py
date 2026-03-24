@@ -303,6 +303,31 @@ class BeatmapResolver:
         return difficulty_adjusted_beatmap
 
     @log_time
+    async def from_osu_scheme_request(
+        self,
+        map_set_id: int | None = None,
+        map_id: int | None = None,
+        map_md5: str | None = None,
+    ) -> Beatmap | None:
+        if map_md5 is not None:
+            beatmap = await self.from_api_md5(map_md5)
+            if beatmap:
+                return beatmap
+
+        if map_id is not None:
+            beatmap = await self.from_api_id(map_id)
+            if beatmap:
+                return beatmap
+
+        if map_set_id is not None:
+            log.warning(
+                f"Received osu scheme request with set id {map_set_id} but no beatmap id or md5, unable to resolve beatmap without more specific identifiers "
+                "Notify a developer if you see this message frequently with the same set id so we can consider implementing a fallback resolution strategy for this case"
+            )
+
+        return None
+
+    @log_time
     async def from_leaderboard_request(
         self, beatmap_md5: str, beatmap_set_id: int, map_filename: str
     ) -> Beatmap | None:

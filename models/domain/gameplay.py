@@ -1,18 +1,40 @@
+from typing import Iterable
+
+import calculator
 from adapters import log
 from osuProtocol.server_packets import osuGameMode, osuMods
 
 LAZER_MODS = list[str]
 _NON_SCORING_ATTRIBUTE_PREFIXES = ("AR", "OD", "HP", "CS")
 
+ACRONYMS = list[str]
 
-class Mods(list[str]):
+RATE = float
+MULTIPLER = float
+
+
+class Mods(ACRONYMS):
     """A list of mods, represented as short names, e.g. ['HD', 'HR', 'DT']."""
+
+    def __init__(self, iterable: Iterable[str]) -> None:
+        super().__init__(iterable)
+        self.post_init()
+
+    def post_init(self):
+        if "NC" in self and "DT" in self:
+            log.warning("Both NC and DT mods found, removing DT since NC includes DT")
+            self.remove("DT")
+
+    @property
+    def stable(self) -> osuMods:
+        stable_mods, _ = self.to_stable_mods()
+        return stable_mods
 
     def __int__(self) -> int:
         stable_mods, _ = self.to_stable_mods()
         return int(stable_mods)
 
-    def are_same(self, other: "Mods", ignore: list[str] | None = None) -> bool:
+    def are_same(self, other: "Mods", ignore: ACRONYMS | None = None) -> bool:
         if ignore is None:
             ignore = []
 
@@ -47,31 +69,18 @@ class Mods(list[str]):
         stable_mods = osuMods(mods)
         return cls.from_stable_mods(stable_mods, None)
 
-    def approximate_score_multiplier(self, rate: float) -> float:
-        # Known (rate, multiplier) points.
-        points = [(0.75, 0.30), (1.00, 1.00), (1.50, 1.10)]
+    def approximate_score_multiplier_for(self, rate: RATE) -> MULTIPLER:
+        points = [
+            # (rate, multiplier)
+            (0.75, 0.30),  # HT or DC multiples are 0.3x
+            (1.00, 1.00),  # Base multiplier at 1.0x rate
+            (1.50, 1.10),  # DT or NC multiples are 1.1x
+        ]
 
-        x1, y1 = points[0]
-        x2, y2 = points[1]
-
-        if rate < points[0][0]:
-            x1, y1 = points[0]
-            x2, y2 = points[1]
-        elif rate > points[-1][0]:
-            x1, y1 = points[-2]
-            x2, y2 = points[-1]
-        else:
-            for i in range(len(points) - 1):
-                if points[i][0] <= rate <= points[i + 1][0]:
-                    x1, y1 = points[i]
-                    x2, y2 = points[i + 1]
-                    break
-
-        if x2 == x1:
-            return y1
-
-        t = (rate - x1) / (x2 - x1)
-        return y1 + t * (y2 - y1)
+        return calculator.linear_interpolation(
+            input_value=rate,
+            points=points,
+        )
 
     def to_stable_mods(self) -> tuple[osuMods, LAZER_MODS]:
         stable_mods = osuMods.NOMOD
@@ -165,7 +174,7 @@ class Mods(list[str]):
                     multiplier *= mod_multipliers[mod]
             elif mod.endswith("x"):
                 rate = float(mod[:-1])
-                multiplier *= self.approximate_score_multiplier(rate)
+                multiplier *= self.approximate_score_multiplier_for(rate)
             elif mod.startswith(_NON_SCORING_ATTRIBUTE_PREFIXES):
                 # DA settings like AR10.5/OD8/HP6/CS4 affect map attributes, not score multiplier.
                 continue
