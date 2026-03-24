@@ -27,6 +27,7 @@ class BeatmapV1(MigratableModel):
     play_count: int
     pass_count: int
     last_updated: datetime
+    average_rating: float
 
     @property
     def unsubmitted(self) -> bool:

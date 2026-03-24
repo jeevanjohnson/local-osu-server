@@ -140,6 +140,7 @@ class BeatmapResolver:
             play_count=api_beatmap.playcount,
             pass_count=api_beatmap.passcount,
             last_updated=api_beatmap.last_updated,
+            average_rating=beatmap_set.rating,
         )
 
         cache.beatmap_by_md5.set(beatmap_md5, bmap)
@@ -195,6 +196,7 @@ class BeatmapResolver:
             status=osuMapStatus.from_api_v2(api_beatmap.status),
             mode=osuGameMode.from_api_v2(api_beatmap.mode),
             difficulty_adjusted=False,
+            average_rating=beatmap_set.rating,
         )
 
         cache.beatmap_by_md5.set(api_beatmap.checksum, bmap)
@@ -241,6 +243,7 @@ class BeatmapResolver:
                 play_count=0,
                 pass_count=0,
                 last_updated=datetime.now(),
+                average_rating=0.0,
             )
 
             if unsubmitted_beatmap.status.permanent:
@@ -291,6 +294,7 @@ class BeatmapResolver:
             play_count=original_beatmap.play_count,
             pass_count=original_beatmap.pass_count,
             last_updated=original_beatmap.last_updated,
+            average_rating=original_beatmap.average_rating,
         )
 
         if difficulty_adjusted_beatmap.status.permanent:
@@ -411,3 +415,17 @@ async def from_score_submission_request(
         current_settings=current_settings,
     )
     return await resolver.from_score_submission_request(beatmap_md5=beatmap_md5)
+
+
+async def from_md5(
+    beatmap_md5: str,
+    songs_folder: Path,
+    current_settings: CurrentSettings,
+) -> Beatmap | None:
+    resolver = BeatmapResolver(
+        songs_folder=songs_folder,
+        beatmaps_repo=BeatmapsRepository(BEATMAPS_FILE),
+        osu_files_repo=OsuFilesRepository(OSU_FILES_FILE),
+        current_settings=current_settings,
+    )
+    return await resolver.from_api_md5(beatmap_md5=beatmap_md5)

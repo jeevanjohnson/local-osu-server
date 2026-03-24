@@ -28,7 +28,7 @@ def _run_with_graceful_shutdown(func: Callable) -> None:
         print("Shutting down gracefully...")
 
 
-def graceful_shutdown(func: Callable, daemon: bool = True) -> Callable:
+def process(func: Callable, daemon: bool = True) -> Callable:
     PROCESSES[func.__name__] = multiprocessing.Process(
         target=_run_with_graceful_shutdown, args=(func,), daemon=daemon
     )
@@ -36,30 +36,30 @@ def graceful_shutdown(func: Callable, daemon: bool = True) -> Callable:
     return func
 
 
-@graceful_shutdown
+@process
 def middleman_proxy():
     print("Proxy server is running!")
 
     os.system("mitmdump -s middleman.py -q")
 
 
-@graceful_shutdown
+@process
 def local_server():
     uvicorn.run(
         "server:app",
         host="127.0.0.1",
         port=LOS_PORT,
-        access_log=False,
-        log_level="critical",
+        # access_log=False,
+        # log_level="critical",
     )
 
 
-@graceful_shutdown
+@process
 def gui():
     os.system(f"{sys.executable} gui.py")
 
 
-@graceful_shutdown
+@process
 def open_gui():
     import usecases.sessions
 

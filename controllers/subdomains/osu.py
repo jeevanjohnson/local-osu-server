@@ -365,6 +365,37 @@ async def osuSubmitModularSelector(
     return Response(content=submission_charts.serialize())
 
 
+@osu.get("/web/osu-rate.php")
+@log_time
+async def osu_rate(
+    map_md5: str = Query(..., alias="c"),
+    rating: int | None = Query(None, alias="v"),
+    profile: Profile = Depends(retrieve_profile(OsuErrors.NON)),
+    session: Session = Depends(retrieve_session(OsuErrors.NON)),
+    server_settings: ServerSettings = Depends(retrieve_server_settings),
+):
+    if session.songs_folder is None:
+        await usecases.sessions.silent_restart_client()
+        return Response(
+            OsuErrors.NON.value.encode(),
+        )
+
+    beatmap = await usecases.beatmaps.from_md5(
+        beatmap_md5=map_md5,
+        songs_folder=session.songs_folder,
+        current_settings=profile.settings,
+    )
+
+    if beatmap is None or not beatmap.status.has_leaderboard():
+        return Response(b"not ranked")
+
+    if rating is None:
+        # user hasn't rated the map, so just tell them they can submit a rating
+        return Response(b"ok")
+
+    return Response(f"alreadyvoted\n{beatmap.average_rating}".encode())
+
+
 @osu.get("/web/osu-getreplay.php")
 @log_time
 async def get_replay(
