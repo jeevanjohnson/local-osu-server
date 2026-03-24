@@ -224,11 +224,19 @@ class LeaderboardScore:
             replay_available = score.replay_available
 
         if not stable_mods & osuMods.SCOREV2:
-            # This allows watching replays
-            # and playing w/ score v2 making the
-            # ranking up the map feel with the lb on more
-            # realistic to bancho/lazer
-            stable_mods |= osuMods.SCOREV2
+            if not isinstance(score, ProfileScore):
+                # This allows watching replays
+                # and playing w/ score v2 making the
+                # ranking up the map feel with the lb on more
+                # realistic to bancho/lazer
+                stable_mods |= osuMods.SCOREV2
+            else:
+                # TODO: profile setting?
+                # cause when you actually play the map the side leaderboards
+                # you just become number 1 cause client will calculate score
+                # by legacy algorithm instead of score v2, which is what the profile scores are stored with
+                # & the replay's acc will be off cause of slider acc
+                pass
 
         return cls(
             score_id=score_id,
