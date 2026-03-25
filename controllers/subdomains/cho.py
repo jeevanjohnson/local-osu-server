@@ -223,6 +223,9 @@ async def on_action_change(packet: ChangeAction, session: Session) -> ServerPack
         return SilentRelog
 
     session.osu_client.status = osuAction(packet.action.value)
+    if session.osu_client.status != osuAction.OsuDirect:
+        session.osu_client.direct_cursor_string = None
+
     session.osu_client.status_message = packet.info_text.value
     session.osu_client.opened = True
 
@@ -260,6 +263,8 @@ async def on_action_change(packet: ChangeAction, session: Session) -> ServerPack
         rank=rank,
         performance_points=performance_points,
     )
+
+    await usecases.sessions.update_current_session(session) # TODO: will this break?
 
     return response
 

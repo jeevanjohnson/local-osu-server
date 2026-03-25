@@ -33,6 +33,14 @@ class OsuFile(BaseOsuFile):
             self.file_name = file_path.name
             super().__init__(str(file_path.absolute()))
 
+    def colours_parser(self, line: str) -> None:
+        # Weird bug with https://osu.ppy.sh/beatmapsets/1682024#osu/3436489
+        # color line has 4 instead of just 3
+        try:
+            super().colours_parser(line)
+        except ValueError:
+            pass
+    
     @property
     def unsubmitted(self) -> bool:
         return self.beatmap_id == 0

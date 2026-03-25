@@ -450,36 +450,57 @@ class Commands(Enum):
 
 def interactive_mode():
     """Run in interactive mode, listening for commands on stdin."""
+    global SONGS_FOLDER
+    
+    # Find songs folder if not already found
+    while SONGS_FOLDER is None:
+        find_songs_folder()
+        if SONGS_FOLDER is None:
+            log.warning("Waiting for osu! client to be launched")
+            time.sleep(1)
+    
+    # Load cache
     load_cache()
+    
+    # Start file watcher in background thread
+    event_handler = SongFolderHandler()
+    observer = Observer()
+    observer.schedule(event_handler, str(SONGS_FOLDER), recursive=True)
+    observer.start()
+    
     print(json.dumps({"status": "ready"}))
     sys.stdout.flush()
-    log.success("Subprocess ready for commands")
+    log.success("Subprocess ready for commands with file watcher active")
     
-    while True:
-        try:
-            # Read command from stdin (blocking)
-            line = sys.stdin.readline()
-            if not line:
-                break
-            
-            parts = line.strip().split("|", 1)
-            if len(parts) != 2:
-                print(json.dumps({"error": "Invalid format, use CMD|PARAM"}))
+    try:
+        while True:
+            try:
+                # Read command from stdin (blocking)
+                line = sys.stdin.readline()
+                if not line:
+                    break
+                
+                parts = line.strip().split("|", 1)
+                if len(parts) != 2:
+                    print(json.dumps({"error": "Invalid format, use CMD|PARAM"}))
+                    sys.stdout.flush()
+                    continue
+                
+                request, parameter = parts
+                
+                if request not in ALL_REGISTERED_COMMANDS:
+                    print(json.dumps({"error": f"Unknown command: {request}"}))
+                else:
+                    result = ALL_REGISTERED_COMMANDS[request](parameter)
+                    print(json.dumps({"result": result}))
+                
                 sys.stdout.flush()
-                continue
-            
-            request, parameter = parts
-            
-            if request not in ALL_REGISTERED_COMMANDS:
-                print(json.dumps({"error": f"Unknown command: {request}"}))
-            else:
-                result = ALL_REGISTERED_COMMANDS[request](parameter)
-                print(json.dumps({"result": result}))
-            
-            sys.stdout.flush()
-        except Exception as e:
-            print(json.dumps({"error": str(e)}))
-            sys.stdout.flush()
+            except Exception as e:
+                print(json.dumps({"error": str(e)}))
+                sys.stdout.flush()
+    finally:
+        observer.stop()
+        observer.join()
 
 
 if __name__ == "__main__":

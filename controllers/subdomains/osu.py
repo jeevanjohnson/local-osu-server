@@ -482,6 +482,8 @@ async def osu_direct(
     page_mode = osu_direct_mode_to_osu_api_v2(mode)
     status_type = osu_direct_ranked_status_to_osu_api_v2(ranked_status)
 
+    print(f"Received direct search request with query: '{query}', mode: {mode} ({page_mode}), ranked_status: {ranked_status} ({status_type}), page_num: {page_num}")
+
     if (query, page_mode, status_type) not in session.osu_client.previous_direct_search:
         session.osu_client.previous_direct_search = [(query, page_mode, status_type)]
         session.osu_client.direct_cursor_string = None

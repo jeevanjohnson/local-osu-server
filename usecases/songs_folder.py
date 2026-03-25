@@ -239,15 +239,15 @@ class OsuFileResolver:
     @cached_for_10_minutes
     async def from_md5(self, md5: str) -> Path | None:
         osu_file_path = await self.run_command(Commands.GET_PATH_BY_MD5, md5)
-        if osu_file_path is None:
+        if osu_file_path is None or osu_file_path == "":
             return None
 
-        return Path(osu_file_path)
+        return Path(osu_file_path).absolute()
 
     @cached_for_10_minutes
     async def from_filename(self, filename: str) -> Path | None:
         osu_file_path = await self.run_command(Commands.GET_PATH_BY_FILENAME, filename)
-        if osu_file_path is None:
+        if osu_file_path is None or osu_file_path == "":
             return None
 
         return Path(osu_file_path).absolute()

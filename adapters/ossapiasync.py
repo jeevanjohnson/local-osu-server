@@ -7,6 +7,9 @@ from ossapi.mod import Mod
 
 import usecases.sessions
 
+from datetime import datetime, timedelta
+
+ONE_MINUTE = timedelta(minutes=1)
 
 # https://osu.ppy.sh/community/forums/topics/1257747?n=5
 class OssapiAsync(BaseOssapiAsync):
@@ -56,11 +59,24 @@ class OssapiAsync(BaseOssapiAsync):
                 session = await usecases.sessions.require_current_session()
                 params["cursor_string"] = session.osu_client.direct_cursor_string
 
+        # Initialize or reset rate limit window
         try:
-            self.api_calls += 1
+            # If more than 1 minute has passed, reset the counter
+            if datetime.now() - self.window_start >= ONE_MINUTE:
+                self.api_calls = 0
+                self.window_start = datetime.now()
         except AttributeError:
-            self.api_calls = 1
+            # First call, initialize tracking
+            self.api_calls = 0
+            self.window_start = datetime.now()
         
-        print(f"Making API call #{self.api_calls} to {url} with params: {params} and data: {data}")
+        # For safety on user's API usage
+        # https://osu.ppy.sh/docs/index.html#introduction:~:text=and%20javascript%20samples.-,Terms%20of%20Use,-Use%20the%20API
+        # no more than 60 calls per min
+
+        if self.api_calls >= 60:
+            raise SystemExit("API call limit exceeded: more than 60 calls in the last minute! Please contact a developer ASAP!!")
+        
+        self.api_calls += 1
 
         return await super()._request(type_, method, url, params=params, data=data)
