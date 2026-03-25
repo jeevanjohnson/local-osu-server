@@ -20,7 +20,7 @@ def log_time(func):
             start_time = datetime.now()
             try:
                 result = await func(*args, **kwargs)
-            except Exception as e:
+            except Exception:
                 error(f"An error occurred in {func.__qualname__}")
                 error(traceback.format_exc())
                 # TODO: save in file

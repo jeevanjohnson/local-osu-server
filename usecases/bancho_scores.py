@@ -209,7 +209,7 @@ async def get_scores_for(
             legacy_only=stable_only,
             type=ranking_type,
         )
-    except ValueError as e:
+    except ValueError:
         # log.error(f"Error fetching scores for beatmap {beatmap.id}: {e}")
         return Scores(all_scores=[])
 

@@ -920,7 +920,12 @@ def LoginError(message: str | None = None) -> Packets:
     return LoginFailed(LoginFailureReason.ERROR_OCCURRED, message)
 
 
-def _BanchoBot() -> Packets:
+def BanchoBot(latency: float | None = None) -> Packets:
+    if latency is not None:
+        info_text = f"API V2 latency: {latency:.2f}ms ʕ•̫͡•ʔ"
+    else:
+        info_text = "over the server... ʕ•̫͡•ʔ"
+
     packets = Packets()
 
     packets += PlayerPresence(
@@ -938,7 +943,7 @@ def _BanchoBot() -> Packets:
     packets += PlayerStats(
         user_id=3,
         action=osuAction.Watching,
-        info_text="over the server... ʕ•̫͡•ʔ",
+        info_text=info_text,
         beatmap_md5="",
         mods=osuMods.NOMOD,
         game_mode=osuGameMode.STANDARD,
@@ -952,9 +957,6 @@ def _BanchoBot() -> Packets:
     )
 
     return packets
-
-
-BanchoBot = _BanchoBot()
 
 
 def Login(
@@ -971,7 +973,8 @@ def Login(
     play_count: int,
     total_score: int,
     performance_points: int,
-    warning: str | None = None,
+    login_message: str | None = None,
+    latency: float | None = None,
 ) -> Packets:
     packets = Packets()
 
@@ -980,9 +983,8 @@ def Login(
 
     packets += UserPrivileges(ALL_PRIVILEGES)
 
-    packets += Notification(f"Welcome to LOS!, {username} ʕ•̫͡•ʔ")
-    if warning is not None:
-        packets += Notification(warning)
+    if login_message is not None:
+        packets += Notification(login_message)
 
     for channel in ["#osu", "#nothing"]:
         packets += ChannelInfo(
@@ -1026,7 +1028,7 @@ def Login(
         performance_points=performance_points,
     )
 
-    packets += BanchoBot
+    packets += BanchoBot(latency=latency)
 
     return packets
 

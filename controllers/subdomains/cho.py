@@ -11,6 +11,7 @@ from fastapi import APIRouter, Header, Request, Response
 import usecases.beatmaps
 import usecases.cho
 import usecases.gui
+import usecases.latency
 import usecases.profiles
 import usecases.server_settings
 import usecases.sessions
@@ -96,13 +97,11 @@ async def client_request_handler(
                 headers={"cho-token": "api-v2-credentials-missing"},
             )
 
+        login_message = f"Welcome to LOS!, {session.profile_name} ʕ•̫͡•ʔ"
+        api_latency = await usecases.latency.bancho_api()
+        login_message += f" \n(Bancho API latency: {api_latency:.2f}ms)"
         if not await usecases.server_settings.osu_daily_credentials_exist():
-            warning = (
-                "osu!daily API credentials not found. Using local linear interpolation for calculating ranking, "
-                "can be inaccurate due to little data. For best results, please set up your credentials through the GUI."
-            )
-        else:
-            warning = None
+            login_message += "\n(Warning: osu!daily credentials not found. Using local ranking calc may result in inaccurate results)"
 
         rank = profile.performance[session.current_game_mode].rank
         ranked_score = profile.performance[session.current_game_mode].ranked_score
@@ -127,7 +126,8 @@ async def client_request_handler(
             play_count=play_count,
             total_score=total_score,
             performance_points=performance_points,
-            warning=warning,
+            login_message=login_message,
+            latency=api_latency,
         )
 
         session.osu_client.opened = True
