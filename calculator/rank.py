@@ -1,6 +1,6 @@
-import cache
 import usecases.osu_daily
 from adapters import log
+from cache import cached_forever
 from models.domain.gameplay import osuGameMode
 
 from .linear_interpolation import linear_interpolation
@@ -10,7 +10,10 @@ RANK = int
 
 
 # TODO: Make a script that gets data points & then these functions can just read from a file instead of hardcoding these values
-def local_rank_for_pp_mode(pp: PP, game_mode: osuGameMode) -> RANK:
+
+
+@cached_forever
+def local_rank_for_pp(pp: PP, game_mode: osuGameMode) -> RANK:
     DATA_POINTS: list[tuple[PP, RANK]]
     if game_mode == osuGameMode.STANDARD:
         # last updated: 3/22/2026
@@ -38,7 +41,7 @@ def local_rank_for_pp_mode(pp: PP, game_mode: osuGameMode) -> RANK:
     return int(round(result))
 
 
-@cache.rank_for_pp.function
+@cached_forever
 async def rank_for_pp(pp: PP, game_mode: osuGameMode) -> RANK:
     """
     Fetch rank for given PP value using osu!daily API.
@@ -53,7 +56,7 @@ async def rank_for_pp(pp: PP, game_mode: osuGameMode) -> RANK:
     """
     if pp < 700:  # osu!daily returns null for ranks below ~700pp
         # Linear interpolation for fetching this value
-        return local_rank_for_pp_mode(pp, game_mode)
+        return local_rank_for_pp(pp, game_mode)
 
     rank = await usecases.osu_daily.get_rank_for_pp(pp, game_mode)
 
@@ -66,14 +69,14 @@ async def rank_for_pp(pp: PP, game_mode: osuGameMode) -> RANK:
         f"Falling back to local rank estimation for pp={pp} due to osu!daily API failure or missing credentials."
     )
 
-    return local_rank_for_pp_mode(pp, game_mode)
+    return local_rank_for_pp(pp, game_mode)
 
 
 Position = int
 TotalScore = int
 
 
-@cache.position_for_score.function
+@cached_forever
 def position_for_score(
     scores_total_score: TotalScore, data_points: list[tuple[Position, TotalScore]]
 ) -> Position:

@@ -5,7 +5,6 @@ Purpose/Domain/Concept:
 
 import base64
 from datetime import datetime
-from pathlib import Path
 
 import ossapi.enums
 from jays_tools.json_database import MigratableModel
@@ -49,8 +48,6 @@ class SessionV1(MigratableModel):
     loaded: bool = Field(default=False)
     profile_name: str = Field(default="")
     packet_queue: bytes = Field(default=b"")
-    songs_folder: Path | None = Field(default=None)
-    replays_folder: Path | None = Field(default=None)
 
     latest_replay_id: int = Field(default=0)
     current_game_mode: osuGameMode = Field(default=osuGameMode.STANDARD)

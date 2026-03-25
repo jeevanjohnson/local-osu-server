@@ -2,7 +2,8 @@ import webbrowser
 
 from adapters import log, log_time
 
-# TODO: use the osu! client update protocol for our server updates :3\
+# TODO: use the osu! client update protocol for our server updates :3
+
 
 @log_time
 def open_lazer_score(score_id: int) -> None:

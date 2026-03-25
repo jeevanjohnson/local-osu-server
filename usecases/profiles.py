@@ -5,7 +5,7 @@ Purpose/Domain/Concept:
 
 import calculator
 from adapters import log_time
-from constants import PROFILES_FILE, SCORES_FILE
+from constants import BEATMAPS_FILE, PROFILES_FILE, SCORES_FILE
 from models.database.profiles import (
     CurrentProfile as Profile,
 )
@@ -16,8 +16,9 @@ from models.database.server_settings import (
     CurrentServerSettings as ServerSettings,
 )
 from models.domain.errors import ProfileNotFoundError, ProfilesNotFoundError
-from osuProtocol.client_web import ScoringAlgorithm
+from osuProtocol.client_web import ScoringAlgorithm, osuMapStatus
 from osuProtocol.server_packets import osuGameMode
+from repositories.beatmaps import BeatmapsRepository
 from repositories.profiles import ProfilesRepository
 from repositories.scores import ScoresRepository
 
@@ -82,19 +83,9 @@ async def recalculate_stats(
     scoring_algorithm: ScoringAlgorithm,
     server_settings: ServerSettings,
 ) -> Profile:
-    """Old code which worked
-
-    scores.sort(key = lambda s: s['pp'], reverse = True)
-    top_scores = utils.filter_top_scores(scores[:100])
-    top_scores.sort(key = lambda s: s['pp'], reverse = True)
-
-    pp = sum([s['pp'] * 0.95 ** i for i, s in enumerate(top_scores)])
-    pp += 416.6667 * (1 - (0.9994 ** len(scores)))
-    self.pp = round(pp)
-    """
-
     profile_repo = ProfilesRepository(PROFILES_FILE)
     scores_repo = ScoresRepository(SCORES_FILE)
+    beatmaps_repo = BeatmapsRepository(BEATMAPS_FILE)
 
     profile = await profile_repo.require_profile(profile_name)
     profile_stats = profile.performance[game_mode]
@@ -122,7 +113,20 @@ async def recalculate_stats(
 
             mode_scores.append(score)
             total_score += score.total_score
-            ranked_score += score.total_score
+
+            # Only count ranked_score for maps that are RANKED, APPROVED, LOVED, or QUALIFIED
+            try:
+                beatmap = await beatmaps_repo.require_by_md5(score.beatmap_md5)
+                if beatmap.status in (
+                    osuMapStatus.RANKED,
+                    osuMapStatus.APPROVED,
+                    osuMapStatus.LOVED,
+                    osuMapStatus.QUALIFIED,
+                ):
+                    ranked_score += score.total_score
+            except Exception:
+                # If beatmap not found in DB, don't count it in ranked_score
+                pass
 
         if mode_scores:
             # Keep a single best score per beatmap for profile pp/acc weighting.

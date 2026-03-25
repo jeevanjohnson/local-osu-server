@@ -6,9 +6,10 @@ Purpose/Domain/Concept:
 from contextlib import asynccontextmanager
 from pathlib import Path
 
+import uvicorn
 from fastapi import FastAPI, Request, Response
 
-from constants import DATA_FOLDER
+from constants import DATA_FOLDER, LOS_PORT
 from controllers.dependencies import ClientResponseException
 from controllers.subdomains.assets import assets
 from controllers.subdomains.avatar import avatar
@@ -49,3 +50,11 @@ app.include_router(resources)
 
 for subdomain in ["/c4", "/c5", "/c6", "/ce", "/c"]:
     app.include_router(bancho, prefix=subdomain)
+
+
+def los_process() -> None:
+    uvicorn.run(
+        app,
+        host="127.0.0.1",
+        port=LOS_PORT,
+    )

@@ -14,7 +14,6 @@ from nicegui.events import UploadEventArguments
 import usecases.profiles
 import usecases.server_settings
 import usecases.sessions
-from constants import LOS_GUI_PORT
 from models.database.profiles import CurrentProfiles as Profiles
 
 
@@ -420,7 +419,9 @@ async def dashboard():
     ui.button("Server Settings", on_click=lambda: ui.navigate.to("/server_settings"))
 
 
+from constants import LOS_INTERFACE_PORT
+
 try:
-    ui.run(title="LOS GUI", port=LOS_GUI_PORT, show=False, reload=False)
+    ui.run(title="LOS Interface", port=LOS_INTERFACE_PORT, show=False, reload=False)
 except KeyboardInterrupt:
     pass

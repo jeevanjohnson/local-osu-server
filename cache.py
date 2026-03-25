@@ -1,7 +1,7 @@
 import functools
 import inspect
 from datetime import datetime, timedelta
-from typing import Any, Callable, Generic, TypeVar, cast
+from typing import Any, Callable, Generic, Literal, TypeVar, cast
 
 from adapters import log
 
@@ -13,10 +13,16 @@ F = TypeVar("F", bound=Callable[..., Any])
 class Cache(Generic[KEY, VALUE]):
     """A simple in-memory cache with time-based expiration."""
 
-    def __init__(self, time_to_live: timedelta, save_on_none: bool = True) -> None:
+    def __init__(
+        self, time_to_live: timedelta | Literal["forever"], save_on_none: bool = True
+    ) -> None:
         self.time_to_live = time_to_live
         self.save_on_none = save_on_none
         self.store: dict[KEY, tuple[VALUE, datetime]] = {}
+
+    @property
+    def size(self) -> int:
+        return len(self.store)
 
     def get(self, key: KEY) -> VALUE | None:
         if key not in self.store:
@@ -24,9 +30,10 @@ class Cache(Generic[KEY, VALUE]):
 
         value, time_set = self.store[key]
         current_time = datetime.now()
-        if current_time - time_set > self.time_to_live:
-            del self.store[key]
-            return None
+        if self.time_to_live != "forever":
+            if (current_time - time_set) > self.time_to_live:  # type: ignore
+                del self.store[key]
+                return None
 
         return value
 
@@ -65,14 +72,20 @@ class CacheFunction(Cache[Any, F]):
     """A decorator class that caches the results of function calls based on their arguments."""
 
     def function(self, func: F) -> F:
+        try:
+            is_method = list(inspect.signature(func).parameters)[0] in ("self", "cls")
+        except IndexError:
+            is_method = False
 
         if inspect.iscoroutinefunction(func):
 
             @functools.wraps(func)
             async def wrapper(*args, **kwargs):  # type: ignore
+                # Keep original args for calling the function, use stripped args for cache key
+                cache_args = args[1:] if is_method else args
 
                 # Create a hashable key from args and kwargs
-                hashable_args = tuple(_make_hashable(arg) for arg in args)
+                hashable_args = tuple(_make_hashable(arg) for arg in cache_args)
                 hashable_kwargs = tuple(
                     sorted((k, _make_hashable(v)) for k, v in kwargs.items())
                 )
@@ -91,8 +104,10 @@ class CacheFunction(Cache[Any, F]):
 
             @functools.wraps(func)
             def wrapper(*args, **kwargs):  # type: ignore
+                # Keep original args for calling the function, use stripped args for cache key
+                cache_args = args[1:] if is_method else args
                 # Create a hashable key from args and kwargs
-                hashable_args = tuple(_make_hashable(arg) for arg in args)
+                hashable_args = tuple(_make_hashable(arg) for arg in cache_args)
                 hashable_kwargs = tuple(
                     sorted((k, _make_hashable(v)) for k, v in kwargs.items())
                 )
@@ -111,42 +126,28 @@ class CacheFunction(Cache[Any, F]):
         return cast(F, wrapper)
 
 
-from pathlib import Path
+def cached(
+    time_to_live: timedelta | Literal["forever"] = timedelta(minutes=10),
+    save_on_none: bool = True,
+) -> Callable[[F], F]:
+    return CacheFunction(time_to_live=time_to_live, save_on_none=save_on_none).function
 
-from models.bancho.scores import Score, Scores
-from models.database.beatmaps import CurrentBeatmap as Beatmap
 
-MD5 = str
-SET_ID = int
-FILE_NAME = str
-beatmap = Cache[MD5, Beatmap](time_to_live=timedelta(minutes=30))
-osu_file_path_by_md5 = Cache[MD5, Path](time_to_live=timedelta(minutes=30))
-osu_files_by_set_id_and_filename = Cache[tuple[SET_ID, FILE_NAME], Path](
-    time_to_live=timedelta(minutes=30)
-)
-osu_file_path_by_beatmap_id_and_set_id = Cache[tuple[int, int], Path](
-    time_to_live=timedelta(minutes=30)
-)
-beatmap_by_md5 = Cache[MD5, Beatmap](time_to_live=timedelta(minutes=30))
-osu_file_path_by_file_name = Cache[FILE_NAME, Path](time_to_live=timedelta(minutes=30))
-beatmap_by_id = Cache[int, Beatmap](time_to_live=timedelta(minutes=30))
-osu_file_path_by_set_id_and_md5 = Cache[tuple[SET_ID, MD5], Path](
-    time_to_live=timedelta(minutes=30)
-)
-score_for_user_on_beatmap_by_md5 = Cache[MD5, Score](time_to_live=timedelta(minutes=5))
-friends_scores_for_beatmap_by_md5 = Cache[MD5, Scores](
-    time_to_live=timedelta(minutes=5)
-)
-get_any_scores_for = CacheFunction(time_to_live=timedelta(minutes=10))
-get_mod_specific_scores_for = CacheFunction(time_to_live=timedelta(minutes=10))
-get_replay = CacheFunction(time_to_live=timedelta(minutes=30))
-get_scores_for = CacheFunction(time_to_live=timedelta(minutes=10))
-get_friends_scores_for_beatmap = CacheFunction(time_to_live=timedelta(minutes=10))
-get_score_for_user_on_beatmap = CacheFunction(time_to_live=timedelta(minutes=5))
-rank_for_pp = CacheFunction(time_to_live=timedelta(hours=1))
-position_for_score = CacheFunction(time_to_live=timedelta(hours=1))
-get_replay_frames_for_score_id = CacheFunction(time_to_live=timedelta(hours=1))
-retrive_osu_file = CacheFunction(time_to_live=timedelta(hours=1))
-retrive_osu_file_from_web = CacheFunction(time_to_live=timedelta(hours=1))
-osu_file_get_by_md5 = CacheFunction(time_to_live=timedelta(hours=1))
-pp = CacheFunction(time_to_live=timedelta(hours=1))
+def cached_for_five_minutes(func: F) -> F:
+    return CacheFunction(time_to_live=timedelta(minutes=5)).function(func)
+
+
+def cached_for_10_minutes(func: F) -> F:
+    return CacheFunction(time_to_live=timedelta(minutes=10)).function(func)
+
+
+def cached_for_30_minutes(func: F) -> F:
+    return CacheFunction(time_to_live=timedelta(minutes=30)).function(func)
+
+
+def cached_for_one_hour(func: F) -> F:
+    return CacheFunction(time_to_live=timedelta(hours=1)).function(func)
+
+
+def cached_forever(func: F) -> F:
+    return CacheFunction(time_to_live="forever").function(func)

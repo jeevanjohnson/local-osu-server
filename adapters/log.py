@@ -1,14 +1,15 @@
 import functools
 import inspect
+import sys
 import traceback
 from datetime import datetime
 
 from colorama import Fore, Style
 
-success = lambda m: print(f"{Fore.GREEN}{m}{Style.RESET_ALL}")
-error = lambda m: print(f"{Fore.RED}{m}{Style.RESET_ALL}")
-warning = lambda m: print(f"{Fore.YELLOW}{m}{Style.RESET_ALL}")
-info = lambda m: print(f"{Fore.CYAN}{m}{Style.RESET_ALL}")
+success = lambda m: print(f"{Fore.GREEN}{m}{Style.RESET_ALL}", file=sys.stderr)
+error = lambda m: print(f"{Fore.RED}{m}{Style.RESET_ALL}", file=sys.stderr)
+warning = lambda m: print(f"{Fore.YELLOW}{m}{Style.RESET_ALL}", file=sys.stderr)
+info = lambda m: print(f"{Fore.CYAN}{m}{Style.RESET_ALL}", file=sys.stderr)
 
 
 def log_time(func):

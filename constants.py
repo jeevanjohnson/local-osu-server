@@ -7,7 +7,7 @@ from pathlib import Path
 
 OSU_CLIENT_REQUEST_URL = "akatsuki.gg"  # The URL that the osu! client will request, which we will redirect to localhost
 LOS_PORT = 5001  # The port on which the local server will run
-LOS_GUI_PORT = 8000  # The port on which the GUI will run
+LOS_INTERFACE_PORT = 8000  # The port on which the GUI will run
 DATA_FOLDER = Path("./.data")
 RESOURCES_FOLDER = Path("./resources")
 PROFILES_FILE = (
@@ -28,4 +28,12 @@ OSU_FILES_FILE = (
 SCORES_FILE = (
     DATA_FOLDER / "scores.json"
 )  # The file where submitted scores will be stored before being processed
+CACHE_SONGS_FOLDER_FILE = (
+    DATA_FOLDER / "songs_folder_cache.json"
+)  # The file where various cache information will be stored (e.g. beatmap md5 to path, beatmap id to path, etc.)
 SEASONAL_BG_GIT_URL = "https://raw.githubusercontent.com/jeevanjohnson/local-osu-server/refs/heads/2026/resources/seasonal_bg.png"
+
+if Path.cwd().name == "LOS2026":
+    DEVELOPER_MODE = True
+else:
+    DEVELOPER_MODE = False

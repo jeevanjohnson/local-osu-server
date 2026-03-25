@@ -1,14 +1,19 @@
+import asyncio
 import functools
-import hashlib
+import json
 import re
+import sys
 from pathlib import Path
-from typing import TypedDict, cast
+from typing import Any, TypedDict
 
 from osupyparser import HitObject
 
-import cache
-from adapters import OsuFile, log, log_time
+import usecases.osu_files
+from adapters import log, log_time
+from adapters.osu_file import OsuFile
+from cache import cached_for_10_minutes, cached_forever
 from models.database.beatmaps import CurrentBeatmap as Beatmap
+from processes.songs_folder import Commands
 
 FILENAME_REGEX = re.compile(
     r"(?P<artist>.*) - (?P<song_name>.*) ((?P<mapper>.*) \[)(?P<diff_name>.*)\]\.osu"
@@ -118,23 +123,6 @@ def extract_adjustments_from_filename(filename: str) -> tuple[Rate, Adjustments]
     return rate, adjustments
 
 
-def is_difficulty_adjusted_from_filename(self, file_name: str) -> bool:
-    # check modified_mp3_list.txt format first
-
-    modified_mp3_list_txt = self.songs_folder / "modified_mp3_list.txt"
-    if not modified_mp3_list_txt.exists():
-        return False
-
-    for line in modified_mp3_list_txt.read_text().splitlines():
-        audio, map_path = line.split(".mp3 | ", maxsplit=1)
-        map_path = Path(map_path)
-
-        if map_path.parent / file_name == map_path:
-            return True
-
-    return False
-
-
 class DifficultyAdjustedFile(OsuFile): ...
 
 
@@ -142,234 +130,96 @@ class PracticeMapFile(OsuFile): ...
 
 
 class OsuFileResolver:
-    def __init__(self, songs_folder: Path) -> None:
-        """
-        Initializes the resolver with the path to the songs folder.
-        Time Complexity: O(1)
-        """
-        self.songs_folder = songs_folder
+    def __init__(self) -> None:
+        pass
 
-    @log_time
-    def from_beatmap_id_and_set_id(
-        self,
-        beatmap_id: int,
-        beatmap_set_id: int,
-        excluded_md5s: set[str] | None = None,
-    ) -> OsuFile | None:
-        """
-        Resolves an OsuFile by beatmap_id and set_id, optionally excluding certain MD5s.
-        Time Complexity: O(1) if cached, O(N) where N is the number of .osu files in the set folder otherwise.
-        """
-        osu_file = cache.osu_file_path_by_beatmap_id_and_set_id.get(
-            (beatmap_id, beatmap_set_id)
+    async def run_command(self, command_name: Commands, parameter: str) -> Any:
+        cmd = [
+            sys.executable,
+            "./processes/songs_folder.py",
+            command_name.value,
+            parameter,
+        ]
+
+        process = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
         )
-        if osu_file is not None:
-            if osu_file.exists():
-                return OsuFile.from_path(osu_file)
-            else:
-                cache.osu_file_path_by_beatmap_id_and_set_id.remove(
-                    (beatmap_id, beatmap_set_id)
-                )
 
-        for set_folder in self.songs_folder.glob(f"{beatmap_set_id}*"):
-            if not set_folder.is_dir():
-                continue
+        output, error = await process.communicate()
 
-            for osu_file in set_folder.glob("*.osu"):
-                if not osu_file.is_file():
+        if process.returncode != 0:
+            log.error(
+                f"Command {command_name} with parameter {parameter} failed with error: {error.decode().strip()}"
+            )
+            return None
+
+        decoded_output = output.decode().strip()
+
+        log.info(
+            f"Command {command_name} with parameter {parameter} returned output: {decoded_output}"
+        )
+
+        try:
+            return json.loads(decoded_output)
+        except json.JSONDecodeError:
+            return decoded_output
+
+    @cached_for_10_minutes
+    async def from_path_to_md5(self, path: Path) -> str | None:
+        md5 = await self.run_command(Commands.GET_MD5_BY_PATH, str(path))
+        if md5 is None:
+            return None
+
+        return md5
+
+    @cached_for_10_minutes
+    async def from_beatmap_id(
+        self, beatmap_id: int, excluded_md5s: set[str] | None = None
+    ) -> list[Path] | None:
+        osu_file_paths: list[str] | None = await self.run_command(
+            Commands.GET_PATH_BY_BEATMAP_ID, str(beatmap_id)
+        )
+        if osu_file_paths is None:
+            return None
+
+        result = []
+
+        for path in osu_file_paths:
+            if excluded_md5s is not None:
+                md5 = await self.from_path_to_md5(Path(path))
+                if md5 in excluded_md5s:
                     continue
 
-                try:
-                    candidate_osu_file = OsuFile.from_path(osu_file)
-                except Exception:
-                    continue
+            result.append(Path(path))
 
-                if candidate_osu_file.beatmap_id != beatmap_id:
-                    continue
+        return result
 
-                if excluded_md5s:
-                    if candidate_osu_file.md5 in excluded_md5s:
-                        continue
+    @cached_for_10_minutes
+    async def from_md5(self, md5: str) -> Path | None:
+        osu_file_path = await self.run_command(Commands.GET_PATH_BY_MD5, md5)
+        if osu_file_path is None:
+            return None
 
-                return candidate_osu_file
+        return Path(osu_file_path)
 
-        return None
+    @cached_for_10_minutes
+    async def from_filename(self, filename: str) -> Path | None:
+        osu_file_path = await self.run_command(Commands.GET_PATH_BY_FILENAME, filename)
+        if osu_file_path is None:
+            return None
 
-    @log_time
-    def from_md5(self, md5: str) -> OsuFile | None:
-        """
-        Resolves an OsuFile by its MD5 hash.
-        Time Complexity: O(1) if cached, O(M) where M is the total number of .osu files in all subfolders (due to full scan and hash computation).
-        """
-        osu_file = cache.osu_file_path_by_md5.get(md5)
-        if osu_file is not None:
-            return OsuFile.from_path(osu_file)
-
-        for osu_file in self.songs_folder.glob("**/*.osu"):
-            if not osu_file.is_file():
-                continue
-
-            match_md5 = hashlib.md5(osu_file.read_bytes()).hexdigest()
-            if match_md5 == md5:
-                cache.osu_file_path_by_md5.set(md5, osu_file)
-                return OsuFile.from_path(osu_file)
-
-        return None
-
-    @log_time
-    def from_set_id_and_md5(self, set_id: int, md5: str) -> OsuFile | None:
-        """
-        Resolves an OsuFile by set_id and MD5 hash.
-        Time Complexity: O(1) if cached, O(K) where K is the number of set folders (worst case: must check each set folder for the file).
-        """
-        osu_file = cache.osu_file_path_by_set_id_and_md5.get((set_id, md5))
-        if osu_file is not None:
-            if osu_file.exists():
-                return OsuFile.from_path(osu_file)
-            else:
-                cache.osu_file_path_by_set_id_and_md5.remove((set_id, md5))
-
-        for set_folder in self.songs_folder.glob(f"{set_id}*"):
-            if not set_folder.is_dir():
-                continue
-
-            for osu_file in set_folder.glob("*.osu"):
-                if not osu_file.is_file():
-                    continue
-
-                candidate_osu_file_md5 = hashlib.md5(osu_file.read_bytes()).hexdigest()
-
-                if candidate_osu_file_md5 != md5:
-                    continue
-
-                cache.osu_file_path_by_set_id_and_md5.set((set_id, md5), osu_file)
-                return OsuFile.from_path(osu_file)
-
-        return None
-
-    @log_time
-    def from_set_id_and_filename(self, set_id: int, filename: str) -> OsuFile | None:
-        """
-        Resolves an OsuFile by set_id and filename.
-        Time Complexity: O(1) if cached, O(K) where K is the number of set folders (worst case: must check each set folder for the file).
-        """
-
-        # TODO: cache by OsuFile?
-        osu_file = cache.osu_files_by_set_id_and_filename.get((set_id, filename))
-
-        if osu_file is not None:
-            if osu_file.exists():
-                return OsuFile.from_path(osu_file)
-            else:
-                cache.osu_files_by_set_id_and_filename.remove((set_id, filename))
-
-        # Look for set folder
-        for set_folder in self.songs_folder.glob(f"{set_id}*"):
-            if not set_folder.is_dir():
-                continue
-
-            osu_file = set_folder / filename
-            if not osu_file.exists():
-                continue
-
-            # Update Cache
-            cache.osu_files_by_set_id_and_filename.set((set_id, filename), osu_file)
-
-            return OsuFile.from_path(osu_file)
-
-        # Nothing found
-        return None
+        return Path(osu_file_path)
 
 
 class DifficultyAdjustedBeatmapResolver:
-    def __init__(self, songs_folder: Path) -> None:
-        self.songs_folder = songs_folder
-        self.osu_file_resolver = OsuFileResolver(songs_folder)
+    def __init__(self) -> None:
+        self.osu_file_resolver = OsuFileResolver()
 
     @log_time
-    def from_modified_mp3_list(self, file_name: str) -> DifficultyAdjustedFile | None:
-        """
-        Resolves a difficulty-adjusted OsuFile by checking modified_mp3_list.txt.
-        Time Complexity: O(L) where L is the number of lines in modified_mp3_list.txt (usually small).
-        """
-        cached_path = cache.osu_file_path_by_file_name.get(file_name)
-        if cached_path is not None:
-            osu_file = OsuFile.from_path(cached_path)
-            return cast(DifficultyAdjustedFile, osu_file)
-
-        modified_mp3_list_txt = self.songs_folder / "modified_mp3_list.txt"
-        if not modified_mp3_list_txt.exists():
-            return None
-
-        for line in modified_mp3_list_txt.read_text().splitlines():
-            audio, map_path = line.split(".mp3 | ", maxsplit=1)
-            map_path = Path(map_path)
-
-            if map_path.parent / file_name == map_path:
-                try:
-                    osu_file = OsuFile.from_path(map_path)
-
-                    cache.osu_file_path_by_file_name.set(file_name, map_path)
-
-                    return cast(DifficultyAdjustedFile, osu_file)
-                except Exception:
-                    log.warning(
-                        f"Failed to parse difficulty-adjusted file from modified_mp3_list.txt for {map_path}"
-                    )
-                    return None
-
-        return None
-
-    @log_time
-    def from_set_id_and_filename(
-        self,
-        set_id: int,
-        filename: str,
-        md5: str | None = None,
-        md5_saftey_check: bool = True,
-    ) -> DifficultyAdjustedFile | None:
-        """
-        Resolves a difficulty-adjusted OsuFile by set_id and filename.
-        Time Complexity: O(1) if cached, O(K) where K is the number of set folders (delegates to OsuFileResolver).
-        """
-        if not valid_difficulty_adjusted_filename(filename):
-            return None
-
-        osu_file = self.from_modified_mp3_list(filename)
-        if osu_file is not None:
-            return osu_file
-
-        osu_file = self.osu_file_resolver.from_set_id_and_filename(set_id, filename)
-
-        if osu_file is None:
-            if md5_saftey_check and md5 is not None:
-                osu_file = self.osu_file_resolver.from_md5(md5)
-                if osu_file is not None:
-                    return None
-            else:
-                return None
-
-        return cast(DifficultyAdjustedFile, osu_file)
-
-    @log_time
-    def from_md5(self, md5: str) -> DifficultyAdjustedFile | None:
-        """
-        Resolves a difficulty-adjusted OsuFile by MD5 hash.
-        Time Complexity: O(1) if cached, O(M) where M is the total number of .osu files in all subfolders (delegates to OsuFileResolver).
-        """
-        osu_file = self.osu_file_resolver.from_md5(md5)
-
-        if osu_file is None:
-            return None
-
-        if not valid_difficulty_adjusted_filename(osu_file.file_name):
-            return None
-
-        return cast(DifficultyAdjustedFile, osu_file)
-
-    @log_time
-    @functools.cache
-    def difficulty_adjusted_map_was_modified(
+    @cached_forever
+    async def difficulty_adjusted_map_was_modified(
         self,
         difficulty_adjusted_osu_file: OsuFile,
         file_name: str | None = None,
@@ -384,18 +234,25 @@ class DifficultyAdjustedBeatmapResolver:
         original_beatmap_set_id = difficulty_adjusted_osu_file.beatmap_set_id
 
         if original_beatmap_id == 0:
-            # these would indicate that the map is a practice map so
+            # these would indicate that the map is a practice/unsubmitted map so
             # TODO: log this case for insight incase of errors
             return False
 
-        original_osu_file = self.osu_file_resolver.from_beatmap_id_and_set_id(
+        original_osu_files = await self.osu_file_resolver.from_beatmap_id(
             original_beatmap_id,
-            original_beatmap_set_id,
             excluded_md5s={difficulty_adjusted_osu_file.md5},
         )
 
-        if original_osu_file is None:
+        if original_osu_files is None:
             return False
+
+        if len(original_osu_files) != 1:
+            log.warning(
+                f"Expected exactly 1 original osu file for beatmap id {original_beatmap_id}, but found {len(original_osu_files)}. Skipping hit object comparison."
+            )
+            return False
+
+        original_osu_file = OsuFile.from_path(original_osu_files[0])
 
         adjusted_hitobjects = difficulty_adjusted_osu_file.hit_objects
         original_hitobjects = original_osu_file.hit_objects
@@ -471,6 +328,7 @@ class DifficultyAdjustedBeatmapResolver:
 
     @staticmethod
     @log_time
+    @cached_forever
     def is_difficulty_adjusted(osu_file: OsuFile, filename_check: bool = True) -> bool:
         """
         Determines if an OsuFile is difficulty-adjusted.
@@ -486,16 +344,41 @@ class DifficultyAdjustedBeatmapResolver:
         return True
 
 
-def osu_file_for_beatmap(beatmap: Beatmap, songs_folder: Path) -> OsuFile | None:
+@cached_for_10_minutes
+async def osu_file_for_beatmap(beatmap: Beatmap) -> OsuFile | None:
 
-    resolver = OsuFileResolver(songs_folder)
+    resolver = OsuFileResolver()
 
-    osu_file = resolver.from_set_id_and_md5(set_id=beatmap.set_id, md5=beatmap.md5)
+    osu_file = await resolver.from_md5(md5=beatmap.md5)
 
     if osu_file is not None:
-        return osu_file
+        return OsuFile.from_path(osu_file)
 
-    # TODO: non difficulty adjusted we can fetch from bancho?
-    # https://osu.ppy.sh/osu/{beatmap_id}
+    if not beatmap.difficulty_adjusted:
+        osu_file = await usecases.osu_files.retrive_osu_file_from_web(beatmap.id)
+
+    return osu_file
+
+
+@cached_for_10_minutes
+async def from_md5(md5: str) -> OsuFile | None:
+    resolver = OsuFileResolver()
+
+    osu_file = await resolver.from_md5(md5)
+
+    if osu_file is not None:
+        return OsuFile.from_path(osu_file)
+
+    return None
+
+
+@cached_for_10_minutes
+async def from_filename(filename: str) -> OsuFile | None:
+    resolver = OsuFileResolver()
+
+    osu_file = await resolver.from_filename(filename)
+
+    if osu_file is not None:
+        return OsuFile.from_path(osu_file)
 
     return None

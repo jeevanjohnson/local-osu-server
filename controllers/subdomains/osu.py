@@ -105,12 +105,6 @@ async def get_leaderboard(
 
     map_filename = urlparse.unquote(map_filename)
 
-    if session.songs_folder is None:
-        await usecases.sessions.silent_restart_client()
-        return Response(
-            OsuErrors.NON.value.encode(),
-        )
-
     leaderboard_type = LeaderboardType(leaderboard_type)
     mode_arg = osuGameMode(mode_arg)
 
@@ -123,7 +117,6 @@ async def get_leaderboard(
             beatmap_md5=map_md5,
             beatmap_set_id=map_set_id,
             map_filename=map_filename,
-            songs_folder=session.songs_folder,
             current_settings=profile.settings,
         )
     except ApiV2CredentialsError:
@@ -219,12 +212,6 @@ async def osuSubmitModularSelector(
     # Mod multiplers change across modes so implementing that
     # for out linear interpolation func, we'd need data points for each mode
 
-    if session.songs_folder is None:
-        await usecases.sessions.silent_restart_client()
-        return Response(
-            OsuErrors.NON.value.encode(),
-        )
-
     if not await usecases.server_settings.credentials_exist():
         await usecases.sessions.restart_client()
         return Response(
@@ -276,7 +263,6 @@ async def osuSubmitModularSelector(
 
     beatmap = await usecases.beatmaps.from_score_submission_request(
         beatmap_md5=score_data.beatmap_md5,
-        songs_folder=session.songs_folder,
         current_settings=profile.settings,
     )
 
@@ -288,12 +274,18 @@ async def osuSubmitModularSelector(
             OsuErrors.BEATMAP.value.encode(),
         )
 
+    # Refresh beatmap status from API to detect any status changes (e.g., PENDING → RANKED)
+    if not beatmap.status.permanent:
+        beatmap = await usecases.beatmaps.refresh_status_from_api(
+            beatmap=beatmap,
+            current_settings=profile.settings,
+        )
+
     if not beatmap.status.has_leaderboard():
         return Response(UNRANKED_CHARTS.serialize())
 
-    osu_file = usecases.songs_folder.osu_file_for_beatmap(
+    osu_file = await usecases.songs_folder.osu_file_for_beatmap(
         beatmap=beatmap,
-        songs_folder=session.songs_folder,
     )
 
     if osu_file is None:
@@ -304,11 +296,6 @@ async def osuSubmitModularSelector(
             OsuErrors.BEATMAP.value.encode(),
         )
 
-    # Store osu! file & audio file in osu_file.json incase of corrupted scores or data
-    # TODO: Could take up too much space, is this necessary?
-    # Is this much protection needed?
-    await usecases.osu_files.store(osu_file)
-
     score = await usecases.score_submission.submit_score(
         score_id=await usecases.scores.generate_score_id(),
         map_file=osu_file,
@@ -318,6 +305,12 @@ async def osuSubmitModularSelector(
         beatmap_md5=beatmap.md5,
         calc_pp=beatmap.status.ranked(),
     )
+
+    # Incase of any difficulty adjustment corruption
+    # lets save the .osu file & audio file here so we can
+    # if needed, recover the beatmap & replay
+    if beatmap.difficulty_adjusted:
+        await usecases.osu_files.store(osu_file, store_audio=True)
 
     try:
         current_profile = await usecases.profiles.recalculate_stats(
@@ -384,15 +377,9 @@ async def osu_rate(
     session: Session = Depends(retrieve_session(OsuErrors.NON)),
     server_settings: ServerSettings = Depends(retrieve_server_settings),
 ):
-    if session.songs_folder is None:
-        await usecases.sessions.silent_restart_client()
-        return Response(
-            OsuErrors.NON.value.encode(),
-        )
 
     beatmap = await usecases.beatmaps.from_md5(
         beatmap_md5=map_md5,
-        songs_folder=session.songs_folder,
         current_settings=profile.settings,
     )
 

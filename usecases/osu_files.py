@@ -1,10 +1,26 @@
-import cache
-from adapters import OsuFile, log
+import aiohttp
+
+from adapters import log
+from adapters.osu_file import OsuFile
+from cache import cached_for_10_minutes, cached_for_30_minutes
 from constants import OSU_FILES_FILE
 from repositories.osu_files import OsuFilesRepository
 
 
-@cache.osu_file_get_by_md5.function
+@cached_for_30_minutes
+async def retrive_osu_file_from_web(beatmap_id: int) -> OsuFile | None:
+    async with aiohttp.ClientSession() as session:
+        async with session.get(f"https://osu.ppy.sh/osu/{beatmap_id}") as response:
+            if response.status != 200:
+                log.warning(
+                    f"Failed to retrieve .osu file for beatmap id {beatmap_id}, status code: {response.status}"
+                )
+                return None
+
+            return OsuFile.from_raw(await response.content.read())
+
+
+@cached_for_10_minutes
 async def get_by_md5(md5: str) -> OsuFile | None:
     osu_files_repo = OsuFilesRepository(OSU_FILES_FILE)
     osu_file = await osu_files_repo.get_by_md5(md5)

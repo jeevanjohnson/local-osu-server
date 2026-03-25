@@ -1,3 +1,4 @@
+import asyncio
 from typing import TYPE_CHECKING
 
 from models.database.scores import (
@@ -42,6 +43,7 @@ class Leaderboard:
         difficulty_adjusted: bool,
         truncate_usernames: bool,
         limit: int,
+        accepted_scores: AcceptedScores,
     ) -> None:
         self.beatmap = beatmap
         self.scores = scores
@@ -50,6 +52,7 @@ class Leaderboard:
         self.difficulty_adjusted = difficulty_adjusted
         self.truncate_usernames = truncate_usernames
         self.limit = limit
+        self.accepted_scores = accepted_scores
 
         if self.personal_best is not None:
             if self.personal_best not in self.scores:
@@ -72,14 +75,12 @@ class Leaderboard:
         if self.personal_best is None:
             return 0
 
-        if self.personal_best in self.scores[: self.limit]:
-            return self.scores.index(self.personal_best) + 1
-        else:
-            return self.scores.position_of_score(
-                self.personal_best,
-                self.scoring_algorithm,
-                beatmap_pass_count=self.beatmap.pass_count,
-            )
+        return self.scores.position_of_score(
+            self.personal_best,
+            self.scoring_algorithm,
+            beatmap_pass_count=self.beatmap.pass_count,
+            leaderboard_limit=self.limit,
+        )
 
     def serialize_personal_best(self) -> LeaderboardScore | None:
         if self.personal_best is None:
@@ -192,6 +193,7 @@ class LeaderboardResolver:
             difficulty_adjusted=beatmap.difficulty_adjusted,
             truncate_usernames=False,
             limit=NO_LEADERBOARD_LIMIT,
+            accepted_scores=AcceptedScores.BOTH,
         )
 
         return self.leaderboard
@@ -230,6 +232,7 @@ class LeaderboardResolver:
             difficulty_adjusted=beatmap.difficulty_adjusted,
             truncate_usernames=False,
             limit=NO_LEADERBOARD_LIMIT,
+            accepted_scores=accepted_scores,
         )
 
         return self.leaderboard
@@ -243,23 +246,23 @@ class LeaderboardResolver:
         limit: int,
         mods: Mods,
     ) -> Leaderboard:
-        bancho = await usecases.bancho_scores.get_mod_specific_scores_for(
-            beatmap=beatmap,
-            game_mode=game_mode,
-            accepted_scores=accepted_scores,
-            mods=mods,
-            ranking_type=self.scoring_algorithm.to_api_v2(),
+        bancho, personal_best = await asyncio.gather(
+            usecases.bancho_scores.get_mod_specific_scores_for(
+                beatmap=beatmap,
+                game_mode=game_mode,
+                accepted_scores=accepted_scores,
+                ranking_type=self.scoring_algorithm.to_api_v2(),
+                mods=mods,
+            ),
+            usecases.scores.personal_best_for_beatmap(
+                beatmap=beatmap,
+                profile_name=self.profile_name,
+                game_mode=game_mode,
+                scoring_algorithm=self.scoring_algorithm,
+                mods=mods,
+            ),
         )
-
         await usecases.sessions.update_avaliable_stable_replay_ids_from_scores(bancho)
-
-        personal_best = await usecases.scores.personal_best_for_beatmap(
-            beatmap=beatmap,
-            profile_name=self.profile_name,
-            game_mode=game_mode,
-            scoring_algorithm=self.scoring_algorithm,
-            mods=mods,
-        )
 
         self.leaderboard = Leaderboard(
             beatmap=beatmap,
@@ -269,6 +272,7 @@ class LeaderboardResolver:
             difficulty_adjusted=beatmap.difficulty_adjusted,
             truncate_usernames=False,
             limit=limit,
+            accepted_scores=accepted_scores,
         )
 
         return self.leaderboard
@@ -282,21 +286,22 @@ class LeaderboardResolver:
         limit: int,
     ) -> Leaderboard:
 
-        bancho = await usecases.bancho_scores.get_any_scores_for(
-            beatmap=beatmap,
-            game_mode=game_mode,
-            accepted_scores=accepted_scores,
-            ranking_type=self.scoring_algorithm.to_api_v2(),
+        bancho, personal_best = await asyncio.gather(
+            usecases.bancho_scores.get_any_scores_for(
+                beatmap=beatmap,
+                game_mode=game_mode,
+                accepted_scores=accepted_scores,
+                ranking_type=self.scoring_algorithm.to_api_v2(),
+            ),
+            usecases.scores.personal_best_for_beatmap(
+                beatmap=beatmap,
+                profile_name=self.profile_name,
+                game_mode=game_mode,
+                scoring_algorithm=self.scoring_algorithm,
+            ),
         )
 
         await usecases.sessions.update_avaliable_stable_replay_ids_from_scores(bancho)
-
-        personal_best = await usecases.scores.personal_best_for_beatmap(
-            beatmap=beatmap,
-            profile_name=self.profile_name,
-            game_mode=game_mode,
-            scoring_algorithm=self.scoring_algorithm,
-        )
 
         self.leaderboard = Leaderboard(
             beatmap=beatmap,
@@ -306,6 +311,7 @@ class LeaderboardResolver:
             difficulty_adjusted=beatmap.difficulty_adjusted,
             truncate_usernames=False,
             limit=limit,
+            accepted_scores=accepted_scores,
         )
 
         return self.leaderboard

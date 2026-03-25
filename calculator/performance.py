@@ -1,7 +1,8 @@
 import rosu_pp_py as rosu
 
-import cache
-from adapters import OsuFile, log, log_time
+from adapters import log, log_time
+from adapters.osu_file import OsuFile
+from cache import cached_forever
 from models.domain.gameplay import Mods, osuGameMode, osuMods
 
 # Mapping from osuGameMode to rosu GameMode
@@ -14,7 +15,7 @@ ROSU_GAME_MODE_MAP: dict[osuGameMode, rosu.GameMode] = {
 
 
 @log_time
-@cache.pp.function
+@cached_forever
 def pp(
     map_file: OsuFile,
     game_mode: osuGameMode,

@@ -1,9 +1,10 @@
 import random
 
-import cache
 import calculator
 import usecases.bancho_scores
+from adapters import log
 from adapters.log import log_time
+from cache import cached_forever
 from constants import SCORES_FILE
 from models.bancho.scores import LazerScore, StableScore
 from models.bancho.scores import Score as BanchoScore
@@ -56,6 +57,7 @@ class AllScores(list[BanchoScore | ProfileScore]):
         target_score: BanchoScore | ProfileScore,
         scoring_algorithm: ScoringAlgorithm,
         beatmap_pass_count: int,
+        leaderboard_limit: int,
     ) -> int:
         """Get the position of a score in the list when sorted by the given scoring algorithm."""
         temp_scores = AllScores(self)
@@ -63,11 +65,21 @@ class AllScores(list[BanchoScore | ProfileScore]):
 
         try:
             position = temp_scores.index(target_score) + 1
+            if self.total < leaderboard_limit:
+                log.info(
+                    f"Target score found in the list of scores, and total scores is less than {leaderboard_limit}, using index as position."
+                )
+                return position
+
+            # This is when we have a total of 51 scores
             last_position = self.total
             if position != last_position:
                 print(f"Found target score at position {position} in sorted scores.")
                 return position
         except ValueError:
+            print(
+                "Target score not found in sorted scores, calculating position using scoring algorithm."
+            )
             if isinstance(target_score, (StableScore, LazerScore)):
                 raise ValueError(
                     "Target score not found in the list of scores. This should not happen since the target score should be included in the list."
@@ -90,14 +102,24 @@ class AllScores(list[BanchoScore | ProfileScore]):
         # 0 - 20 % acc equalling around 0 - 9500 score
         if scoring_algorithm == ScoringAlgorithm.LAZER:
             data_points.append((beatmap_pass_count, random.randint(0, 9500)))
-        else:
+        elif scoring_algorithm == ScoringAlgorithm.PP:
             # play just worth nothing
             data_points.append((beatmap_pass_count, 0))
+        else:
+            raise ValueError(f"Unsupported scoring algorithm: {scoring_algorithm}")
 
-        return calculator.position_for_score(
-            scores_total_score=target_score.total_score,
-            data_points=data_points,
-        )
+        if scoring_algorithm == ScoringAlgorithm.LAZER:
+            return calculator.position_for_score(
+                scores_total_score=target_score.total_score,
+                data_points=data_points,
+            )
+        elif scoring_algorithm == ScoringAlgorithm.PP:
+            return calculator.position_for_score(
+                scores_total_score=target_score.performance_points or 0,
+                data_points=data_points,
+            )
+        else:
+            raise ValueError(f"Unsupported scoring algorithm: {scoring_algorithm}")
 
     def sort(self, scoring_algorithm: ScoringAlgorithm) -> None:
         if scoring_algorithm == ScoringAlgorithm.PP:
@@ -184,7 +206,10 @@ async def score_rank(
     all_scores.append(score)
 
     return all_scores.position_of_score(
-        score, settings.scoring_algorithm, beatmap_pass_count=beatmap.pass_count
+        score,
+        settings.scoring_algorithm,
+        beatmap_pass_count=beatmap.pass_count,
+        leaderboard_limit=settings.leaderboard.leaderboard_score_limit,
     )
 
 
@@ -382,7 +407,7 @@ async def personal_best_for_beatmap(
 
 
 @log_time
-@cache.get_replay_frames_for_score_id.function
+@cached_forever
 async def get_replay_frames_for_score_id(score_id: int) -> bytes | None:
     """Get replay frames for a given score ID, if available."""
     scores_repo = ScoresRepository(SCORES_FILE)

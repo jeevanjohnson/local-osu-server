@@ -1,23 +1,31 @@
+from typing import TYPE_CHECKING
+
 from ossapi import OssapiV1
 
-from adapters import OssapiAsync
+from cache import cached_forever
 from constants import SERVER_SETTINGS_FILE
 from repositories.server_settings import ServerSettingsRepository
 
 from .osu_daily import OsuDailyCredentialsError as OsuDailyCredentialsError
+
+if TYPE_CHECKING:
+    from adapters import OssapiAsync
 
 
 class ApiV2CredentialsError(Exception):
     pass
 
 
-async def get_ossapi_async() -> OssapiAsync:
+@cached_forever
+async def get_ossapi_async() -> "OssapiAsync":
     """
     Reads credentials from ServerSettingsRepository and constructs OssapiAsync.
     Raises ApiV2CredentialsError if credentials are absent or invalid.
     Single source of truth — replaces the duplicated get_ossapi() in
     usecases/scores.py and usecases/beatmaps.py.
     """
+    from adapters import OssapiAsync
+
     server_settings_repo = ServerSettingsRepository(SERVER_SETTINGS_FILE)
     server_settings = await server_settings_repo.get_server_settings()
 
@@ -44,6 +52,7 @@ async def get_ossapi_async() -> OssapiAsync:
     return osuApiAsync
 
 
+@cached_forever
 async def get_ossapi_v1() -> OssapiV1:
     """
     Same pattern as above for v1.

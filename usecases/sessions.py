@@ -3,14 +3,9 @@ Purpose/Domain/Concept:
 - This file contains the logic related to sessions.
 """
 
-import os
-from pathlib import Path
-
-import psutil
-
 import usecases.profiles
 from adapters import log, log_time
-from constants import SERVER_SETTINGS_FILE, SESSIONS_FILE
+from constants import SESSIONS_FILE
 from models.bancho.scores import Scores, StableScore
 from models.database.sessions import CurrentSession as Session
 from models.domain.errors import ProfileNotFoundError, SessionNotFoundError
@@ -19,7 +14,6 @@ from osuProtocol.server_packets import (
     Notification,
     PlayerStats,
 )
-from repositories.server_settings import ServerSettingsRepository
 from repositories.sessions import SessionRepository
 
 
@@ -159,81 +153,6 @@ async def clear_packet_queue() -> Session | None:
     await update_current_session(session)
 
     return session
-
-
-@log_time
-async def retrieve_songs_folder() -> Path | None:
-    server_settings_repo = ServerSettingsRepository(SERVER_SETTINGS_FILE)
-    settings = await server_settings_repo.get_server_settings()
-
-    if settings.osu_songs_folder_override:
-        return settings.osu_songs_folder_override
-
-    processes = [
-        process for process in psutil.process_iter() if process.name() == "osu!.exe"
-    ]
-
-    if not processes:
-        log.warning(
-            "Attempted to retrieve songs folder but osu! process was not found."
-        )
-        return None  # raise error that osu! process was not found, cannot retrieve songs folder
-
-    osu_path = Path(processes[0].exe())
-
-    cfg_path: Path | None = None
-    for cfg_file in osu_path.parent.glob("osu!.*.cfg"):
-        if cfg_file.is_file():
-            cfg_path = cfg_file
-            break
-
-    if cfg_path is None:
-        log.warning(
-            "Attempted to retrieve songs folder but osu! cfg file was not found."
-        )
-        return None  # raise error that osu! cfg file was not found, cannot retrieve songs folder
-
-    raw_cfg = cfg_path.read_text(errors="ignore")
-    songs_folder: str | None = None
-    for line in raw_cfg.splitlines():
-        line = line.strip()
-
-        if line.startswith("BeatmapDirectory"):
-            songs_folder = line.split("=")[1].strip()
-            break
-
-    if songs_folder is None:
-        log.warning(
-            "Attempted to retrieve songs folder but songs folder path was not found in osu! cfg file."
-        )
-        return None  # raise error that songs folder path was not found in cfg file, cannot retrieve songs folder
-
-    if os.path.isabs(songs_folder):
-        return Path(songs_folder)
-    else:
-        return osu_path.parent / songs_folder
-
-
-@log_time
-async def retrieve_replays_folder() -> Path | None:
-    server_settings_repo = ServerSettingsRepository(SERVER_SETTINGS_FILE)
-    settings = await server_settings_repo.get_server_settings()
-
-    if settings.osu_replay_folder_override:
-        return settings.osu_replay_folder_override
-
-    processes = [
-        process for process in psutil.process_iter() if process.name() == "osu!.exe"
-    ]
-
-    if not processes:
-        log.warning(
-            "Attempted to retrieve replays folder but osu! process was not found."
-        )
-        return None  # raise error that osu! process was not found, cannot retrieve replays folder
-
-    osu_path = Path(processes[0].exe())
-    return osu_path.parent / "Replays"
 
 
 async def update_avaliable_stable_replay_ids_from_ids(ids: list[int]) -> None:

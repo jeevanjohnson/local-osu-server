@@ -3,7 +3,7 @@ import base64
 from jays_tools import MigratableModel
 from pydantic import ConfigDict, Field, field_serializer, field_validator
 
-from adapters import OsuFile
+from adapters.osu_file import OsuFile
 
 
 class OsuFileEntryV1(MigratableModel):

@@ -7,111 +7,64 @@ from install_dependencies import install_dependencies
 
 install_dependencies()
 
-import asyncio  # noqa: E402
-import multiprocessing  # noqa: E402
-import os  # noqa: E402
-import sys  # noqa: E402
-from typing import Callable  # noqa: E402
+import multiprocessing
+import sys
 
-import uvicorn  # noqa: E402
-import webview  # noqa: E402
-
-from constants import LOS_GUI_PORT, LOS_PORT  # noqa: E402
-
-PROCESSES: dict[str, multiprocessing.Process] = {}
-
-
-def _run_with_graceful_shutdown(func: Callable) -> None:
-    try:
-        func()
-    except KeyboardInterrupt:
-        print("Shutting down gracefully...")
-
-
-def process(func: Callable, daemon: bool = True) -> Callable:
-    PROCESSES[func.__name__] = multiprocessing.Process(
-        target=_run_with_graceful_shutdown, args=(func,), daemon=daemon
-    )
-
-    return func
-
-
-@process
-def middleman_proxy():
-    print("Proxy server is running!")
-
-    os.system("mitmdump -s middleman.py -q")
-
-
-@process
-def local_server():
-    uvicorn.run(
-        "server:app",
-        host="127.0.0.1",
-        port=LOS_PORT,
-        # access_log=False,
-        # log_level="critical",
-    )
-
-
-@process
-def gui():
-    os.system(f"{sys.executable} gui.py")
-
-
-@process
-def open_gui():
-    import usecases.sessions
-
-    if asyncio.run(usecases.sessions.session_exists()):
-        url = f"http://localhost:{LOS_GUI_PORT}/dashboard"
-    else:
-        url = f"http://localhost:{LOS_GUI_PORT}/"
-
-    webview.create_window(
-        title="Los!",
-        url=url,
-        resizable=True,
-        frameless=True,
-        draggable=True,
-    )
-    webview.start()
-
-
-def start_services():
-    for process_name, process in PROCESSES.items():
-        print(f"Starting {process_name}...")
-        process.start()
-
-
-def keep_alive():
-    for process_name, process in PROCESSES.items():
-        process.join()  # Wait for the process to finish, overwritten with daemon=True,
-        # so it will run until the main process is killed
-
-        print(f"{process_name} has stopped.")
-
-
-def shutdown_services():
-    print("Shutting down all services...")
-    for process_name, process in PROCESSES.items():
-        if process.is_alive():
-            print(f"Terminating {process_name}...")
-            process.terminate()
-            process.join()
-    print("All services have been shut down.")
+from adapters import log
+from processes import (
+    interface_process,
+    los_process,
+    proxy_process,
+    songs_folder_process,
+)
 
 
 def main():
-    start_services()
+
+    processes: list[multiprocessing.Process] = [
+        multiprocessing.Process(target=process, daemon=True, name=process.__name__)
+        for process in [
+            songs_folder_process,
+            proxy_process,
+            los_process,
+            interface_process,
+        ]
+    ]
+
+    for process in processes:
+        log.info(f"Starting {process.name}...")
+        process.start()
+        log.success(f"Succesfully started {process.name}")
 
     try:
-        keep_alive()
+        while any(p.is_alive() for p in processes):
+            for process in processes:
+                process.join(timeout=1)
+                if not process.is_alive() and process.exitcode != 0:
+                    log.error(f"{process.name} exited with code {process.exitcode}")
+
     except KeyboardInterrupt:
-        print("Shutting down all services...")
-        shutdown_services()
-        print("All services have been shut down.")
+        pass
+
+    finally:
+        for process in processes:
+            if process.is_alive():
+                log.info(f"Terminating {process.name}...")
+                process.terminate()
+                process.join(timeout=5)
+
+                if process.is_alive():
+                    log.warning(f"{process.name} did not stop, killing...")
+                    process.kill()
+                    process.join()
+
+                log.success(f"Succesfully terminated {process.name}!")
+            else:
+                log.warning(f"{process.name} was already dead")
+
+    sys.exit(130)
 
 
 if __name__ == "__main__":
+    install_dependencies()
     main()

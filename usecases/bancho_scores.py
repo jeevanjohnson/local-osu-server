@@ -4,9 +4,10 @@ import ossapi.enums
 import ossapi.models
 from ossapi import UserCompact
 
-import cache
 import usecases.performance
+import usecases.songs_folder
 from adapters import log
+from cache import cached_for_10_minutes
 from models.bancho.scores import Combo, LazerScore, Mods, Scores, StableScore
 from models.database.beatmaps import (
     CurrentBeatmap as Beatmap,
@@ -53,13 +54,19 @@ async def api_to_score_model(
 
     score_id = api_to_score_id(score)
     score_mods = Mods.from_api_v2(score.mods)
+    osu_file = await usecases.songs_folder.from_md5(beatmap.md5)
+
+    if osu_file is None:
+        log.warning(
+            f"Could not find .osu file for beatmap {beatmap.id} with md5 {beatmap.md5}, performance points will not be calculated for score {score_id}"
+        )
+        raise Exception
 
     if score.pp is None:
         pp = await usecases.performance.calc_pp_for_api_score(
             score=score,
-            beatmap_id=beatmap.id,
-            beatmap_md5=beatmap.md5,
             game_mode=game_mode,
+            osu_file=osu_file,
         )
     else:
         pp = int(score.pp)
@@ -83,16 +90,16 @@ async def api_to_score_model(
     )
 
 
-@cache.get_score_for_user_on_beatmap.function
+@cached_for_10_minutes
 async def get_score_for_user_on_beatmap(
     beatmap: Beatmap,
     game_mode: osuGameMode,
     user_id: int,
     accepted_scores: AcceptedScores,
 ) -> StableScore | LazerScore | None:
-    score = cache.score_for_user_on_beatmap_by_md5.get(beatmap.md5)
-    if score is not None:
-        return score
+    # score = cache.score_for_user_on_beatmap_by_md5.get(beatmap.md5)
+    # if score is not None:
+    #     return score
 
     osuApi = await get_ossapi_async()
 
@@ -126,23 +133,27 @@ async def get_score_for_user_on_beatmap(
         log.info(f"No score data found for user {user_id} on beatmap {beatmap.id}")
         return None
 
-    score = await api_to_score_model(score, beatmap, game_mode)
+    score = await api_to_score_model(
+        score,
+        beatmap,
+        game_mode,
+    )
 
-    cache.score_for_user_on_beatmap_by_md5.set(beatmap.md5, score)
+    # cache.score_for_user_on_beatmap_by_md5.set(beatmap.md5, score)
 
     return score
 
 
-@cache.get_friends_scores_for_beatmap.function
+@cached_for_10_minutes
 async def get_friends_scores_for_beatmap(
     beatmap: Beatmap,
     game_mode: osuGameMode,
     accepted_scores: AcceptedScores,
     friends_user_ids: list[int],
 ) -> Scores:
-    cached_scores = cache.friends_scores_for_beatmap_by_md5.get(beatmap.md5)
-    if cached_scores is not None:
-        return cached_scores
+    # cached_scores = cache.friends_scores_for_beatmap_by_md5.get(beatmap.md5)
+    # if cached_scores is not None:
+    #     return cached_scores
 
     friends_scores: list[StableScore | LazerScore] = []
 
@@ -161,12 +172,13 @@ async def get_friends_scores_for_beatmap(
 
     scores = Scores(all_scores=friends_scores)
 
-    cache.friends_scores_for_beatmap_by_md5.set(beatmap.md5, scores)
+    # cache.friends_scores_for_beatmap_by_md5.set(beatmap.md5, scores)
 
     return scores
 
 
-@cache.get_scores_for.function
+@cached_for_10_minutes
+@log.log_time
 async def get_scores_for(
     beatmap: Beatmap,
     game_mode: osuGameMode,
@@ -227,7 +239,8 @@ async def get_scores_for(
     return scores
 
 
-@cache.get_any_scores_for.function
+@cached_for_10_minutes
+@log.log_time
 async def get_any_scores_for(
     beatmap: Beatmap,
     game_mode: osuGameMode,
@@ -243,7 +256,7 @@ async def get_any_scores_for(
     )
 
 
-@cache.get_mod_specific_scores_for.function
+@cached_for_10_minutes
 async def get_mod_specific_scores_for(
     beatmap: Beatmap,
     game_mode: osuGameMode,
@@ -260,7 +273,7 @@ async def get_mod_specific_scores_for(
     )
 
 
-@cache.get_replay.function
+@cached_for_10_minutes
 async def get_replay(score_id: int, beatmap_md5: str | None = None) -> bytes | None:
     """Returns compatible stable replay frames for the given score ID or None if it doesn't match the conditions"""
     # Check if replay is available for this score & md5's match

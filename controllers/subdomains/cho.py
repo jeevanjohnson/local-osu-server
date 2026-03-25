@@ -14,6 +14,7 @@ import usecases.gui
 import usecases.profiles
 import usecases.server_settings
 import usecases.sessions
+import usecases.songs_folder
 from adapters import log, log_time
 from models.domain.errors import ProfileNotFoundError, SessionNotFoundError
 from osuProtocol.client_packets import (
@@ -131,8 +132,6 @@ async def client_request_handler(
 
         session.osu_client.opened = True
         session.osu_client.logged_in_at = datetime.now()
-        session.songs_folder = await usecases.sessions.retrieve_songs_folder()
-        session.replays_folder = await usecases.sessions.retrieve_replays_folder()
 
         await usecases.sessions.update_current_session(session)
 

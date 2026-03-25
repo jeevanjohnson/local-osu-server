@@ -8,6 +8,8 @@ from pathlib import Path
 from osupyparser import OsuFile as BaseOsuFile
 from osupyparser.osu.constants import OSU_FILE_HEADER
 
+from cache import cached_forever
+
 PACKED_MAGIC = b"LOS2"
 PACKED_HEADER = struct.Struct("<4sBII")
 PACKED_FLAG_AUDIO_COMPRESSED = 0b00000001
@@ -36,6 +38,7 @@ class OsuFile(BaseOsuFile):
         return self.beatmap_id == 0
 
     @classmethod
+    @cached_forever
     def from_path(
         cls,
         file_path: str | Path,
@@ -50,6 +53,7 @@ class OsuFile(BaseOsuFile):
         return parsed_file
 
     @classmethod
+    @cached_forever
     def from_raw(
         cls,
         raw_file: bytes,
