@@ -17,6 +17,7 @@ from osuProtocol.osuTypes import (
     osuIntUnsigned32Bit,
     osuString,
     osuUnsignedChar,
+    osuIntUnSigned32List
 )
 
 
@@ -251,7 +252,16 @@ class Ping(Packet):
 
     def __repr__(self) -> str:
         return "<Ping Packet>"
+    
+@handles(ClientPackets.USER_STATS_REQUEST)
+@dataclass
+class UserStatsRequest(Packet):
+    user_ids: osuIntUnSigned32List = field(init=False)
 
+@handles(ClientPackets.FRIEND_REMOVE)
+@dataclass
+class FriendRemove(Packet):
+    friend_user_id: osuIntUnsigned32Bit = field(init=False)
 
 class Packets(list[Packet]):
     def __init__(self, raw_packet_data: bytes) -> None:

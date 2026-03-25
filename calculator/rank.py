@@ -25,6 +25,7 @@ def local_rank_for_pp(pp: PP, game_mode: osuGameMode) -> RANK:
             (9_444, 9951),
             (5133, 96478),
             (937, 918194),
+            (611, 1_171_307),
             (0, 26_971_582),
         ]
     else:

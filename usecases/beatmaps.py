@@ -248,6 +248,7 @@ class BeatmapResolver:
     async def from_difficulty_adjusted_request(
         self, beatmap_md5: str, beatmap_set_id: int, map_filename: str
     ) -> Beatmap | None:
+        print(f"Attempting to resolve difficulty-adjusted beatmap for md5 {beatmap_md5}, set id {beatmap_set_id}, filename {map_filename}")
         difficulty_adjusted_osu_file = await usecases.songs_folder.from_filename(
             map_filename
         )
@@ -255,6 +256,7 @@ class BeatmapResolver:
         if difficulty_adjusted_osu_file is None:
             return None
 
+        print(f"Found osu file for difficulty-adjusted beatmap with filename {map_filename}, checking if it's valid for difficulty adjustment")
         original_beatmap = await self.from_db(
             beatmap_id=difficulty_adjusted_osu_file.beatmap_id
         )

@@ -130,41 +130,81 @@ class PracticeMapFile(OsuFile): ...
 
 
 class OsuFileResolver:
-    def __init__(self) -> None:
-        pass
+    _instance: "OsuFileResolver | None" = None
+    _process: "asyncio.subprocess.Process | None" = None
+    _lock: asyncio.Lock | None = None
 
-    async def run_command(self, command_name: Commands, parameter: str) -> Any:
-        cmd = [
-            sys.executable,
-            "./processes/songs_folder.py",
-            command_name.value,
-            parameter,
-        ]
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+            cls._instance._lock = asyncio.Lock()
+        return cls._instance
 
-        process = await asyncio.create_subprocess_exec(
-            *cmd,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-
-        output, error = await process.communicate()
-
-        if process.returncode != 0:
-            log.error(
-                f"Command {command_name} with parameter {parameter} failed with error: {error.decode().strip()}"
+    async def _ensure_subprocess(self) -> "asyncio.subprocess.Process":
+        """Ensure subprocess is running, restarting if needed."""
+        if self._process is None or self._process.returncode is not None:
+            # Subprocess dead or not started; spawn new one
+            self._process = await asyncio.create_subprocess_exec(
+                sys.executable,
+                "./processes/songs_folder.py",
+                "--interactive",
+                stdin=asyncio.subprocess.PIPE,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
             )
-            return None
+            
+            # Wait for "ready" confirmation with timeout
+            try:
+                assert self._process.stdout is not None
+                line = await asyncio.wait_for(
+                    self._process.stdout.readline(), timeout=5.0
+                )
+                response = line.decode().strip()
+                if "ready" not in response.lower():
+                    log.warning(f"Subprocess startup message: {response}")
+            except asyncio.TimeoutError:
+                log.error("Subprocess failed to start")
+                self._process = None
+                raise
+        
+        return self._process
 
-        decoded_output = output.decode().strip()
-
-        log.info(
-            f"Command {command_name} with parameter {parameter} returned output: {decoded_output}"
-        )
-
-        try:
-            return json.loads(decoded_output)
-        except json.JSONDecodeError:
-            return decoded_output
+    @log_time
+    async def run_command(self, command_name: Commands, parameter: str) -> Any:
+        assert self._lock is not None
+        async with self._lock:
+            process = await self._ensure_subprocess()
+            
+            # Send command via stdin
+            cmd_line = f"{command_name.value}|{parameter}\n"
+            assert process.stdin is not None
+            process.stdin.write(cmd_line.encode())
+            await process.stdin.drain()
+            
+            # Read response from stdout
+            assert process.stdout is not None
+            response_line = await process.stdout.readline()
+            decoded = response_line.decode().strip()
+            
+            if not decoded:
+                log.error(f"No response from subprocess for command {command_name}")
+                return None
+            
+            try:
+                response_data = json.loads(decoded)
+                
+                if "error" in response_data:
+                    log.error(f"Command error: {response_data['error']}")
+                    return None
+                
+                result = response_data.get("result")
+                log.info(
+                    f"Command {command_name} with parameter {parameter} returned output: {result}"
+                )
+                return result
+            except json.JSONDecodeError as e:
+                log.error(f"Failed to decode response: {decoded} - {e}")
+                return None
 
     @cached_for_10_minutes
     async def from_path_to_md5(self, path: Path) -> str | None:
@@ -210,7 +250,7 @@ class OsuFileResolver:
         if osu_file_path is None:
             return None
 
-        return Path(osu_file_path)
+        return Path(osu_file_path).absolute()
 
 
 class DifficultyAdjustedBeatmapResolver:
@@ -374,6 +414,7 @@ async def from_md5(md5: str) -> OsuFile | None:
 
 @cached_for_10_minutes
 async def from_filename(filename: str) -> OsuFile | None:
+    print(f"Attempting to resolve osu file for filename: {filename}")
     resolver = OsuFileResolver()
 
     osu_file = await resolver.from_filename(filename)

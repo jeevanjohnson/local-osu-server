@@ -8,14 +8,18 @@ from typing import Any, Callable, Coroutine, Literal, TypeVar
 
 from fastapi import APIRouter, Header, Request, Response
 
-import usecases.beatmaps
+import usecases.bancho_users
 import usecases.cho
 import usecases.gui
 import usecases.latency
+from models.database.sessions import (
+    CurrentSession as Session,
+)
 import usecases.profiles
 import usecases.server_settings
 import usecases.sessions
 import usecases.songs_folder
+from cache import cached_forever
 from adapters import log, log_time
 from models.domain.errors import ProfileNotFoundError, SessionNotFoundError
 from osuProtocol.client_packets import (
@@ -25,6 +29,8 @@ from osuProtocol.client_packets import (
     Packet,
     Packets,
     Ping,
+    UserStatsRequest,
+    FriendRemove
 )
 from osuProtocol.server_packets import (
     Login,
@@ -35,6 +41,8 @@ from osuProtocol.server_packets import (
     osuAction,
     osuGameMode,
     osuMods,
+    BanchoBot,
+    LogOut as PlayerLogOut
 )
 from osuProtocol.server_packets import Packet as ServerPacket
 from osuProtocol.server_packets import Packets as ServerPackets
@@ -130,6 +138,12 @@ async def client_request_handler(
             latency=api_latency,
         )
 
+        login_response += await usecases.bancho_users.get_friends_client_status(
+            user_ids=profile.friend_ids,
+            game_mode=session.current_game_mode,
+            presence_aware=True
+        )
+
         session.osu_client.opened = True
         session.osu_client.logged_in_at = datetime.now()
 
@@ -157,42 +171,37 @@ async def client_request_handler(
             )
             continue
 
-        emergency_response: ServerPackets | ServerPacket | None = await PACKET_HANDLERS[
+        response: ServerPackets | ServerPacket | None = await PACKET_HANDLERS[
             ClientPackets(packet._id)
-        ](packet)
+        ](packet, session)
 
-        if emergency_response is not None:
-            return Response(
-                content=emergency_response.build(),
-            )
+        if response is not None:
+            session.packet_queue += response.build()
 
-    if not session.packet_queue:
-        return Response(content=b"")
+    print(f"Finished processing {len(incoming_packets)} incoming packets. Sending {len(session.packet_queue)} packets in response.")
 
     response_packets = session.packet_queue
-
     await usecases.sessions.clear_packet_queue()
 
     return Response(content=response_packets)
 
 
-PACKET_HANDLERS: dict[
-    ClientPackets,
-    Callable[[Packet], Coroutine[Any, Any, ServerPackets | ServerPacket | None]],
-] = {}
 PacketType = TypeVar("PacketType", bound=Packet)
 PACKET_HANDLER = Callable[
-    [PacketType], Coroutine[Any, Any, ServerPackets | ServerPacket | None]
+    [PacketType, Session], Coroutine[Any, Any, ServerPackets | ServerPacket | None]
 ]
-
+PACKET_HANDLERS: dict[
+    ClientPackets,
+    PACKET_HANDLER,
+] = {}
 
 def register_packet_handler(packet_id: ClientPackets, packet_type: type[PacketType]):
     def inner(func: PACKET_HANDLER) -> PACKET_HANDLER:
-        async def wrapper(packet: Packet) -> ServerPackets | ServerPacket | None:
+        async def wrapper(packet: Packet, session: Session) -> ServerPackets | ServerPacket | None:
             if not isinstance(packet, packet_type):
                 return None
 
-            return await func(packet)
+            return await func(packet, session)
 
         PACKET_HANDLERS[packet_id] = wrapper
         return func
@@ -201,20 +210,13 @@ def register_packet_handler(packet_id: ClientPackets, packet_type: type[PacketTy
 
 
 @register_packet_handler(ClientPackets.PING, packet_type=Ping)
-async def handle_ping(packet: Ping) -> ServerPackets | ServerPacket | None:
+async def handle_ping(packet: Ping, session: Session) -> ServerPackets | ServerPacket | None:
     return
 
 
 @register_packet_handler(ClientPackets.CHANGE_ACTION, packet_type=ChangeAction)
 @log_time
-async def on_action_change(packet: ChangeAction) -> ServerPackets | ServerPacket | None:
-    # This should be taken care of via the decorater to remove redundancy
-    # and be passed in as a parameter along with the packet
-    try:
-        session = await usecases.sessions.require_current_session()
-    except SessionNotFoundError:
-        return SilentRelog
-
+async def on_action_change(packet: ChangeAction, session: Session) -> ServerPackets | ServerPacket | None:
     try:
         profile = await usecases.profiles.require_profile(session.profile_name)
     except ProfileNotFoundError:
@@ -242,8 +244,8 @@ async def on_action_change(packet: ChangeAction) -> ServerPackets | ServerPacket
         session.current_game_mode
     ].performance_points
 
-    packet_enqueue = ServerPackets()
-    packet_enqueue += PlayerStats(
+    response = ServerPackets()
+    response += PlayerStats(
         user_id=2,
         action=osuAction(packet.action.value),
         info_text=packet.info_text.value,
@@ -259,18 +261,12 @@ async def on_action_change(packet: ChangeAction) -> ServerPackets | ServerPacket
         performance_points=performance_points,
     )
 
-    session.packet_queue += packet_enqueue.build()
-    await usecases.sessions.update_current_session(session)
+    return response
 
 
 @register_packet_handler(ClientPackets.LOGOUT, packet_type=LogOut)
 @log_time
-async def on_logout(packet: LogOut):
-    try:
-        session = await usecases.sessions.require_current_session()
-    except SessionNotFoundError:
-        return
-
+async def on_logout(packet: LogOut, session: Session) -> ServerPackets | ServerPacket | None:
     # osu! client logs out as soon as the user logs in
     # just ensure that this packet is a valid logout
     # 1+ s after login
@@ -286,3 +282,55 @@ async def on_logout(packet: LogOut):
     session.packet_queue = b""
 
     await usecases.sessions.update_current_session(session)
+
+@register_packet_handler(ClientPackets.USER_STATS_REQUEST, packet_type=UserStatsRequest)
+@log_time
+# @cached_forever
+# @cache_
+async def on_user_stats_request(packet: UserStatsRequest, session: Session) -> ServerPackets | ServerPacket | None:
+    user_ids = packet.user_ids.value
+    print(user_ids)
+
+    response = ServerPackets()
+
+    if 3 in user_ids: # BanchoBot
+        # print("User stats request includes BanchoBot. Adding BanchoBot packet to response.")
+        response += BanchoBot(
+            latency= await usecases.latency.bancho_api()
+        )
+        user_ids.remove(3)
+    
+    if 2 in user_ids: # The user
+        # print("User stats request includes the user themselves. Adding player stats packet to response.")
+        await usecases.sessions.update_current_session(session)
+        user_ids.remove(2)
+
+    response += await usecases.bancho_users.get_friends_client_status(
+        user_ids=user_ids, 
+        game_mode=session.current_game_mode,
+        presence_aware=True
+    )
+    
+    return response
+
+@register_packet_handler(ClientPackets.FRIEND_REMOVE, packet_type=FriendRemove)
+@log_time
+async def on_friend_remove(packet: FriendRemove, session: Session) -> ServerPackets | ServerPacket | None:
+    friend_user_id = packet.friend_user_id.value
+    print(f"Received friend remove packet for user ID {friend_user_id}. Removing from session's friend list if present.")
+
+    if friend_user_id in (2, 3):
+        print(f"Received friend remove packet for special user ID {friend_user_id} (the user themselves or BanchoBot). Ignoring.")
+        return
+
+    try:
+        profile = await usecases.profiles.require_profile(session.profile_name)
+    except ProfileNotFoundError:
+        return SilentRelog
+    
+    if friend_user_id in profile.friend_ids:
+        await usecases.profiles.remove_friend_from_profile(session.profile_name, friend_user_id)
+        print(f"Removed user ID {friend_user_id} from profile's friend list.")
+    
+    # log out so we don't request information from them again
+    return PlayerLogOut(friend_user_id)

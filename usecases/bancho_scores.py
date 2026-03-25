@@ -4,10 +4,12 @@ import ossapi.enums
 import ossapi.models
 from ossapi import UserCompact
 
+from osuProtocol.client_web import ScoringAlgorithm
+from ossapi.enums import ScoreType
 import usecases.performance
 import usecases.songs_folder
 from adapters import log
-from cache import cached_for_10_minutes
+from cache import cached_for_10_minutes, cached_for_five_minutes
 from models.bancho.scores import Combo, LazerScore, Mods, Scores, StableScore
 from models.database.beatmaps import (
     CurrentBeatmap as Beatmap,
@@ -15,7 +17,6 @@ from models.database.beatmaps import (
 from models.domain.gameplay import osuGameMode
 from osuProtocol.replay import extract_replay_frames_from_osr
 from usecases.providers import get_ossapi_async
-
 
 class AcceptedScores(Enum):
     LAZER_ONLY = "lazer_only"
@@ -42,8 +43,13 @@ def api_to_score_id(score: ossapi.models.Score) -> int:
 
 async def api_to_score_model(
     score: ossapi.models.Score,
-    beatmap: Beatmap,
+    # beatmap: Beatmap,
+    beatmap_md5: str,
+    beatmap_id: int,
+    beatmap_max_combo: int,
     game_mode: osuGameMode,
+    scoring_algorithm: ScoringAlgorithm = ScoringAlgorithm.LAZER, # TODO: safe?
+    pp_calc_fallback: bool = True
 ) -> StableScore | LazerScore:
     user: UserCompact = score._ossapi_data["_user"]
 
@@ -54,20 +60,24 @@ async def api_to_score_model(
 
     score_id = api_to_score_id(score)
     score_mods = Mods.from_api_v2(score.mods)
-    osu_file = await usecases.songs_folder.from_md5(beatmap.md5)
+    osu_file = await usecases.songs_folder.from_md5(beatmap_md5)
 
     if osu_file is None:
         log.warning(
-            f"Could not find .osu file for beatmap {beatmap.id} with md5 {beatmap.md5}, performance points will not be calculated for score {score_id}"
+            f"Could not find .osu file for beatmap {beatmap_id} with md5 {beatmap_md5}, "
+            f"performance points will not be calculated for score {score_id}"
         )
         raise Exception
 
     if score.pp is None:
-        pp = await usecases.performance.calc_pp_for_api_score(
-            score=score,
-            game_mode=game_mode,
-            osu_file=osu_file,
-        )
+        if scoring_algorithm == ScoringAlgorithm.PP and pp_calc_fallback:
+            pp = await usecases.performance.calc_pp_for_api_score(
+                score=score,
+                game_mode=game_mode,
+                osu_file=osu_file,
+            )
+        else:
+            pp = 0 # TODO: is this right?
     else:
         pp = int(score.pp)
 
@@ -75,7 +85,7 @@ async def api_to_score_model(
         score_id=score_id,
         username=user.username,
         total_score_value=score.total_score,
-        combo=Combo(actual=score.max_combo, max=beatmap.max_combo),
+        combo=Combo(actual=score.max_combo, max=beatmap_max_combo),
         count50=score.statistics.meh or 0,
         count100=score.statistics.ok or 0,
         count300=score.statistics.great or 0,
@@ -96,6 +106,7 @@ async def get_score_for_user_on_beatmap(
     game_mode: osuGameMode,
     user_id: int,
     accepted_scores: AcceptedScores,
+    scoring_algorithm: ScoringAlgorithm,
 ) -> StableScore | LazerScore | None:
     # score = cache.score_for_user_on_beatmap_by_md5.get(beatmap.md5)
     # if score is not None:
@@ -134,9 +145,12 @@ async def get_score_for_user_on_beatmap(
         return None
 
     score = await api_to_score_model(
-        score,
-        beatmap,
-        game_mode,
+        score=score,
+        beatmap_md5=beatmap.md5,
+        beatmap_id = beatmap.id,
+        beatmap_max_combo = beatmap.max_combo,
+        game_mode=game_mode,
+        scoring_algorithm=scoring_algorithm
     )
 
     # cache.score_for_user_on_beatmap_by_md5.set(beatmap.md5, score)
@@ -150,6 +164,7 @@ async def get_friends_scores_for_beatmap(
     game_mode: osuGameMode,
     accepted_scores: AcceptedScores,
     friends_user_ids: list[int],
+    scoring_algorithm: ScoringAlgorithm
 ) -> Scores:
     # cached_scores = cache.friends_scores_for_beatmap_by_md5.get(beatmap.md5)
     # if cached_scores is not None:
@@ -163,6 +178,7 @@ async def get_friends_scores_for_beatmap(
             game_mode=game_mode,
             user_id=user_id,
             accepted_scores=accepted_scores,
+            scoring_algorithm=scoring_algorithm,
         )
 
         if bancho is None:
@@ -177,13 +193,14 @@ async def get_friends_scores_for_beatmap(
     return scores
 
 
-@cached_for_10_minutes
 @log.log_time
+@cached_for_10_minutes
 async def get_scores_for(
     beatmap: Beatmap,
     game_mode: osuGameMode,
     ranking_type: ossapi.enums.RankingType,
     accepted_scores: AcceptedScores,
+    scoring_algorithm: ScoringAlgorithm,
     mods: Mods | None = None,
 ) -> Scores:
 
@@ -234,7 +251,14 @@ async def get_scores_for(
             if "DT" in mods and "NC" in score_mods:
                 continue
 
-        scores.append(await api_to_score_model(score, beatmap, game_mode))
+        scores.append(await api_to_score_model(
+            score=score,
+            beatmap_md5=beatmap.md5,
+            beatmap_id = beatmap.id,
+            beatmap_max_combo = beatmap.max_combo,
+            game_mode=game_mode,
+            scoring_algorithm=scoring_algorithm
+        ))
 
     return scores
 
@@ -246,6 +270,7 @@ async def get_any_scores_for(
     game_mode: osuGameMode,
     accepted_scores: AcceptedScores,
     ranking_type: ossapi.enums.RankingType,
+    scoring_algorithm: ScoringAlgorithm,
 ) -> Scores:
     return await get_scores_for(
         beatmap=beatmap,
@@ -253,6 +278,7 @@ async def get_any_scores_for(
         ranking_type=ranking_type,
         accepted_scores=accepted_scores,
         mods=None,
+        scoring_algorithm=scoring_algorithm,
     )
 
 
@@ -263,6 +289,7 @@ async def get_mod_specific_scores_for(
     accepted_scores: AcceptedScores,
     ranking_type: ossapi.enums.RankingType,
     mods: Mods,
+    scoring_algorithm: ScoringAlgorithm
 ) -> Scores:
     return await get_scores_for(
         beatmap=beatmap,
@@ -270,6 +297,7 @@ async def get_mod_specific_scores_for(
         ranking_type=ranking_type,
         accepted_scores=accepted_scores,
         mods=mods,
+        scoring_algorithm=scoring_algorithm,
     )
 
 
@@ -305,3 +333,30 @@ async def get_replay(score_id: int, beatmap_md5: str | None = None) -> bytes | N
     except ValueError as e:
         log.error(f"Error fetching replay for score {score_id}: {e}")
         raise
+
+@cached_for_five_minutes
+async def get_recent_from(
+    user_id: int,
+    game_mode: osuGameMode,
+) -> list[ossapi.models.Score]:
+    osuApi = await get_ossapi_async()
+
+    recent_scores = await osuApi.user_scores(
+        user_id=user_id,
+        type=ScoreType.RECENT,
+        include_fails=True,
+        mode=game_mode.to_api_v2(),
+    )
+
+    filtered_scores: list[ossapi.models.Score] = []
+
+    for score in recent_scores:
+        if score.beatmap is None:
+            continue
+
+        if score.beatmap.checksum is None:
+            continue
+
+        filtered_scores.append(score)
+    
+    return filtered_scores

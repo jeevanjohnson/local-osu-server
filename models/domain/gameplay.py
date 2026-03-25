@@ -297,3 +297,6 @@ class Mods(ACRONYMS):
                 score_mods.append(mod.acronym)
 
         return cls(score_mods)
+
+    def __repr__(self) -> str:
+        return ",".join(self)

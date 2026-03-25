@@ -75,6 +75,16 @@ async def update_profile(profile_name: str, updated_profile: Profile) -> None:
 
     return
 
+async def remove_friend_from_profile(profile_name: str, friend_user_id: int) -> None:
+    profiles_repo = ProfilesRepository(PROFILES_FILE)
+
+    profile = await profiles_repo.require_profile(profile_name)
+
+    if friend_user_id in profile.friend_ids:
+        profile.friend_ids.remove(friend_user_id)
+        await profiles_repo.update_profile(profile_name, profile)
+
+    return
 
 async def recalculate_stats(
     profile_name: str,

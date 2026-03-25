@@ -2,6 +2,7 @@ import struct
 from dataclasses import dataclass, field
 from typing import Literal
 
+OffSet = int
 
 class osuBaseType:
     def osu_protocol_serialize(self) -> bytes:
@@ -11,7 +12,7 @@ class osuBaseType:
         )
 
     @classmethod
-    def osu_protocol_deserialize(cls, buffer: bytes) -> tuple["osuBaseType", int]:
+    def osu_protocol_deserialize(cls, buffer: bytes) -> tuple["osuBaseType", OffSet]:
         """Deserialize bytes from osu! protocol into an instance of this type."""
         raise NotImplementedError(
             "osu_protocol_deserialize must be implemented by subclasses."
@@ -40,6 +41,18 @@ class osuUnsignedChar(osuBaseType):
         value = int.from_bytes(buffer[:1], "little", signed=False)
         return cls(value=value), 1
 
+@dataclass
+class osuIntUnSigned32List(osuBaseType):
+    value: list[int]
+
+    @classmethod
+    def osu_protocol_deserialize(cls, buffer: bytes) -> tuple["osuIntUnSigned32List", OffSet]:
+        length = int.from_bytes(buffer[:2], "little")
+        buffer = buffer[2:]
+
+        values = struct.unpack(f'<{"I" * length}', buffer[: length * 4])
+
+        return cls(value=list(values)), 2 + length * 4
 
 @dataclass
 class osuUTCOffset(osuUnsignedChar):
@@ -83,7 +96,7 @@ class osuIntSigned32Bit(osuInteger):
     bit_width: Literal[32, 64] = 32
 
     @classmethod
-    def osu_protocol_deserialize(cls, buffer: bytes) -> tuple["osuIntSigned32Bit", int]:
+    def osu_protocol_deserialize(cls, buffer: bytes) -> tuple["osuIntSigned32Bit", OffSet]:
         value = int.from_bytes(buffer[:4], "little", signed=True)
         return cls(value=value), 4
 
@@ -97,7 +110,7 @@ class osuIntUnsigned32Bit(osuInteger):
     @classmethod
     def osu_protocol_deserialize(
         cls, buffer: bytes
-    ) -> tuple["osuIntUnsigned32Bit", int]:
+    ) -> tuple["osuIntUnsigned32Bit", OffSet]:
         value = int.from_bytes(buffer[:4], "little", signed=False)
         return cls(value=value), 4
 
@@ -111,7 +124,7 @@ class osuIntUnsigned64Bit(osuInteger):
     @classmethod
     def osu_protocol_deserialize(
         cls, buffer: bytes
-    ) -> tuple["osuIntUnsigned64Bit", int]:
+    ) -> tuple["osuIntUnsigned64Bit", OffSet]:
         value = int.from_bytes(buffer[:8], "little", signed=False)
         return cls(value=value), 8
 
@@ -173,7 +186,7 @@ class osuString(osuBaseType):
         return bytes(length_bytes)
 
     @classmethod
-    def osu_protocol_deserialize(cls, buffer: bytes) -> tuple["osuString", int]:
+    def osu_protocol_deserialize(cls, buffer: bytes) -> tuple["osuString", OffSet]:
         # 0x00 means empty string; 0x0b means string is present and length-prefixed.
         if buffer[0] == 0x00:
             return cls(value=""), 1

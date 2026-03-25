@@ -8,6 +8,8 @@ import base64
 from enum import IntEnum, IntFlag, unique
 
 import ossapi
+import ossapi.models
+import ossapi.enums
 
 from osuProtocol.osuTypes import (
     osuAccuracy,
@@ -296,6 +298,15 @@ class osuGameMode(IntEnum):
             ossapi.GameMode.CATCH: cls.CATCH_THE_BEAT,
             ossapi.GameMode.MANIA: cls.MANIA,
         }[mode]
+
+    # @classmethod
+    # def from_api_v2_beatmap(cls, bmap: ossapi.models.Beatmap) -> "osuGameMode":
+    #     return {
+    #         ossapi.enums.GameMode.OSU: cls.STANDARD,
+    #         ossapi.enums.GameMode.TAIKO: cls.TAIKO,
+    #         ossapi.enums.GameMode.CATCH: cls.CATCH_THE_BEAT,
+    #         ossapi.enums.GameMode.MANIA: cls.MANIA
+    #     }[mode]
 
 
 @unique
@@ -901,6 +912,15 @@ class ClientRelog(Packet):
             data={"millisecond_delay": osuIntSigned32Bit(millisecond_delay)},
         )
 
+class LogOut(Packet):
+    def __init__(self, user_id: int) -> None:
+        super().__init__(
+            _id=ServerPackets.USER_LOGOUT,
+            data={
+                "user_id": osuIntSigned32Bit(user_id),
+                "padding": osuUnsignedChar(0),
+            },
+        )
 
 def LoginFailed(reason: LoginFailureReason, message: str | None = None) -> Packets:
     packets = Packets()
@@ -919,6 +939,56 @@ def LoginAuthFailed(message: str | None = None) -> Packets:
 def LoginError(message: str | None = None) -> Packets:
     return LoginFailed(LoginFailureReason.ERROR_OCCURRED, message)
 
+def BanchoUser(
+    user_id: int,
+    username: str,
+    country_code: osuCountryCode,
+    game_mode: osuGameMode,
+    rank: int,
+    action: osuAction,
+    info_text: str,
+    beatmap_md5: str,
+    mods: osuMods,
+    beatmap_id: int,
+    ranked_score: int,
+    accuracy: float,
+    play_count: int,
+    total_score: int,
+    performance_points: int,
+    presence_aware: bool,
+) -> Packets:
+    packets = Packets()
+
+    if presence_aware:
+        packets += PlayerPresence(
+            user_id=user_id,
+            username=username,
+            utc_offset=0,
+            country_code=country_code,
+            user_privileges=ALL_PRIVILEGES,
+            game_mode=game_mode,
+            longitude=0.0,
+            latitude=0.0,
+            rank=rank,
+        )
+
+    packets += PlayerStats(
+        user_id=user_id,
+        action=action,
+        info_text=info_text,
+        beatmap_md5=beatmap_md5,
+        mods=mods,
+        game_mode=game_mode,
+        beatmap_id=beatmap_id,
+        ranked_score=ranked_score,
+        accuracy=accuracy,
+        play_count=play_count,
+        total_score=total_score,
+        rank=rank,
+        performance_points=performance_points,
+    )
+
+    return packets
 
 def BanchoBot(latency: float | None = None) -> Packets:
     if latency is not None:

@@ -448,6 +448,40 @@ class Commands(Enum):
 
 """ ----- Main Entry Point ----- """
 
+def interactive_mode():
+    """Run in interactive mode, listening for commands on stdin."""
+    load_cache()
+    print(json.dumps({"status": "ready"}))
+    sys.stdout.flush()
+    log.success("Subprocess ready for commands")
+    
+    while True:
+        try:
+            # Read command from stdin (blocking)
+            line = sys.stdin.readline()
+            if not line:
+                break
+            
+            parts = line.strip().split("|", 1)
+            if len(parts) != 2:
+                print(json.dumps({"error": "Invalid format, use CMD|PARAM"}))
+                sys.stdout.flush()
+                continue
+            
+            request, parameter = parts
+            
+            if request not in ALL_REGISTERED_COMMANDS:
+                print(json.dumps({"error": f"Unknown command: {request}"}))
+            else:
+                result = ALL_REGISTERED_COMMANDS[request](parameter)
+                print(json.dumps({"result": result}))
+            
+            sys.stdout.flush()
+        except Exception as e:
+            print(json.dumps({"error": str(e)}))
+            sys.stdout.flush()
+
+
 if __name__ == "__main__":
     if not CACHE_SONGS_FOLDER_FILE.exists():
         raise SystemExit("only run when cache file exists")
@@ -455,19 +489,22 @@ if __name__ == "__main__":
     args: list[str] = sys.argv[1:]
     args_len = len(args)
 
-    if args_len > 2:
-        raise SystemExit("Bad arguments passed in, format {request} {parameter}")
-
-    if args_len == 1:
+    # Check if running in interactive mode (no args or --interactive flag)
+    if args_len == 0 or (args_len == 1 and args[0] == "--interactive"):
+        interactive_mode()
+    elif args_len == 1:
         print_help()
         raise SystemExit(0)
+    elif args_len > 2:
+        raise SystemExit("Bad arguments passed in, format {request} {parameter}")
+    else:
+        # Legacy single-command mode
+        request, parameter = args
 
-    request, parameter = args
+        if request not in ALL_REGISTERED_COMMANDS:
+            print_help()
+            raise SystemExit("command doesn't exists")
 
-    if request not in ALL_REGISTERED_COMMANDS:
-        print_help()
-        raise SystemExit("command doesn't exists")
+        load_cache()
 
-    load_cache()
-
-    print(json.dumps(ALL_REGISTERED_COMMANDS[request](parameter)))
+        print(json.dumps(ALL_REGISTERED_COMMANDS[request](parameter)))

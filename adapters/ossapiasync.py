@@ -56,4 +56,11 @@ class OssapiAsync(BaseOssapiAsync):
                 session = await usecases.sessions.require_current_session()
                 params["cursor_string"] = session.osu_client.direct_cursor_string
 
+        try:
+            self.api_calls += 1
+        except AttributeError:
+            self.api_calls = 1
+        
+        print(f"Making API call #{self.api_calls} to {url} with params: {params} and data: {data}")
+
         return await super()._request(type_, method, url, params=params, data=data)

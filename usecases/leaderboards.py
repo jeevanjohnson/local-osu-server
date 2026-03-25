@@ -211,11 +211,11 @@ class LeaderboardResolver:
             game_mode=game_mode,
             accepted_scores=accepted_scores,
             friends_user_ids=friends,
+            scoring_algorithm=self.scoring_algorithm,
         )
 
-        await usecases.sessions.update_avaliable_stable_replay_ids_from_scores(
-            friends_scores
-        )
+        if friends_scores.total != 0:
+            await usecases.sessions.update_avaliable_stable_replay_ids_from_scores(friends_scores)
 
         personal_best = await usecases.scores.personal_best_for_beatmap(
             beatmap=beatmap,
@@ -253,6 +253,7 @@ class LeaderboardResolver:
                 accepted_scores=accepted_scores,
                 ranking_type=self.scoring_algorithm.to_api_v2(),
                 mods=mods,
+                scoring_algorithm=self.scoring_algorithm,
             ),
             usecases.scores.personal_best_for_beatmap(
                 beatmap=beatmap,
@@ -262,7 +263,8 @@ class LeaderboardResolver:
                 mods=mods,
             ),
         )
-        await usecases.sessions.update_avaliable_stable_replay_ids_from_scores(bancho)
+        if bancho.total != 0:
+            await usecases.sessions.update_avaliable_stable_replay_ids_from_scores(bancho)
 
         self.leaderboard = Leaderboard(
             beatmap=beatmap,
@@ -292,6 +294,7 @@ class LeaderboardResolver:
                 game_mode=game_mode,
                 accepted_scores=accepted_scores,
                 ranking_type=self.scoring_algorithm.to_api_v2(),
+                scoring_algorithm=self.scoring_algorithm,
             ),
             usecases.scores.personal_best_for_beatmap(
                 beatmap=beatmap,
@@ -301,7 +304,8 @@ class LeaderboardResolver:
             ),
         )
 
-        await usecases.sessions.update_avaliable_stable_replay_ids_from_scores(bancho)
+        if bancho.total != 0:
+            await usecases.sessions.update_avaliable_stable_replay_ids_from_scores(bancho)
 
         self.leaderboard = Leaderboard(
             beatmap=beatmap,

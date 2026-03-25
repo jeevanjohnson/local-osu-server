@@ -67,6 +67,13 @@ def _make_hashable(obj: Any) -> Any:
             # For Pydantic models and custom objects, use their id
             return id(obj)
 
+def _format_timedelta(delta: timedelta) -> str:
+    total_seconds = delta.total_seconds()
+    minutes = total_seconds // 60
+    if minutes < 60:
+        return f"{int(minutes)} minute{'s' if minutes != 1 else ''}"
+    hours = minutes // 60
+    return f"{int(hours)} hour{'s' if hours != 1 else ''}"
 
 class CacheFunction(Cache[Any, F]):
     """A decorator class that caches the results of function calls based on their arguments."""
@@ -76,6 +83,11 @@ class CacheFunction(Cache[Any, F]):
             is_method = list(inspect.signature(func).parameters)[0] in ("self", "cls")
         except IndexError:
             is_method = False
+
+        if self.time_to_live == "forever":
+            ttl_desc = "forever"
+        else:
+            ttl_desc = _format_timedelta(self.time_to_live) # type: ignore
 
         if inspect.iscoroutinefunction(func):
 
@@ -123,8 +135,11 @@ class CacheFunction(Cache[Any, F]):
                 )  # Cache the function result for future calls
                 return result
 
-        return cast(F, wrapper)
+        original_doc = func.__doc__ or ""
+        note = f"\n\nNote: Results are cached for {ttl_desc}."
+        wrapper.__doc__ = original_doc + note
 
+        return cast(F, wrapper)
 
 def cached(
     time_to_live: timedelta | Literal["forever"] = timedelta(minutes=10),
@@ -132,22 +147,20 @@ def cached(
 ) -> Callable[[F], F]:
     return CacheFunction(time_to_live=time_to_live, save_on_none=save_on_none).function
 
+def cached_for_one_minute(func: F) -> F:
+    return CacheFunction(time_to_live=timedelta(minutes=1)).function(func)
 
 def cached_for_five_minutes(func: F) -> F:
     return CacheFunction(time_to_live=timedelta(minutes=5)).function(func)
 
-
 def cached_for_10_minutes(func: F) -> F:
     return CacheFunction(time_to_live=timedelta(minutes=10)).function(func)
-
 
 def cached_for_30_minutes(func: F) -> F:
     return CacheFunction(time_to_live=timedelta(minutes=30)).function(func)
 
-
 def cached_for_one_hour(func: F) -> F:
     return CacheFunction(time_to_live=timedelta(hours=1)).function(func)
-
 
 def cached_forever(func: F) -> F:
     return CacheFunction(time_to_live="forever").function(func)
