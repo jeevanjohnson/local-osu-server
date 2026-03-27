@@ -2,7 +2,6 @@ import rosu_pp_py as rosu
 
 from adapters import log, log_time
 from adapters.osu_file import OsuFile
-from cache import cached_forever
 from models.domain.gameplay import Mods, osuGameMode, osuMods
 
 # Mapping from osuGameMode to rosu GameMode
@@ -14,8 +13,54 @@ ROSU_GAME_MODE_MAP: dict[osuGameMode, rosu.GameMode] = {
 }
 
 
+# @cached_forever
+def pp_for_acc(
+    map_file: OsuFile,
+    game_mode: osuGameMode,
+    mods: Mods,
+    accuracy: float,
+    misses: int = 0,
+    combo: int | None = None,
+) -> int:
+    """Assuming score is from stable."""
+    assert map_file.raw_file is not None, (
+        "Map file content is required for pp calculation"
+    )
+
+    if combo is None:
+        combo = map_file.max_combo
+
+    rosu_map = rosu.Beatmap(content=map_file.raw_file)
+
+    if rosu_map.is_suspicious():
+        log.warning("Beatmap is marked as suspicious, pp calculation denied to 0")
+        return 0
+
+    stable_mods, lazer_mods = mods.to_stable_mods()
+
+    if "NC" in mods:
+        # Ensure DT is applied for safe calculation.
+        stable_mods |= osuMods.DOUBLETIME
+
+    rosu_map.convert(
+        ROSU_GAME_MODE_MAP[game_mode],  # type: ignore # Convert osuGameMode to rosu GameMode
+        stable_mods,  # type: ignore
+    )
+
+    calculator = rosu.Performance(
+        mods=stable_mods,  # type: ignore
+        accuracy=accuracy,
+        combo=combo,
+        misses=misses,
+    )
+
+    result = calculator.calculate(rosu_map)
+
+    return int(result.pp)
+
+
 @log_time
-@cached_forever
+# @cached_forever
 def pp(
     map_file: OsuFile,
     game_mode: osuGameMode,

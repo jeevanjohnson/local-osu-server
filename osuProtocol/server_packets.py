@@ -8,8 +8,8 @@ import base64
 from enum import IntEnum, IntFlag, unique
 
 import ossapi
-import ossapi.models
 import ossapi.enums
+import ossapi.models
 
 from osuProtocol.osuTypes import (
     osuAccuracy,
@@ -298,6 +298,15 @@ class osuGameMode(IntEnum):
             ossapi.GameMode.CATCH: cls.CATCH_THE_BEAT,
             ossapi.GameMode.MANIA: cls.MANIA,
         }[mode]
+
+    @classmethod
+    def from_extended_user(cls, playmode: str) -> "osuGameMode":
+        return {
+            "osu": cls.STANDARD,
+            "taiko": cls.TAIKO,
+            "fruits": cls.CATCH_THE_BEAT,
+            "mania": cls.MANIA,
+        }[playmode.lower()]
 
     # @classmethod
     # def from_api_v2_beatmap(cls, bmap: ossapi.models.Beatmap) -> "osuGameMode":
@@ -912,6 +921,7 @@ class ClientRelog(Packet):
             data={"millisecond_delay": osuIntSigned32Bit(millisecond_delay)},
         )
 
+
 class LogOut(Packet):
     def __init__(self, user_id: int) -> None:
         super().__init__(
@@ -921,6 +931,22 @@ class LogOut(Packet):
                 "padding": osuUnsignedChar(0),
             },
         )
+
+
+class Message(Packet):
+    def __init__(
+        self, sender: str, message: str, recipient: str, sender_id: int
+    ) -> None:
+        super().__init__(
+            _id=ServerPackets.SEND_MESSAGE,
+            data={
+                "sender": osuString(sender),
+                "message": osuString(message),
+                "recipient": osuString(recipient),
+                "sender_id": osuIntSigned32Bit(sender_id),
+            },
+        )
+
 
 def LoginFailed(reason: LoginFailureReason, message: str | None = None) -> Packets:
     packets = Packets()
@@ -938,6 +964,7 @@ def LoginAuthFailed(message: str | None = None) -> Packets:
 
 def LoginError(message: str | None = None) -> Packets:
     return LoginFailed(LoginFailureReason.ERROR_OCCURRED, message)
+
 
 def BanchoUser(
     user_id: int,
@@ -990,9 +1017,25 @@ def BanchoUser(
 
     return packets
 
+
+def readable_latency(ms: float) -> str:
+    ms_abs = abs(ms)
+
+    minutes = int(ms_abs // 60000)  # total minutes
+    seconds = int((ms_abs % 60000) // 1000)  # remaining seconds
+    milliseconds = int(ms_abs % 1000)  # remaining milliseconds
+
+    if minutes > 0:
+        return f"{minutes}m {seconds}s {milliseconds}ms"
+    elif seconds > 0:
+        return f"{seconds}s {milliseconds}ms"
+    else:
+        return f"{milliseconds}ms"
+
+
 def BanchoBot(latency: float | None = None) -> Packets:
     if latency is not None:
-        info_text = f"API V2 latency: {latency:.2f}ms ʕ•̫͡•ʔ"
+        info_text = f"API V2 latency: {readable_latency(latency)} ʕ•̫͡•ʔ"
     else:
         info_text = "over the server... ʕ•̫͡•ʔ"
 
@@ -1054,6 +1097,11 @@ def Login(
     packets += UserPrivileges(ALL_PRIVILEGES)
 
     if login_message is not None:
+        if "{api_latency}" in login_message and latency is not None:
+            login_message = login_message.replace(
+                "{api_latency}", readable_latency(latency)
+            )
+
         packets += Notification(login_message)
 
     for channel in ["#osu", "#nothing"]:

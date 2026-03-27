@@ -4,6 +4,7 @@ from typing import Literal
 
 OffSet = int
 
+
 class osuBaseType:
     def osu_protocol_serialize(self) -> bytes:
         """Serialize this type into bytes for osu! protocol."""
@@ -41,18 +42,22 @@ class osuUnsignedChar(osuBaseType):
         value = int.from_bytes(buffer[:1], "little", signed=False)
         return cls(value=value), 1
 
+
 @dataclass
 class osuIntUnSigned32List(osuBaseType):
     value: list[int]
 
     @classmethod
-    def osu_protocol_deserialize(cls, buffer: bytes) -> tuple["osuIntUnSigned32List", OffSet]:
+    def osu_protocol_deserialize(
+        cls, buffer: bytes
+    ) -> tuple["osuIntUnSigned32List", OffSet]:
         length = int.from_bytes(buffer[:2], "little")
         buffer = buffer[2:]
 
-        values = struct.unpack(f'<{"I" * length}', buffer[: length * 4])
+        values = struct.unpack(f"<{'I' * length}", buffer[: length * 4])
 
         return cls(value=list(values)), 2 + length * 4
+
 
 @dataclass
 class osuUTCOffset(osuUnsignedChar):
@@ -96,7 +101,9 @@ class osuIntSigned32Bit(osuInteger):
     bit_width: Literal[32, 64] = 32
 
     @classmethod
-    def osu_protocol_deserialize(cls, buffer: bytes) -> tuple["osuIntSigned32Bit", OffSet]:
+    def osu_protocol_deserialize(
+        cls, buffer: bytes
+    ) -> tuple["osuIntSigned32Bit", OffSet]:
         value = int.from_bytes(buffer[:4], "little", signed=True)
         return cls(value=value), 4
 

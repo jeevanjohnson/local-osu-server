@@ -2,8 +2,8 @@ from typing import Any, Iterable, TypedDict
 
 import ossapi.models
 
-import calculator
 from adapters import log
+from calculator.linear_interpolation import linear_interpolation
 from osuProtocol.server_packets import osuGameMode, osuMods
 
 LAZER_MODS = list[str]
@@ -50,8 +50,8 @@ class AttributeModifiers(TypedDict):
 class Mods(ACRONYMS):
     """A list of mods, represented as short names, e.g. ['HD', 'HR', 'DT']."""
 
-    def __init__(self, iterable: Iterable[str]) -> None:
-        super().__init__(iterable)
+    def __init__(self, iterable: Iterable[str] | None = None) -> None:
+        super().__init__(iterable or [])
         self.post_init()
 
     def difficulty_adjustments(self) -> AttributeModifiers:
@@ -161,7 +161,7 @@ class Mods(ACRONYMS):
             (1.50, 1.10),  # DT or NC multiples are 1.1x
         ]
 
-        return calculator.linear_interpolation(
+        return linear_interpolation(
             input_value=rate,
             points=points,
         )
@@ -300,3 +300,30 @@ class Mods(ACRONYMS):
 
     def __repr__(self) -> str:
         return ",".join(self)
+
+    def __str__(self) -> str:
+        rep = self.__repr__()
+
+        if rep == "":
+            return "NM"
+
+        return rep
+
+    @classmethod
+    def from_stable_string(cls, stable_mods_str: str) -> "Mods":
+        # for every 2 chars in the string
+        stable_mods = osuMods.NOMOD
+        for i in range(0, len(stable_mods_str), 2):
+            mod_acronym = stable_mods_str[i : i + 2]
+            stable_mods |= osuMods.from_acronym(mod_acronym)
+
+        return cls.from_stable_mods(stable_mods)
+
+    @classmethod
+    def from_stable_int(cls, stable_mods_int: int) -> "Mods":
+        stable_mods = osuMods(stable_mods_int)
+        return cls.from_stable_mods(stable_mods)
+
+    def to_stable_mods_int(self) -> int:
+        stable_mods, _ = self.to_stable_mods()
+        return int(stable_mods)

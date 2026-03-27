@@ -5,24 +5,17 @@ Purpose/Domain/Concept:
 
 from pathlib import Path
 
-import usecases.profiles
-import usecases.sessions
-from adapters import log_time
-from models.domain.errors import ProfileNotFoundError, SessionNotFoundError
+from repositories.profiles import (
+    ProfilesRepository,
+)
 
 
-@log_time
-async def get_session_avatar() -> str | Path | None:
-    try:
-        session = await usecases.sessions.require_current_session()
-    except SessionNotFoundError:
-        return None
+async def profile(name: str) -> str | Path | None:
+    profile_repo = ProfilesRepository()
 
-    profile_name = session.profile_name
+    profile = await profile_repo.get(name)
 
-    try:
-        profile = await usecases.profiles.require_profile(profile_name)
-    except ProfileNotFoundError:
+    if profile is None:
         return None
 
     if profile.profile_picture is None:

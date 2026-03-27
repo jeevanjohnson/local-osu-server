@@ -1,7 +1,6 @@
-from pathlib import Path
-
 from jays_tools import JsonDatabase
 
+from constants.paths import SCORES
 from models.database.scores import (
     CurrentMapScores as MapScores,
 )
@@ -19,8 +18,8 @@ from osuProtocol.server_packets import osuGameMode
 
 
 class ScoresRepository:
-    def __init__(self, path: Path) -> None:
-        self.scores = JsonDatabase(path=path, models=Scores)
+    def __init__(self) -> None:
+        self.scores = JsonDatabase(path=SCORES, models=Scores)
 
     @staticmethod
     def _profile_key(profile_name: str) -> str:
@@ -33,6 +32,22 @@ class ScoresRepository:
             scores.score_counter += 1
             self.scores.set(scores)
             return scores.score_counter
+
+    async def delete_score_by_id(self, score_id: int) -> None:
+        """Delete a score by its unique ID"""
+        async with self.scores as scores:
+            # Remove from profiles
+            for profile_scores in scores.profiles.values():
+                for map_scores in profile_scores.scores.values():
+                    map_scores.scores = [
+                        s for s in map_scores.scores if s.id != score_id
+                    ]
+
+            # Remove from beatmap leaderboards
+            for map_scores in scores.beatmap_leaderboards.values():
+                map_scores.scores = [s for s in map_scores.scores if s.id != score_id]
+
+            self.scores.set(scores)
 
     async def save_score(self, score: Score, profile_name: str) -> None:
         """

@@ -15,9 +15,9 @@ from osuProtocol.osuTypes import (
     osuBaseType,
     osuIntSigned32Bit,
     osuIntUnsigned32Bit,
+    osuIntUnSigned32List,
     osuString,
     osuUnsignedChar,
-    osuIntUnSigned32List
 )
 
 
@@ -252,16 +252,43 @@ class Ping(Packet):
 
     def __repr__(self) -> str:
         return "<Ping Packet>"
-    
+
+
 @handles(ClientPackets.USER_STATS_REQUEST)
 @dataclass
 class UserStatsRequest(Packet):
     user_ids: osuIntUnSigned32List = field(init=False)
 
+
 @handles(ClientPackets.FRIEND_REMOVE)
 @dataclass
 class FriendRemove(Packet):
-    friend_user_id: osuIntUnsigned32Bit = field(init=False)
+    friend_user_id: osuIntSigned32Bit = field(init=False)
+
+
+@handles(ClientPackets.FRIEND_ADD)
+@dataclass
+class FriendAdd(Packet):
+    friend_user_id: osuIntSigned32Bit = field(init=False)
+
+
+@handles(ClientPackets.SEND_PUBLIC_MESSAGE)
+@dataclass
+class SendPublicMessage(Packet):
+    sender: osuString = field(init=False)
+    text: osuString = field(init=False)
+    reciever: osuString = field(init=False)
+    sender_id: osuIntSigned32Bit = field(init=False)
+
+
+@handles(ClientPackets.SEND_PRIVATE_MESSAGE)
+@dataclass
+class SendPrivateMessage(Packet):
+    sender: osuString = field(init=False)
+    text: osuString = field(init=False)
+    reciever: osuString = field(init=False)
+    sender_id: osuIntSigned32Bit = field(init=False)
+
 
 class Packets(list[Packet]):
     def __init__(self, raw_packet_data: bytes) -> None:

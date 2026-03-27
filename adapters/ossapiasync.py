@@ -1,15 +1,15 @@
 from __future__ import annotations
 
+from datetime import datetime, timedelta
 from typing import Any
 
 from ossapi import OssapiAsync as BaseOssapiAsync
 from ossapi.mod import Mod
 
-import usecases.sessions
-
-from datetime import datetime, timedelta
+import usecases.application.client.state
 
 ONE_MINUTE = timedelta(minutes=1)
+
 
 # https://osu.ppy.sh/community/forums/topics/1257747?n=5
 class OssapiAsync(BaseOssapiAsync):
@@ -52,12 +52,18 @@ class OssapiAsync(BaseOssapiAsync):
                 # mod int to ?mods[]=EZ&mods[]=HD
                 params["mods"] = self._mods_int_to_array(params["mods"])
 
+            print(f"DEBUG adapter params keys: {params.keys()}")
+            print(f"DEBUG adapter params: {params}")
+
             if "cursor" in params and "cursor_string" not in params:
                 del params["cursor"]
 
                 # Retrive cursor_string from session
-                session = await usecases.sessions.require_current_session()
-                params["cursor_string"] = session.osu_client.direct_cursor_string
+                stored_cursor = (
+                    await usecases.application.client.state.get_direct_cursor_string()
+                )
+                print(f"DEBUG adapter - using stored cursor: {stored_cursor}")
+                params["cursor_string"] = stored_cursor
 
         # Initialize or reset rate limit window
         try:
@@ -69,14 +75,16 @@ class OssapiAsync(BaseOssapiAsync):
             # First call, initialize tracking
             self.api_calls = 0
             self.window_start = datetime.now()
-        
+
         # For safety on user's API usage
         # https://osu.ppy.sh/docs/index.html#introduction:~:text=and%20javascript%20samples.-,Terms%20of%20Use,-Use%20the%20API
         # no more than 60 calls per min
 
         if self.api_calls >= 60:
-            raise SystemExit("API call limit exceeded: more than 60 calls in the last minute! Please contact a developer ASAP!!")
-        
+            raise SystemExit(
+                "API call limit exceeded: more than 60 calls in the last minute! Please contact a developer ASAP!!"
+            )
+
         self.api_calls += 1
 
         return await super()._request(type_, method, url, params=params, data=data)

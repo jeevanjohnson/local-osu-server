@@ -14,41 +14,44 @@ from osuProtocol.client_web import ScoringAlgorithm
 from osuProtocol.server_packets import osuCountryCode
 
 
-class difficultyAdjustedBeatmapConfigV1(MigratableModel):
-    allow_submission: bool = Field(default=True)
-    sync_rank_status_with_bancho: bool = Field(default=True)
+class SubmissionSettingsV1(MigratableModel):
+    """What score submissions are allowed"""
 
-
-CurrentDifficultyAdjustedBeatmapConfig = difficultyAdjustedBeatmapConfigV1
-
-
-class LeaderboardConfigV1(MigratableModel):
-    leaderboard_score_limit: int = Field(default=50)
-    show_lazer_scores_on_leaderboard: bool = Field(default=True)
-    truncate_user_names_on_leaderboard: bool = Field(default=False)
-
-
-CurrentLeaderboardConfig = LeaderboardConfigV1
-
-
-class SettingsV1(MigratableModel):
-    relax_submission: bool = Field(default=False)
-    auto_pilot_submission: bool = Field(default=False)
-    score_v2_submission: bool = Field(default=False)
-    force_scorev2: bool = Field(default=False)
+    relax_submission: bool = Field(default=True)
+    auto_pilot_submission: bool = Field(default=True)
+    score_v2_submission: bool = Field(default=True)
+    force_score_v2: bool = Field(default=False)
     force_nf: bool = Field(default=False)
-    difficulty_adjusted_beatmaps: CurrentDifficultyAdjustedBeatmapConfig = Field(
-        default_factory=CurrentDifficultyAdjustedBeatmapConfig
-    )
-    self_rank: bool = Field(default=False)
-    leaderboard: CurrentLeaderboardConfig = Field(
-        default_factory=CurrentLeaderboardConfig
-    )
-    scoring_algorithm: ScoringAlgorithm = Field(default=ScoringAlgorithm.LAZER)
+
+
+class ScoringSettingsV1(MigratableModel):
+    """How to calculate and display scores"""
+
+    algorithm: ScoringAlgorithm = Field(default=ScoringAlgorithm.LAZER)
     score_v2_shows_lazer_only_leaderboard: bool = Field(default=False)
 
 
-CurrentSettings = SettingsV1
+class LeaderboardSettingsV1(MigratableModel):
+    """Leaderboard display rules"""
+
+    score_limit: int = Field(default=50)
+    show_lazer_scores_on_leaderboard: bool = Field(default=True)
+
+
+SubmissionSettings = SubmissionSettingsV1
+ScoringSettings = ScoringSettingsV1
+LeaderboardSettings = LeaderboardSettingsV1
+
+
+class ProfileSettingsV1(MigratableModel):
+    """Master settings container"""
+
+    submission: SubmissionSettingsV1 = Field(default_factory=SubmissionSettings)
+    scoring: ScoringSettingsV1 = Field(default_factory=ScoringSettings)
+    leaderboard: LeaderboardSettingsV1 = Field(default_factory=LeaderboardSettings)
+
+
+ProfileSettings = ProfileSettingsV1
 
 
 class PerformanceV1(MigratableModel):
@@ -78,6 +81,12 @@ def performace_factory() -> dict[osuGameMode, CurrentPerformance]:
     }
 
 
+def seasonal_backgrounds_factory() -> list[str]:
+    return [
+        "https://raw.githubusercontent.com/jeevanjohnson/local-osu-server/refs/heads/2026/resources/seasonal_bg.png"
+    ]
+
+
 URL = str
 
 
@@ -89,7 +98,10 @@ class ProfileV1(MigratableModel):
         default_factory=performace_factory
     )
     notes: str | None = Field(default=None)
-    settings: CurrentSettings = Field(default_factory=CurrentSettings)
+    settings: ProfileSettings = Field(default_factory=ProfileSettings)
+    seasonal_backgrounds: list[str] = Field(
+        default_factory=seasonal_backgrounds_factory
+    )
 
 
 CurrentProfile = ProfileV1

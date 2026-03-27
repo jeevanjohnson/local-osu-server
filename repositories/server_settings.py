@@ -1,11 +1,12 @@
 from jays_tools.json_database import JsonDatabase
 
+from constants.paths import SERVER_SETTINGS
 from models.database.server_settings import CurrentServerSettings as Settings
 
 
 class ServerSettingsRepository:
-    def __init__(self, path):
-        self.server_settings = JsonDatabase(path, models=Settings)
+    def __init__(self):
+        self.server_settings = JsonDatabase(SERVER_SETTINGS, models=Settings)
 
     async def get_server_settings(self) -> Settings:
         async with self.server_settings as server_settings:

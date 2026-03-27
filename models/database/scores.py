@@ -9,8 +9,9 @@ from models.domain.gameplay import Mods
 from osuProtocol.server_packets import osuGameMode
 
 if TYPE_CHECKING:
-    from osuProtocol.client_web import ScoringAlgorithm
     from usecases.score_submission import ScoreData
+
+    from osuProtocol.client_web import ScoringAlgorithm
 
 EpochTime = int
 

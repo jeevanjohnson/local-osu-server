@@ -11,9 +11,9 @@ from nicegui import ui
 from nicegui.elements.upload_files import FileUpload
 from nicegui.events import UploadEventArguments
 
-import usecases.profiles
+import usecases.application.client.state
+import usecases.domain.profiles
 import usecases.server_settings
-import usecases.sessions
 from models.database.profiles import CurrentProfiles as Profiles
 
 
@@ -62,7 +62,7 @@ async def login():
                 )
 
     with ui.row():
-        profiles = await usecases.profiles.get_profiles()
+        profiles = await usecases.domain.profiles.get_profiles()
         render_profiles(profiles)
 
     async def on_login_click():
@@ -70,16 +70,16 @@ async def login():
             ui.notify("Please enter a profile name.")
             return
 
-        profile = await usecases.profiles.get_profile(profile_textarea.value)
+        profile = await usecases.domain.profiles.get_profile(profile_textarea.value)
         if profile is None:
             ui.notify("Profile not found. Please enter a valid profile name.")
             return
 
-        active_session = await usecases.sessions.maybe_get_current_session()
-        if active_session:
-            await usecases.sessions.delete_current_session()
+        client_state = await usecases.application.client.state.get()
+        if client_state.logged_in:
+            await usecases.application.client.state.logout()
 
-        await usecases.sessions.create_session(profile_textarea.value)
+        await usecases.application.client.state.create(profile_textarea.value)
 
         ui.notify(
             f"Login successful! Profile '{profile_textarea.value}' is now active. Please start the osu! client to use this profile."
@@ -117,14 +117,14 @@ async def login():
             ui.notify("Please enter a profile name.")
             return
 
-        profile = await usecases.profiles.get_profile(profile_textarea.value)
+        profile = await usecases.domain.profiles.get_profile(profile_textarea.value)
         if profile is None:
             ui.notify("Profile not found. Please enter a valid profile name.")
             return
 
-        await usecases.profiles.delete_profile(profile_textarea.value)
+        await usecases.domain.profiles.delete_profile(profile_textarea.value)
 
-        render_profiles.refresh(await usecases.profiles.get_profiles())
+        render_profiles.refresh(await usecases.domain.profiles.get_profiles())
 
         profile_textarea.set_value("")
 
@@ -135,7 +135,7 @@ async def login():
             ui.notify("Please enter a profile name.")
             return
 
-        profile = await usecases.profiles.get_profile(profile_textarea.value)
+        profile = await usecases.domain.profiles.get_profile(profile_textarea.value)
 
         if profile is not None:
             ui.notify("Profile already exists. Please choose a different name.")
@@ -145,9 +145,9 @@ async def login():
             ui.notify("Profile name cannot contain emojis.")
             return
 
-        await usecases.profiles.create_profile(profile_textarea.value)
+        await usecases.domain.profiles.create_profile(profile_textarea.value)
 
-        render_profiles.refresh(await usecases.profiles.get_profiles())
+        render_profiles.refresh(await usecases.domain.profiles.get_profiles())
 
         ui.notify(
             (
@@ -241,33 +241,33 @@ async def profile_settings():
 async def dashboard():
     dark_mode()
 
-    session = await usecases.sessions.maybe_get_current_session()
-    if session is None:
+    client_state = await usecases.application.client.state.get()
+    if not client_state.logged_in:
         ui.notify("No active session found. Please log in first.")
         ui.navigate.to("/")
         return
 
-    profile_name = session.profile_name
+    profile_name = client_state.profile_name
 
-    client_opened: bool = session.osu_client.opened
+    client_opened: bool = client_state.in_game
 
     async def render_if_client_opened():
         nonlocal client_opened
 
-        session = await usecases.sessions.maybe_get_current_session()
-        if session is None:
+        client_state = await usecases.application.client.state.get()
+        if not client_state.logged_in:
             ui.notify("No active session found. Please log in first.")
             ui.navigate.to("/")
             return
 
-        if session.osu_client.opened and not client_opened:
+        if client_state.in_game and not client_opened:
             message = "osu! client opened! Dashboard features are now active."
 
             ui.notify(message)
             client_opened = True
             render_welcome_message.refresh(message)
 
-        elif not session.osu_client.opened and client_opened:
+        elif not client_state.in_game and client_opened:
             message = "osu! client closed. Dashboard features are now inactive."
 
             ui.notify(message)
@@ -292,7 +292,7 @@ async def dashboard():
 
     ui.timer(2, render_if_client_opened)
 
-    profile = await usecases.profiles.get_profile(profile_name)
+    profile = await usecases.domain.profiles.get_profile(profile_name)
     if profile is None:
         ui.notify("Profile not found. Please log in again.")
         ui.navigate.to("/")
@@ -325,7 +325,7 @@ async def dashboard():
     async def on_change_profile_picture_click():
         nonlocal pfp_file_upload
 
-        profile = await usecases.profiles.get_profile(profile_name)
+        profile = await usecases.domain.profiles.get_profile(profile_name)
         if profile is None:
             ui.notify("Profile not found. Please log in again.")
             ui.navigate.to("/")
@@ -344,7 +344,7 @@ async def dashboard():
             )
             return
 
-        await usecases.profiles.update_profile(profile_name, profile)
+        await usecases.domain.profiles.update_profile(profile_name, profile)
 
         render_profile_picture.refresh(profile.profile_picture)
 
@@ -359,14 +359,14 @@ async def dashboard():
     async def render_currently_looking_at_if_changed():
         nonlocal last_cover_url
 
-        session = await usecases.sessions.maybe_get_current_session()
-        if session is None:
+        client_state = await usecases.application.client.state.get()
+        if not client_state.in_game:
             cover_url = None
         else:
-            if session.latest_beatmap is None:
+            if not client_state.beatmap.set_id:
                 cover_url = None
             else:
-                cover_url = f"https://assets.ppy.sh/beatmaps/{session.latest_beatmap.set_id}/covers/cover.jpg"
+                cover_url = f"https://assets.ppy.sh/beatmaps/{client_state.beatmap.set_id}/covers/cover.jpg"
 
         if cover_url == last_cover_url:
             return
@@ -391,14 +391,14 @@ async def dashboard():
     ui.button("Change Profile Picture", on_click=change_pfp_confirmation)
 
     async def on_logout_click():
-        await usecases.sessions.delete_current_session()
+        await usecases.application.client.state.logout()
         ui.notify("Logged out successfully!")
         ui.navigate.to("/")
 
     ui.button("Logout", on_click=on_logout_click)
 
     async def update_notes(new_notes: str):
-        profile = await usecases.profiles.get_profile(profile_name)
+        profile = await usecases.domain.profiles.get_profile(profile_name)
         if profile is None:
             ui.notify("Profile not found. Please log in again.")
             ui.navigate.to("/")
@@ -406,7 +406,7 @@ async def dashboard():
 
         profile.notes = new_notes
 
-        await usecases.profiles.update_profile(profile_name, profile)
+        await usecases.domain.profiles.update_profile(profile_name, profile)
 
         ui.notify("Notes updated successfully!")
 
@@ -419,7 +419,7 @@ async def dashboard():
     ui.button("Server Settings", on_click=lambda: ui.navigate.to("/server_settings"))
 
 
-from constants import LOS_INTERFACE_PORT
+from constants.network import LOS_INTERFACE_PORT
 
 try:
     ui.run(title="LOS Interface", port=LOS_INTERFACE_PORT, show=False, reload=False)

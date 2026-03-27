@@ -9,7 +9,6 @@ import secrets
 from collections import defaultdict
 from collections.abc import Awaitable, Callable, Mapping
 from enum import IntEnum, unique
-from functools import cache
 from pathlib import Path as SystemPath
 from typing import Any, Literal
 from urllib.parse import unquote, unquote_plus
@@ -64,7 +63,7 @@ router = APIRouter(
 )
 
 
-@cache
+# @cache
 def authenticate_player_session(
     param_function: Callable[..., Any],
     username_alias: str = "u",

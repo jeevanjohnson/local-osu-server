@@ -67,6 +67,7 @@ def _make_hashable(obj: Any) -> Any:
             # For Pydantic models and custom objects, use their id
             return id(obj)
 
+
 def _format_timedelta(delta: timedelta) -> str:
     total_seconds = delta.total_seconds()
     minutes = total_seconds // 60
@@ -74,6 +75,52 @@ def _format_timedelta(delta: timedelta) -> str:
         return f"{int(minutes)} minute{'s' if minutes != 1 else ''}"
     hours = minutes // 60
     return f"{int(hours)} hour{'s' if hours != 1 else ''}"
+
+
+class CacheManager:
+    """Manages all cached functions globally for easy cache control."""
+
+    def __init__(self):
+        self.caches: dict[str, Cache[Any, Any]] = {}
+
+    def register(self, func_name: str, cache: Cache[Any, Any]) -> None:
+        """Register a cache instance for a function."""
+        self.caches[func_name] = cache
+        log.success(f"Registered cache for function: {func_name}")
+
+    def clear_cache(self, func_name: str) -> bool:
+        """Clear cache for a specific function. Returns True if found and cleared."""
+        if func_name in self.caches:
+            self.caches[func_name].clear()
+            return True
+        return False
+
+    def clear_cache_pattern(self, pattern: str) -> int:
+        """Clear all caches matching a pattern (e.g., 'bancho*'). Returns count cleared."""
+        import fnmatch
+
+        cleared = 0
+        for func_name in list(self.caches.keys()):
+            if fnmatch.fnmatch(func_name, pattern):
+                self.caches[func_name].clear()
+                cleared += 1
+        return cleared
+
+    def clear_all(self) -> int:
+        """Clear all caches. Returns count cleared."""
+        count = len(self.caches)
+        for cache in self.caches.values():
+            cache.clear()
+        return count
+
+    def list_caches(self) -> dict[str, int]:
+        """List all registered caches and their sizes."""
+        return {name: cache.size for name, cache in self.caches.items()}
+
+
+# Global cache manager instance
+_cache_manager = CacheManager()
+
 
 class CacheFunction(Cache[Any, F]):
     """A decorator class that caches the results of function calls based on their arguments."""
@@ -87,7 +134,7 @@ class CacheFunction(Cache[Any, F]):
         if self.time_to_live == "forever":
             ttl_desc = "forever"
         else:
-            ttl_desc = _format_timedelta(self.time_to_live) # type: ignore
+            ttl_desc = _format_timedelta(self.time_to_live)  # type: ignore
 
         if inspect.iscoroutinefunction(func):
 
@@ -139,7 +186,15 @@ class CacheFunction(Cache[Any, F]):
         note = f"\n\nNote: Results are cached for {ttl_desc}."
         wrapper.__doc__ = original_doc + note
 
+        # Attach cache instance to wrapper for external access
+        wrapper.__cache__ = self  # type: ignore
+        wrapper.__cache_function_name__ = func.__qualname__  # type: ignore
+
+        # Register this cache globally
+        _cache_manager.register(func.__qualname__, self)
+
         return cast(F, wrapper)
+
 
 def cached(
     time_to_live: timedelta | Literal["forever"] = timedelta(minutes=10),
@@ -147,20 +202,65 @@ def cached(
 ) -> Callable[[F], F]:
     return CacheFunction(time_to_live=time_to_live, save_on_none=save_on_none).function
 
+
 def cached_for_one_minute(func: F) -> F:
     return CacheFunction(time_to_live=timedelta(minutes=1)).function(func)
+
 
 def cached_for_five_minutes(func: F) -> F:
     return CacheFunction(time_to_live=timedelta(minutes=5)).function(func)
 
+
 def cached_for_10_minutes(func: F) -> F:
     return CacheFunction(time_to_live=timedelta(minutes=10)).function(func)
+
 
 def cached_for_30_minutes(func: F) -> F:
     return CacheFunction(time_to_live=timedelta(minutes=30)).function(func)
 
+
 def cached_for_one_hour(func: F) -> F:
     return CacheFunction(time_to_live=timedelta(hours=1)).function(func)
 
+
 def cached_forever(func: F) -> F:
     return CacheFunction(time_to_live="forever").function(func)
+
+
+# ============================================================================
+# Public Cache Control API
+# ============================================================================
+
+
+def clear_cache(func_name: str) -> bool:
+    """
+    Clear cache for a specific function by name.
+
+    Example: clear_cache("usecases.bancho_scores.get_scores_for")
+    Returns True if cache was found and cleared, False otherwise.
+    """
+    return _cache_manager.clear_cache(func_name)
+
+
+def clear_cache_pattern(pattern: str) -> int:
+    """
+    Clear all caches matching a glob pattern.
+
+    Examples:
+    - clear_cache_pattern("*bancho*") - clears all caches with 'bancho' in name
+    - clear_cache_pattern("usecases.bancho_*") - clears all bancho_* functions
+    - clear_cache_pattern("*") - clears everything
+
+    Returns count of caches cleared.
+    """
+    return _cache_manager.clear_cache_pattern(pattern)
+
+
+def clear_all_caches() -> int:
+    """Clear all caches completely. Returns count of caches cleared."""
+    return _cache_manager.clear_all()
+
+
+def get_cache_stats() -> dict[str, int]:
+    """Get all registered caches and their current sizes."""
+    return _cache_manager.list_caches()

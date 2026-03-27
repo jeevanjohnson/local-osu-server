@@ -17,12 +17,12 @@ from watchdog.observers import Observer
 
 try:
     from adapters import log
-    from constants import CACHE_SONGS_FOLDER_FILE
+    from constants.paths import CACHE_SONGS_FOLDER  # type: ignore
 except ImportError:
     # Ensure we are running from the project root
     sys.path.insert(0, str(Path(__file__).parent.parent))
     from adapters import log
-    from constants import CACHE_SONGS_FOLDER_FILE
+    from constants.paths import CACHE_SONGS_FOLDER
 
 """ ----- Process Start ----- """
 
@@ -109,11 +109,11 @@ def parse_osu_file(file: Path) -> ParseOsuFileResponse:
 
 
 def load_cache() -> None:
-    CACHE_SONGS_FOLDER_FILE.parent.mkdir(parents=True, exist_ok=True)
+    CACHE_SONGS_FOLDER.parent.mkdir(parents=True, exist_ok=True)
 
-    if CACHE_SONGS_FOLDER_FILE.exists():
+    if CACHE_SONGS_FOLDER.exists():
         log.info("Loading songs folder cache...")
-        content = orjson.loads(CACHE_SONGS_FOLDER_FILE.read_bytes())
+        content = orjson.loads(CACHE_SONGS_FOLDER.read_bytes())
         global \
             MD5_TO_PATH, \
             BEATMAP_ID_TO_PATH, \
@@ -178,7 +178,7 @@ def load_cache() -> None:
 
 
 def save_cache() -> None:
-    CACHE_SONGS_FOLDER_FILE.write_bytes(
+    CACHE_SONGS_FOLDER.write_bytes(
         orjson.dumps(
             [
                 MD5_TO_PATH,
@@ -448,30 +448,31 @@ class Commands(Enum):
 
 """ ----- Main Entry Point ----- """
 
+
 def interactive_mode():
     """Run in interactive mode, listening for commands on stdin."""
     global SONGS_FOLDER
-    
+
     # Find songs folder if not already found
     while SONGS_FOLDER is None:
         find_songs_folder()
         if SONGS_FOLDER is None:
             log.warning("Waiting for osu! client to be launched")
             time.sleep(1)
-    
+
     # Load cache
     load_cache()
-    
+
     # Start file watcher in background thread
     event_handler = SongFolderHandler()
     observer = Observer()
     observer.schedule(event_handler, str(SONGS_FOLDER), recursive=True)
     observer.start()
-    
+
     print(json.dumps({"status": "ready"}))
     sys.stdout.flush()
     log.success("Subprocess ready for commands with file watcher active")
-    
+
     try:
         while True:
             try:
@@ -479,21 +480,21 @@ def interactive_mode():
                 line = sys.stdin.readline()
                 if not line:
                     break
-                
+
                 parts = line.strip().split("|", 1)
                 if len(parts) != 2:
                     print(json.dumps({"error": "Invalid format, use CMD|PARAM"}))
                     sys.stdout.flush()
                     continue
-                
+
                 request, parameter = parts
-                
+
                 if request not in ALL_REGISTERED_COMMANDS:
                     print(json.dumps({"error": f"Unknown command: {request}"}))
                 else:
                     result = ALL_REGISTERED_COMMANDS[request](parameter)
                     print(json.dumps({"result": result}))
-                
+
                 sys.stdout.flush()
             except Exception as e:
                 print(json.dumps({"error": str(e)}))
@@ -504,7 +505,7 @@ def interactive_mode():
 
 
 if __name__ == "__main__":
-    if not CACHE_SONGS_FOLDER_FILE.exists():
+    if not CACHE_SONGS_FOLDER.exists():
         raise SystemExit("only run when cache file exists")
 
     args: list[str] = sys.argv[1:]

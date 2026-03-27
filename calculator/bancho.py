@@ -1,7 +1,8 @@
-from datetime import datetime, timedelta, timezone
-import numpy as np
 import random
-from cache import cached_for_five_minutes
+from datetime import datetime, timedelta, timezone
+
+import numpy as np
+
 from osuProtocol.server_packets import osuAction
 
 ALL_STATES = [
@@ -20,6 +21,7 @@ ALL_STATES = [
     osuAction.OsuDirect,
 ]
 
+
 # ----------------------------------------------------------------------
 # Helper: convert any datetime to UTC
 # ----------------------------------------------------------------------
@@ -29,6 +31,7 @@ def ensure_utc(dt: datetime) -> datetime:
         # Assume naive datetime is UTC
         return dt.replace(tzinfo=timezone.utc)
     return dt.astimezone(timezone.utc)
+
 
 # ----------------------------------------------------------------------
 # Helper: extract timestamps when playcount increased
@@ -40,9 +43,10 @@ def extract_play_times(data: list[tuple[datetime, int]]) -> list[datetime]:
     """
     play_times = []
     for i in range(1, len(data)):
-        if data[i][1] > data[i-1][1]:
+        if data[i][1] > data[i - 1][1]:
             play_times.append(ensure_utc(data[i][0]))
     return play_times
+
 
 # ----------------------------------------------------------------------
 # Helper: compute gaps between consecutive play times (in seconds)
@@ -52,9 +56,10 @@ def compute_gaps(play_times: list[datetime]) -> np.ndarray:
         return np.array([])
     gaps = []
     for i in range(1, len(play_times)):
-        delta = (play_times[i] - play_times[i-1]).total_seconds()
+        delta = (play_times[i] - play_times[i - 1]).total_seconds()
         gaps.append(delta)
     return np.array(gaps)
+
 
 # ----------------------------------------------------------------------
 # K-means for 1D data (3 clusters, sorted)
@@ -82,6 +87,7 @@ def kmeans_1d(data: np.ndarray, k: int = 3, max_iter: int = 20) -> np.ndarray:
 
     return np.sort(centers)
 
+
 # ----------------------------------------------------------------------
 # Convert a gap to probabilities using distance to cluster centers
 # ----------------------------------------------------------------------
@@ -93,13 +99,16 @@ def gap_to_probabilities(gap: float, centers: np.ndarray) -> dict[osuAction, flo
     return {
         osuAction.Playing: probs[0],
         osuAction.Idle: probs[1],
-        osuAction.Afk: probs[2]
+        osuAction.Afk: probs[2],
     }
+
 
 # ----------------------------------------------------------------------
 # Apply recency bias based on average gap (extreme gaps)
 # ----------------------------------------------------------------------
-def apply_recency_bias(probs: dict[osuAction, float], current_gap: float, avg_gap: float) -> dict[osuAction, float]:
+def apply_recency_bias(
+    probs: dict[osuAction, float], current_gap: float, avg_gap: float
+) -> dict[osuAction, float]:
     if avg_gap > 0:
         if current_gap > 2 * avg_gap:
             probs[osuAction.Afk] *= 1.5
@@ -111,10 +120,15 @@ def apply_recency_bias(probs: dict[osuAction, float], current_gap: float, avg_ga
         probs[k] /= total
     return probs
 
+
 # ----------------------------------------------------------------------
 # Apply score recency boost (explicit boost based on last score time)
 # ----------------------------------------------------------------------
-def apply_score_recency_boost(probs: dict[osuAction, float], last_score_gap: float | None, boost_threshold: float = 300) -> dict[osuAction, float]:
+def apply_score_recency_boost(
+    probs: dict[osuAction, float],
+    last_score_gap: float | None,
+    boost_threshold: float = 300,
+) -> dict[osuAction, float]:
     """
     Boost PLAYING probability if a score was submitted recently.
     boost_threshold: time in seconds (default 5 minutes) – if last_score_gap <= this, boost is applied.
@@ -130,15 +144,16 @@ def apply_score_recency_boost(probs: dict[osuAction, float], last_score_gap: flo
             probs[k] /= total
     return probs
 
+
 # ----------------------------------------------------------------------
 # Main function: estimate player state at a given time
 # ----------------------------------------------------------------------
 def estimate_player_state(
-        data: list[tuple[datetime, int]],
-        score_times: list[datetime] | None = None,
-        now: datetime | None = None,
-        random_state_on_low_confidence: bool = True,
-        _score_recency_threshold: timedelta = timedelta(minutes=5)  # 5 minutes
+    data: list[tuple[datetime, int]],
+    score_times: list[datetime] | None = None,
+    now: datetime | None = None,
+    random_state_on_low_confidence: bool = True,
+    _score_recency_threshold: timedelta = timedelta(minutes=5),  # 5 minutes
 ) -> tuple[dict[osuAction, float], osuAction]:
     """
     Input:
@@ -176,7 +191,11 @@ def estimate_player_state(
 
     # Not enough data to make a confident estimate: fallback to AFK
     if len(all_activities) < 3:
-        return {osuAction.Afk: 1.0, osuAction.Idle: 0.0, osuAction.Playing: 0.0}, osuAction.Afk
+        return {
+            osuAction.Afk: 1.0,
+            osuAction.Idle: 0.0,
+            osuAction.Playing: 0.0,
+        }, osuAction.Afk
 
     # Step 2: Compute gaps between consecutive activities
     gaps = compute_gaps(all_activities)
@@ -201,7 +220,11 @@ def estimate_player_state(
     state = max(probs, key=lambda k: probs[k])
 
     # Step 9: Optional low‑confidence randomness
-    print(f"Estimated probabilities: {probs}, most likely state: {state}, current_gap: {current_gap:.1f}s, avg_gap: {avg_gap:.1f}s, last_score_gap: {last_score_gap:.1f}s" if last_score_gap is not None else f"Estimated probabilities: {probs}, most likely state: {state}, current_gap: {current_gap:.1f}s, avg_gap: {avg_gap:.1f}s")
+    print(
+        f"Estimated probabilities: {probs}, most likely state: {state}, current_gap: {current_gap:.1f}s, avg_gap: {avg_gap:.1f}s, last_score_gap: {last_score_gap:.1f}s"
+        if last_score_gap is not None
+        else f"Estimated probabilities: {probs}, most likely state: {state}, current_gap: {current_gap:.1f}s, avg_gap: {avg_gap:.1f}s"
+    )
     if random_state_on_low_confidence and max(probs.values()) < 0.3:
         state = random.choice(ALL_STATES)
 

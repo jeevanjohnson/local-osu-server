@@ -6,7 +6,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable, Collection, Iterator
 from dataclasses import dataclass, field
 from enum import IntEnum, unique
-from functools import cache, lru_cache
+from functools import lru_cache
 from typing import TYPE_CHECKING, Any, NamedTuple, cast
 
 # from app.objects.beatmap import BeatmapInfo
@@ -752,7 +752,7 @@ class LoginFailureReason(IntEnum):
 
 
 # packet id: 5
-@cache
+# @cache
 def login_reply(user_id: int) -> bytes:
     """\
     Construct a login reply packet.
@@ -773,7 +773,7 @@ def send_message(sender: str, msg: str, recipient: str, sender_id: int) -> bytes
 
 
 # packet id: 8
-@cache
+# @cache
 def pong() -> bytes:
     return write(ServerPackets.PONG)
 
@@ -804,7 +804,7 @@ BOT_STATUSES = (
 # `bg_loops.reroll_bot_status` to keep fresh.
 
 
-@cache
+# @cache
 def bot_stats(player: Player) -> bytes:
     # pick at random from list of potential statuses.
     status_id, status_txt = random.choice(BOT_STATUSES)
@@ -897,19 +897,19 @@ def user_stats(player: Player) -> bytes:
 
 
 # packet id: 12
-@cache
+# @cache
 def logout(user_id: int) -> bytes:
     return write(ServerPackets.USER_LOGOUT, (user_id, osuTypes.i32), (0, osuTypes.u8))
 
 
 # packet id: 13
-@cache
+# @cache
 def spectator_joined(user_id: int) -> bytes:
     return write(ServerPackets.SPECTATOR_JOINED, (user_id, osuTypes.i32))
 
 
 # packet id: 14
-@cache
+# @cache
 def spectator_left(user_id: int) -> bytes:
     return write(ServerPackets.SPECTATOR_LEFT, (user_id, osuTypes.i32))
 
@@ -925,19 +925,19 @@ def spectate_frames(data: bytes) -> bytes:
 
 
 # packet id: 19
-@cache
+# @cache
 def version_update() -> bytes:
     return write(ServerPackets.VERSION_UPDATE)
 
 
 # packet id: 22
-@cache
+# @cache
 def spectator_cant_spectate(user_id: int) -> bytes:
     return write(ServerPackets.SPECTATOR_CANT_SPECTATE, (user_id, osuTypes.i32))
 
 
 # packet id: 23
-@cache
+# @cache
 def get_attention() -> bytes:
     return write(ServerPackets.GET_ATTENTION)
 
@@ -959,13 +959,13 @@ def new_match(m: Match) -> bytes:
 
 
 # packet id: 28
-@cache
+# @cache
 def dispose_match(id: int) -> bytes:
     return write(ServerPackets.DISPOSE_MATCH, (id, osuTypes.i32))
 
 
 # packet id: 34
-@cache
+# @cache
 def toggle_block_non_friend_dm() -> bytes:
     return write(ServerPackets.TOGGLE_BLOCK_NON_FRIEND_DMS)
 
@@ -976,19 +976,19 @@ def match_join_success(m: Match) -> bytes:
 
 
 # packet id: 37
-@cache
+# @cache
 def match_join_fail() -> bytes:
     return write(ServerPackets.MATCH_JOIN_FAIL)
 
 
 # packet id: 42
-@cache
+# @cache
 def fellow_spectator_joined(user_id: int) -> bytes:
     return write(ServerPackets.FELLOW_SPECTATOR_JOINED, (user_id, osuTypes.i32))
 
 
 # packet id: 43
-@cache
+# @cache
 def fellow_spectator_left(user_id: int) -> bytes:
     return write(ServerPackets.FELLOW_SPECTATOR_LEFT, (user_id, osuTypes.i32))
 
@@ -1008,31 +1008,31 @@ def match_score_update(frame: ScoreFrame) -> bytes:
 
 
 # packet id: 50
-@cache
+# @cache
 def match_transfer_host() -> bytes:
     return write(ServerPackets.MATCH_TRANSFER_HOST)
 
 
 # packet id: 53
-@cache
+# @cache
 def match_all_players_loaded() -> bytes:
     return write(ServerPackets.MATCH_ALL_PLAYERS_LOADED)
 
 
 # packet id: 57
-@cache
+# @cache
 def match_player_failed(slot_id: int) -> bytes:
     return write(ServerPackets.MATCH_PLAYER_FAILED, (slot_id, osuTypes.i32))
 
 
 # packet id: 58
-@cache
+# @cache
 def match_complete() -> bytes:
     return write(ServerPackets.MATCH_COMPLETE)
 
 
 # packet id: 61
-@cache
+# @cache
 def match_skip() -> bytes:
     return write(ServerPackets.MATCH_SKIP)
 
@@ -1073,7 +1073,7 @@ def channel_auto_join(name: str, topic: str, p_count: int) -> bytes:
 
 
 # packet id: 71
-@cache
+# @cache
 def bancho_privileges(priv: int) -> bytes:
     return write(ServerPackets.PRIVILEGES, (priv, osuTypes.i32))
 
@@ -1084,13 +1084,13 @@ def friends_list(friends: Collection[int]) -> bytes:
 
 
 # packet id: 75
-@cache
+# @cache
 def protocol_version(ver: int) -> bytes:
     return write(ServerPackets.PROTOCOL_VERSION, (ver, osuTypes.i32))
 
 
 # packet id: 76
-@cache
+# @cache
 def main_menu_icon(icon_url: str, onclick_url: str) -> bytes:
     return write(
         ServerPackets.MAIN_MENU_ICON,
@@ -1100,7 +1100,7 @@ def main_menu_icon(icon_url: str, onclick_url: str) -> bytes:
 
 # packet id: 80
 # NOTE: deprecated
-@cache
+# @cache
 def monitor() -> bytes:
     # this is an older (now removed) 'anticheat' feature of the osu!
     # client; basically, it would do some checks (most likely for aqn),
@@ -1113,7 +1113,7 @@ def monitor() -> bytes:
 
 
 # packet id: 81
-@cache
+# @cache
 def match_player_skipped(user_id: int) -> bytes:
     return write(ServerPackets.MATCH_PLAYER_SKIPPED, (user_id, osuTypes.i32))
 
@@ -1122,7 +1122,7 @@ def match_player_skipped(user_id: int) -> bytes:
 # also automatically added to all player's
 # friends list, their presence is requested
 # *very* frequently; only build it once.
-@cache
+# @cache
 def bot_presence(player: Player) -> bytes:
     return write(
         ServerPackets.USER_PRESENCE,
@@ -1177,7 +1177,7 @@ def user_presence(player: Player) -> bytes:
 
 
 # packet id: 86
-@cache
+# @cache
 def restart_server(ms: int) -> bytes:
     return write(ServerPackets.RESTART, (ms, osuTypes.i32))
 
@@ -1193,7 +1193,7 @@ def match_invite(player: Player, target_name: str) -> bytes:
 
 
 # packet id: 89
-@cache
+# @cache
 def channel_info_end() -> bytes:
     return write(ServerPackets.CHANNEL_INFO_END)
 
@@ -1209,7 +1209,7 @@ def silence_end(delta: int) -> bytes:
 
 
 # packet id: 94
-@cache
+# @cache
 def user_silenced(user_id: int) -> bytes:
     return write(ServerPackets.USER_SILENCED, (user_id, osuTypes.i32))
 
@@ -1218,7 +1218,7 @@ def user_silenced(user_id: int) -> bytes:
 
 
 # packet id: 95
-@cache
+# @cache
 def user_presence_single(user_id: int) -> bytes:
     return write(ServerPackets.USER_PRESENCE_SINGLE, (user_id, osuTypes.i32))
 
@@ -1242,7 +1242,7 @@ def target_silenced(target: str) -> bytes:
 
 
 # packet id: 102
-@cache
+# @cache
 def version_update_forced() -> bytes:
     return write(ServerPackets.VERSION_UPDATE_FORCED)
 
@@ -1255,7 +1255,7 @@ def switch_server(t: int) -> bytes:
 
 
 # packet id: 104
-@cache
+# @cache
 def account_restricted() -> bytes:
     return write(ServerPackets.ACCOUNT_RESTRICTED)
 
@@ -1271,7 +1271,7 @@ def rtx(msg: str) -> bytes:
 
 
 # packet id: 106
-@cache
+# @cache
 def match_abort() -> bytes:
     return write(ServerPackets.MATCH_ABORT)
 

@@ -1,6 +1,6 @@
 import ossapi.models
 
-import calculator
+import calculator.performance
 from adapters.osu_file import OsuFile
 from models.domain.gameplay import Mods, osuGameMode
 
@@ -10,7 +10,7 @@ async def calc_pp_for_api_score(
     game_mode: osuGameMode,
     osu_file: OsuFile,
 ) -> int:
-    return calculator.pp(
+    return calculator.performance.pp(
         map_file=osu_file,
         game_mode=game_mode,
         mods=Mods.from_api_v2(score.mods),

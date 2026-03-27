@@ -1,63 +1,35 @@
-from pathlib import Path
-
 from jays_tools import JsonDatabase
 
 from adapters import log_time
+from constants.paths import BEATMAPS
 from models.database.beatmaps import CurrentBeatmap as Beatmap
 from models.database.beatmaps import CurrentBeatmaps as Beatmaps
 from models.database.beatmaps import CurrentBeatmapSet as BeatmapSet
-from models.domain.errors import BeatmapNotFoundError, BeatmapSetNotFoundError
 
 
-# TODO: Async?
 class BeatmapsRepository:
-    def __init__(self, path: Path) -> None:
-        self.beatmaps = JsonDatabase(path=path, models=Beatmaps)
+    def __init__(self) -> None:
+        self.beatmaps = JsonDatabase(path=BEATMAPS, models=Beatmaps)
 
     @log_time
-    async def get_by_md5(self, md5: str) -> Beatmap | None:
-        try:
-            return await self.require_by_md5(md5)
-        except BeatmapNotFoundError:
-            return None
-
-    @log_time
-    async def require_by_md5(self, md5: str) -> Beatmap:
+    async def from_md5(self, md5: str) -> Beatmap | None:
         async with self.beatmaps as beatmaps:
             if md5 not in beatmaps.all["by_md5"]:
-                raise BeatmapNotFoundError(f"Beatmap with md5 '{md5}' was not found.")
+                return None
 
             return beatmaps.all["by_md5"][md5]
 
-    @log_time
-    async def get_by_id(self, id: int) -> Beatmap | None:
-        try:
-            return await self.require_by_id(id)
-        except BeatmapNotFoundError:
-            return None
-
-    @log_time
-    async def require_by_id(self, id: int) -> Beatmap:
+    async def from_id(self, id: int) -> Beatmap | None:
         async with self.beatmaps as beatmaps:
             if id not in beatmaps.all["by_id"]:
-                raise BeatmapNotFoundError(f"Beatmap with id '{id}' was not found.")
+                return None
 
             return beatmaps.all["by_id"][id]
 
-    @log_time
-    async def get_by_set_id(self, set_id: int) -> BeatmapSet | None:
-        try:
-            return await self.require_by_set_id(set_id)
-        except BeatmapSetNotFoundError:
-            return None
-
-    @log_time
-    async def require_by_set_id(self, set_id: int) -> BeatmapSet:
+    async def from_set_id(self, set_id: int) -> BeatmapSet | None:
         async with self.beatmaps as beatmaps:
             if set_id not in beatmaps.all["by_set_id"]:
-                raise BeatmapSetNotFoundError(
-                    f"Beatmap set with id '{set_id}' was not found."
-                )
+                return None
 
             return beatmaps.all["by_set_id"][set_id]
 

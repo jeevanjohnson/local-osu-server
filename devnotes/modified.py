@@ -548,10 +548,10 @@ from objects import (
     Mods,
     NotSupported,
 )
+from server import Alias, Query, Response, Router
 from utils import Color, log, log_success
 
 from constants import InvalidMods, ParsedParams
-from server import Alias, Query, Response, Router
 
 web = Router(
     (

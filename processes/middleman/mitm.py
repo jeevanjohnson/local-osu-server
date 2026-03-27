@@ -7,14 +7,14 @@ from mitmproxy import http  # type: ignore
 from mitmproxy.http import Response
 
 try:
-    from constants import LOS_PORT, OSU_CLIENT_REQUEST_URL
+    from constants.network import LOS_PORT, OSU_CLIENT_REQUEST_URL
 except (ImportError, ModuleNotFoundError):
     import sys
     from pathlib import Path
 
     sys.path.append(str(Path(__file__).parent.parent.parent))
 
-    from constants import LOS_PORT, OSU_CLIENT_REQUEST_URL
+    from constants.network import LOS_PORT, OSU_CLIENT_REQUEST_URL
 
 """ Architectural Notes: """
 # Status codes 301 & 302 are not used since using them would cause the request to turn into a GET request.

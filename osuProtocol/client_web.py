@@ -1,17 +1,27 @@
+from base64 import b64decode
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from enum import IntEnum, unique
+from typing import TYPE_CHECKING
 
 import ossapi.enums
 import ossapi.models
+from fastapi.datastructures import FormData
+from py3rijndael import Pkcs7Padding, RijndaelCbc
+from pydantic import BaseModel, ConfigDict
+from starlette.datastructures import UploadFile as StarletteUploadFile
 
 from adapters import log
 from models.bancho.scores import LazerScore, Score, StableScore
 from models.database.scores import (
     CurrentScore as ProfileScore,
 )
-from models.domain.gameplay import osuMods
+from models.domain.gameplay import Mods, osuGameMode, osuMods
+from models.domain.scores import AcceptedScores, AllScores, ScoringAlgorithm
 from osuProtocol.server_packets import osuGameMode
+
+if TYPE_CHECKING:
+    from models.database.beatmaps import CurrentBeatmap as Beatmap
 
 
 @unique
@@ -20,9 +30,9 @@ class osuMapStatus(IntEnum):
     Represents the ranked status of a beatmap.
     """
 
-    NOTSUBMITTED = -1
+    NOT_SUBMITTED = -1
     PENDING = 0
-    UPDATEAVALIABLE = 1
+    UPDATE_AVAILABLE = 1
     RANKED = 2
     APPROVED = 3
     QUALIFIED = 4
@@ -61,6 +71,9 @@ class osuMapStatus(IntEnum):
             ossapi.enums.RankStatus.QUALIFIED: cls.QUALIFIED,
             ossapi.enums.RankStatus.LOVED: cls.LOVED,
         }[ranked_status]
+
+    def __str__(self) -> str:
+        return self.name.replace("_", " ").title()
 
 
 @unique
@@ -181,6 +194,9 @@ class LeaderboardScore:
             # Client needs this in order to actual speed up the
             # replay properly
             stable_mods |= osuMods.DOUBLETIME
+
+            if isinstance(score, LazerScore):
+                stable_mods |= osuMods.NIGHTCORE
 
         if from_difficulty_adjusted and not isinstance(score, ProfileScore):
             # https://capitalizemytitle.com/small-text-converter/
@@ -339,7 +355,127 @@ class Leaderboard:
         return bytes(buffer)
 
 
-class _GraveyardLeaderboard(Leaderboard):
+class LeaderboardWithScores(Leaderboard):
+    # @log_time
+    def __init__(
+        self,
+        beatmap: "Beatmap",
+        scores: AllScores,
+        personal_best: ProfileScore | None,
+        scoring_algorithm: ScoringAlgorithm,
+        difficulty_adjusted: bool,
+        limit: int,
+        accepted_scores: AcceptedScores,
+        profile_name: str,
+    ) -> None:
+        self.beatmap = beatmap
+        self.scores = scores
+        self.personal_best = personal_best
+        self.scoring_algorithm = scoring_algorithm
+        self.difficulty_adjusted = difficulty_adjusted
+        self.limit = limit
+        self.accepted_scores = accepted_scores
+        self.profile_name = profile_name
+
+        if self.personal_best is not None:
+            if self.personal_best not in self.scores:
+                self.scores.append(self.personal_best)
+
+        self.scores.sort(self.scoring_algorithm)
+
+    @property
+    def play_count(self) -> int:
+        return self.beatmap.play_count
+
+    @property
+    def pass_count(self) -> int:
+        if self.beatmap.pass_count < 1:
+            return 1
+
+        return self.beatmap.pass_count
+
+    def personal_best_position(self) -> int:
+        if self.personal_best is None:
+            return 0
+
+        return self.scores.position_of_score(
+            self.personal_best,
+            self.scoring_algorithm,
+            beatmap_pass_count=self.beatmap.pass_count,
+            leaderboard_limit=self.limit,
+        )
+
+    def serialize_personal_best(self) -> LeaderboardScore | None:
+        if self.personal_best is None:
+            return None
+
+        if (
+            self.scoring_algorithm == ScoringAlgorithm.PP
+            and self.beatmap.can_display_pp
+        ):
+            ingame_score = self.personal_best.performance_points or 0
+        else:
+            ingame_score = self.personal_best.total_score
+
+        return LeaderboardScore.from_score(
+            score=self.personal_best,
+            position=self.personal_best_position(),
+            ingame_score=ingame_score,
+            from_difficulty_adjusted=self.difficulty_adjusted,
+        )
+
+    def serialize(self) -> bytes:
+        leaderboard_header = LeaderboardHeader(
+            beatmap_status=self.beatmap.status[self.profile_name],
+            beatmap_id=self.beatmap.id,
+            beatmap_set_id=self.beatmap.set_id,
+            num_of_scores=self.beatmap.pass_count,
+            artist=self.beatmap.artist,
+            title=self.beatmap.title,
+        )
+
+        leaderboard = Leaderboard(
+            header=leaderboard_header,
+            personal_best=self.serialize_personal_best(),
+        )
+
+        leaderboard_scores = []
+
+        seen_self = False
+        for index, score in enumerate(self.scores[: self.limit]):
+            if (
+                self.scoring_algorithm == ScoringAlgorithm.PP
+                and self.beatmap.can_display_pp
+            ):
+                ingame_score = score.performance_points or 0
+            else:
+                ingame_score = score.total_score
+
+            if seen_self:
+                score.username += " " * (index + 1)
+
+            if score == self.personal_best:
+                seen_self = True
+
+            leaderboard_score = LeaderboardScore.from_score(
+                score=score,
+                position=index + 1,
+                ingame_score=ingame_score,
+                from_difficulty_adjusted=self.difficulty_adjusted,
+            )
+            leaderboard_scores.append(leaderboard_score)
+
+        if not seen_self and leaderboard.personal_best:
+            # if personal best not in top scores, calc its position
+            # using interpolation
+            leaderboard.personal_best.position = self.personal_best_position()
+
+        leaderboard.scores = leaderboard_scores
+
+        return leaderboard.serialize()
+
+
+class GraveyardLeaderboard(Leaderboard):
     """
     Represents a leaderboard for beatmaps that are in the graveyard.
     """
@@ -358,10 +494,7 @@ class _GraveyardLeaderboard(Leaderboard):
         )
 
 
-GRAVEYARD_LEADERBOARD = _GraveyardLeaderboard().serialize()
-
-
-class _UpdateBeatmapRequestLeaderboard(Leaderboard):
+class UpdateBeatmapRequestLeaderboard(Leaderboard):
     """
     Represents a leaderboard for beatmaps that have been updated.
     """
@@ -369,7 +502,7 @@ class _UpdateBeatmapRequestLeaderboard(Leaderboard):
     def __init__(self):
         super().__init__(
             LeaderboardHeader(
-                beatmap_status=osuMapStatus.UPDATEAVALIABLE,
+                beatmap_status=osuMapStatus.UPDATE_AVAILABLE,
                 beatmap_id=0,
                 beatmap_set_id=0,
                 num_of_scores=0,
@@ -380,10 +513,7 @@ class _UpdateBeatmapRequestLeaderboard(Leaderboard):
         )
 
 
-UPDATE_BEATMAP_REQUEST_LEADERBOARD = _UpdateBeatmapRequestLeaderboard().serialize()
-
-
-class _NotSubmittedLeaderboard(Leaderboard):
+class NotSubmittedLeaderboard(Leaderboard):
     """
     Represents a leaderboard for beatmaps that have not been submitted.
     """
@@ -391,7 +521,7 @@ class _NotSubmittedLeaderboard(Leaderboard):
     def __init__(self):
         super().__init__(
             LeaderboardHeader(
-                beatmap_status=osuMapStatus.NOTSUBMITTED,
+                beatmap_status=osuMapStatus.NOT_SUBMITTED,
                 beatmap_id=0,
                 beatmap_set_id=0,
                 num_of_scores=0,
@@ -400,20 +530,6 @@ class _NotSubmittedLeaderboard(Leaderboard):
             ),
             [],
         )
-
-
-NOT_SUBMITTED_LEADERBOARD = _NotSubmittedLeaderboard().serialize()
-
-
-class ScoringAlgorithm(IntEnum):
-    LAZER = 0
-    PP = 1
-
-    def to_api_v2(self) -> ossapi.enums.RankingType:
-        return {
-            ScoringAlgorithm.LAZER: ossapi.enums.RankingType.SCORE,
-            ScoringAlgorithm.PP: ossapi.enums.RankingType.PERFORMANCE,
-        }[self]
 
 
 @dataclass
@@ -493,11 +609,11 @@ class Chart:
         ]
 
 
-class Beatmap(Chart):
+class BeatmapChart(Chart):
     pass
 
 
-class OverallRanking(Chart):
+class OverallRankingChart(Chart):
     pass
 
 
@@ -509,8 +625,8 @@ class SubmissionCharts:
     beatmap_passcount: int
     last_updated: datetime
     score_id: int
-    beatmap_chart: Beatmap
-    overall_ranking_chart: OverallRanking
+    beatmap_chart: BeatmapChart
+    overall_ranking_chart: OverallRankingChart
     achievements: Achievements
 
     @property
@@ -555,7 +671,7 @@ UNRANKED_CHARTS = SubmissionCharts(
     beatmap_passcount=0,
     last_updated=datetime.now(),
     score_id=0,
-    beatmap_chart=Beatmap(
+    beatmap_chart=BeatmapChart(
         rank=Rank(name="rank"),
         ranked_score=RankedScore(name="rankedScore"),
         total_score=TotalScore(name="totalScore"),
@@ -563,7 +679,7 @@ UNRANKED_CHARTS = SubmissionCharts(
         accuracy=Accuracy(name="accuracy"),
         pp=PerformancePoints(name="pp"),
     ),
-    overall_ranking_chart=OverallRanking(
+    overall_ranking_chart=OverallRankingChart(
         rank=Rank(name="rank"),
         ranked_score=RankedScore(name="rankedScore"),
         total_score=TotalScore(name="totalScore"),
@@ -686,3 +802,100 @@ def osu_direct_mode_to_osu_api_v2(mode: int) -> ossapi.enums.BeatmapsetSearchMod
         2: ossapi.enums.BeatmapsetSearchMode.CATCH,
         3: ossapi.enums.BeatmapsetSearchMode.MANIA,
     }[mode]
+
+
+def parse_form_data(form_data: FormData) -> tuple[bytes, StarletteUploadFile] | None:
+    try:
+        score_parts = form_data.getlist("score")
+        assert len(score_parts) == 2, "Expected exactly 2 score parts"
+
+        score_data_b64 = score_parts[0]
+        assert isinstance(score_data_b64, str), "Expected score data to be a string"
+
+        score_replay_file = score_parts[1]
+        assert isinstance(score_replay_file, StarletteUploadFile), (
+            "Expected score replay file to be an UploadFile"
+        )
+
+        return score_data_b64.encode(), score_replay_file
+    except (AssertionError, IndexError):
+        return None
+
+
+class ScoreData(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    beatmap_md5: str
+    username: str
+    online_checksum: str
+    count_300: int
+    count_100: int
+    count_50: int
+    count_geki: int
+    count_katu: int
+    count_miss: int
+    total_score: int
+    max_combo: int
+    perfect: bool
+    grade: str
+    mods: Mods
+    passed: bool
+    game_mode: osuGameMode
+    play_time: datetime
+    # Ignore client flags & version since we don't have a use for them
+    # Although not parsing could cause issues?
+
+    # @field_serializer("mods")
+    # def serialize_mods(self, value: Mods) -> list[str]:
+    #     return list(value)
+
+    # @field_validator("mods", mode="before")
+    # @classmethod
+    # def deserialize_mods(cls, value: list[str]) -> Mods:
+    #     return Mods(value)
+
+
+def decrypt_score_aes_data(
+    # to decode
+    score_data_b64: bytes,
+    client_hash_b64: bytes,
+    # used for decoding
+    iv_b64: bytes,
+    osu_version: str,
+) -> tuple[ScoreData, str]:
+    """Decrypt the base64'ed score data."""
+
+    # attempt to decrypt score data
+    aes = RijndaelCbc(
+        key=f"osu!-scoreburgr---------{osu_version}".encode(),
+        iv=b64decode(iv_b64),
+        padding=Pkcs7Padding(32),
+        block_size=32,
+    )
+
+    score_data = aes.decrypt(b64decode(score_data_b64)).decode().split(":")
+    client_hash_decoded = aes.decrypt(b64decode(client_hash_b64)).decode()
+
+    parsed_score_data = ScoreData(
+        beatmap_md5=score_data[0],
+        username=score_data[1].strip(),
+        online_checksum=score_data[2],
+        count_300=int(score_data[3]),
+        count_100=int(score_data[4]),
+        count_50=int(score_data[5]),
+        count_geki=int(score_data[6]),
+        count_katu=int(score_data[7]),
+        count_miss=int(score_data[8]),
+        total_score=int(score_data[9]),
+        max_combo=int(score_data[10]),
+        perfect=score_data[11] == "True",
+        grade=score_data[12].upper(),
+        mods=Mods.from_score_submission(int(score_data[13])),
+        passed=score_data[14] == "True",
+        game_mode=osuGameMode(int(score_data[15])),
+        # Score submission timestamp is UTC; keep it timezone-aware so epoch conversion is stable.
+        play_time=datetime.strptime(score_data[16], "%y%m%d%H%M%S").replace(tzinfo=UTC),
+    )
+
+    # score data is delimited by colons (:).
+    return parsed_score_data, client_hash_decoded
