@@ -13,7 +13,7 @@ import usecases.application.client.update
 from controllers.dependencies import client_state, profile
 from models.database.client.state import ClientState
 from models.database.profiles import CurrentProfile as Profile
-from osuProtocol.client_packets import (
+from osu_protocol.cho.client import (
     ChangeAction,
     ClientPackets,
     FriendAdd,
@@ -26,7 +26,7 @@ from osuProtocol.client_packets import (
     SendPublicMessage,
     UserStatsRequest,
 )
-from osuProtocol.server_packets import (
+from osu_protocol.cho.server import (
     SilentRelog,
 )
 

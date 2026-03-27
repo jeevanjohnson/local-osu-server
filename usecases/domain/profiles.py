@@ -11,8 +11,8 @@ from models.database.profiles import (
 from models.database.profiles import (
     CurrentProfiles as Profiles,
 )
-from osuProtocol.client_web import osuMapStatus
-from osuProtocol.server_packets import osuGameMode
+from osu_protocol.osu.types import osuMapStatus
+from osu_protocol.cho.server import osuGameMode
 from repositories.beatmaps import BeatmapsRepository
 from repositories.profiles import ProfilesRepository
 from repositories.scores import ScoresRepository

@@ -13,7 +13,7 @@ from pydantic import (
 from models.domain.gameplay import Mods, osuGameMode
 
 if TYPE_CHECKING:
-    from osuProtocol.client_web import ScoringAlgorithm
+    from osu_protocol.client_web import ScoringAlgorithm
 
 
 EpochTime = int
@@ -135,7 +135,7 @@ class Scores(BaseModel):
 
     def sort(self, algorithm: "ScoringAlgorithm") -> None:
         # Lazy import prevents circular import at module load time.
-        from osuProtocol.client_web import ScoringAlgorithm
+        from osu_protocol.client_web import ScoringAlgorithm
 
         if algorithm == ScoringAlgorithm.PP:
             self.sort_by_pp()

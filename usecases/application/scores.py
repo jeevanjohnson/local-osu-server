@@ -7,7 +7,7 @@ from models.database.profiles import CurrentProfile as Profile
 from models.database.scores import CurrentScore as ProfileScore
 from models.domain.accuracy import to_percentage
 from models.domain.scores import AcceptedScores, ScoringAlgorithm
-from osuProtocol.client_web import (
+from osu_protocol.osu.charts import (
     Accuracy,
     BeatmapChart,
     MaxCombo,

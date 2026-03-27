@@ -5,7 +5,7 @@ import usecases.adapters.ossapi
 import usecases.application.client.state
 import usecases.application.client.update
 import usecases.application.commands
-from osuProtocol.client_packets import parse_login_data
+from osu_protocol.cho.client import parse_login_data, ChangeAction
 import usecases.domain.bancho.users
 import usecases.domain.chats
 import usecases.domain.profiles
@@ -13,8 +13,7 @@ import usecases.domain.interface
 from models.database.client.state import ClientState
 from models.database.profiles import CurrentProfile as Profile
 from models.domain.gameplay import Mods
-from osuProtocol.client_packets import ChangeAction
-from osuProtocol.server_packets import Login, LoginAuthFailed, osuAction, osuGameMode
+from osu_protocol.cho.server import Login, LoginAuthFailed, osuAction, osuGameMode
 
 
 class LoginResponse(TypedDict):

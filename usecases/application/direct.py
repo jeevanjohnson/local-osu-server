@@ -3,7 +3,7 @@ from ossapi import Cursor
 
 import usecases.adapters.ossapi
 import usecases.domain.direct
-from osuProtocol.client_web import (
+from osu_protocol.osu.direct import (
     DirectBeatmapSet,
     DirectSearchResult,
 )

@@ -10,10 +10,10 @@ from models.database.scores import (
 )
 from models.domain.gameplay import Mods, osuGameMode
 from models.domain.scores import AllScores
-from osuProtocol.client_web import (
+from osu_protocol.client_web import (
     ScoringAlgorithm,
 )
-from osuProtocol.replay import extract_replay_frames_from_osr
+from osu_protocol.domain.replay import extract_replay_frames_from_osr
 from repositories.scores import ScoresRepository
 
 

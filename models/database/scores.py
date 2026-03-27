@@ -6,12 +6,12 @@ from pydantic import ConfigDict, Field, field_serializer, field_validator
 
 from models.domain.accuracy import UnitAccuracy
 from models.domain.gameplay import Mods
-from osuProtocol.server_packets import osuGameMode
+from osu_protocol.cho.server import osuGameMode
 
 if TYPE_CHECKING:
     from usecases.score_submission import ScoreData
 
-    from osuProtocol.client_web import ScoringAlgorithm
+    from osu_protocol.client_web import ScoringAlgorithm
 
 EpochTime = int
 
@@ -155,7 +155,7 @@ class MapScoresV1(MigratableModel):
 
     def sort(self, algorithm: "ScoringAlgorithm") -> None:
         # Lazy import prevents circular import at module load time.
-        from osuProtocol.client_web import ScoringAlgorithm
+        from osu_protocol.client_web import ScoringAlgorithm
 
         if algorithm == ScoringAlgorithm.PP:
             self.sort_by_pp()

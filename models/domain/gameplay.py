@@ -4,7 +4,7 @@ import ossapi.models
 
 # from adapters import log
 from usecases.domain.calculator.linear_interpolation import linear_interpolation
-from osuProtocol.server_packets import osuGameMode, osuMods
+from osu_protocol.cho.server import osuGameMode, osuMods
 
 LAZER_MODS = list[str]
 _NON_SCORING_ATTRIBUTE_PREFIXES = ("AR", "OD", "HP", "CS")

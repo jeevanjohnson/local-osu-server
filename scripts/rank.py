@@ -111,7 +111,7 @@ async def main():
             print(f"Fetching data point for {game_mode.name} - Rank: {rank}...")
 
             params = {
-                "k": "83ed1b45786e0d7256729dfe717be2b9",
+                "k": "387bbc571c6e6ae6e27375eb0ad8da5e",
                 "t": "pp",
                 "v": str(rank),
                 "m": str(game_mode.value),

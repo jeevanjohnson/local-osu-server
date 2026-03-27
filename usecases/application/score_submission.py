@@ -12,7 +12,7 @@ import usecases.domain.score_submission
 import usecases.domain.scores
 from models.database.profiles import CurrentProfile as Profile
 from models.domain.errors import OsuErrors
-from osuProtocol.client_web import UNRANKED_CHARTS, SubmissionCharts
+from osu_protocol.osu.charts import UNRANKED_CHARTS, SubmissionCharts
 import usecases.domain.cache_control
 
 

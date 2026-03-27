@@ -8,10 +8,8 @@ import base64
 from enum import IntEnum, IntFlag, unique
 
 import ossapi
-import ossapi.enums
-import ossapi.models
 
-from osuProtocol.osuTypes import (
+from osu_protocol.cho.types import (
     osuAccuracy,
     osuBaseType,
     osuByteArray,

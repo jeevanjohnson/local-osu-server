@@ -11,7 +11,7 @@ from pprint import pformat
 from typing import Callable, Type, TypedDict, TypeVar, get_type_hints
 
 # from adapters import log
-from osuProtocol.osuTypes import (
+from osu_protocol.cho.types import (
     osuBaseType,
     osuIntSigned32Bit,
     osuIntUnsigned32Bit,

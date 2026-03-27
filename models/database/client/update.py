@@ -3,8 +3,8 @@ import base64
 from jays_tools import MigratableModel
 from pydantic import Field, field_serializer, field_validator
 
-from osuProtocol.server_packets import Packet
-from osuProtocol.server_packets import Packets as ServerPackets
+from osu_protocol.cho.server import Packet
+from osu_protocol.cho.server import Packets as ServerPackets
 
 RAW_PACKET = bytes
 

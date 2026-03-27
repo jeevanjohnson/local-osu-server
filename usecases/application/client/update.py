@@ -3,7 +3,7 @@ import usecases.domain.bancho.users
 from models.database.client.state import ClientState
 from models.database.profiles import CurrentProfile as Profile
 from models.domain.gameplay import Mods
-from osuProtocol.server_packets import (
+from osu_protocol.cho.server import (
     ClientRelog,
     LogOut,
     Message,

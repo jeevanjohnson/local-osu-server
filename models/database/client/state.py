@@ -5,7 +5,7 @@ from jays_tools import MigratableModel
 from pydantic import Field, field_serializer, field_validator
 
 from models.domain.gameplay import Mods
-from osuProtocol.server_packets import osuAction, osuGameMode
+from osu_protocol.cho.server import osuAction, osuGameMode
 
 
 class DirectReferenceV1(MigratableModel):

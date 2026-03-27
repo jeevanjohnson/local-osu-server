@@ -13,8 +13,8 @@ from models.database.beatmaps import (
 )
 from models.domain.gameplay import osuGameMode
 from models.domain.scores import AcceptedScores
-from osuProtocol.client_web import ScoringAlgorithm
-from osuProtocol.replay import extract_replay_frames_from_osr
+from osu_protocol.client_web import ScoringAlgorithm
+from osu_protocol.domain.replay import extract_replay_frames_from_osr
 from repositories.osufiles.songs_folder import OsuFileRepository
 import usecases.domain.cache_control
 
