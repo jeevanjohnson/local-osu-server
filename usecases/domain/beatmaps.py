@@ -1,12 +1,13 @@
 import hashlib
 from datetime import datetime
 
-from adapters import OssapiAsync
+from usecases.adapters.ossapiasync import OssapiAsync
 from models.database.beatmaps import CurrentBeatmap as Beatmap
 from osuProtocol.client_web import osuMapStatus
 from osuProtocol.server_packets import osuGameMode
 from repositories.beatmaps import BeatmapsRepository
 from repositories.osufiles.songs_folder import OsuFileRepository
+import usecases.domain.osufile
 
 
 async def from_db(
@@ -49,7 +50,7 @@ async def from_api_md5(
         return None
 
     if api_beatmap is None:
-        print(f"[DEBUG] API returned None for beatmap checksum: {beatmap_md5}")
+        print(f"[DEBUG] API returned None for beatmap checksum: {beatmap_md5}", )
         return None
 
     # get .osu file from songs folder
@@ -193,7 +194,7 @@ async def from_difficulty_adjusted_request(
     difficulty_adjusted_osu_file = await osu_file_repo.from_filename(map_filename)
 
     if difficulty_adjusted_osu_file is None:
-        print(f"[DEBUG] Could not find osu file: {map_filename}")
+        print(f"[DEBUG] Could not find osu file: {map_filename}", )
         return None
 
     print(
@@ -216,7 +217,7 @@ async def from_difficulty_adjusted_request(
         )
 
     if original_beatmap is None:
-        print(f"[DEBUG] Could not find or fetch original beatmap")
+        print(f"[DEBUG] Could not find or fetch original beatmap", )
         return None
 
     difficulty_adjusted_beatmap = Beatmap(
@@ -342,14 +343,14 @@ async def change_beatmapset_status(
         file_content = osu_file_in_folder.read_bytes()
         md5 = hashlib.md5(file_content).hexdigest()
 
-        print(f"[DEBUG] Processing osu file: {osu_file_in_folder.name}, MD5: {md5}")
+        print(f"[DEBUG] Processing osu file: {osu_file_in_folder.name}, MD5: {md5}", )
 
         # First check if already in database
         beatmap = await from_db(beatmap_md5=md5)
 
         # If not found in database, check the file itself to see if it's difficulty-adjusted
         if beatmap is None:
-            print(f"[DEBUG] Beatmap not in database for MD5: {md5}")
+            print(f"[DEBUG] Beatmap not in database for MD5: {md5}", )
             # Try to create it as a difficulty-adjusted map first
             beatmap = await from_difficulty_adjusted_request(
                 api_client=api_client,
@@ -361,7 +362,7 @@ async def change_beatmapset_status(
 
             # If it's not a difficulty-adjusted map, try fetching from API
             if beatmap is None:
-                print(f"[DEBUG] Not difficulty-adjusted, trying from API")
+                print(f"[DEBUG] Not difficulty-adjusted, trying from API", )
                 beatmap = await from_api_md5(
                     api_client=api_client,
                     beatmap_md5=md5,
@@ -375,11 +376,11 @@ async def change_beatmapset_status(
 
         # If still not found, skip this file
         if beatmap is None:
-            print(f"[DEBUG] Skipping, beatmap still None")
+            print(f"[DEBUG] Skipping, beatmap still None", )
             continue
 
         # Update the status
-        print(f"[DEBUG] Updating status for beatmap {beatmap.id} to {new_status}")
+        print(f"[DEBUG] Updating status for beatmap {beatmap.id} to {new_status}", )
         beatmap.status.update({profile_name: new_status})
         await beatmap_repo.insert_beatmap(beatmap)
         updated_beatmaps.append(beatmap)

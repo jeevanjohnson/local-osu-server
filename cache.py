@@ -3,7 +3,7 @@ import inspect
 from datetime import datetime, timedelta
 from typing import Any, Callable, Generic, Literal, TypeVar, cast
 
-from adapters import log
+# from adapters import log
 
 KEY = TypeVar("KEY")
 VALUE = TypeVar("VALUE")
@@ -39,16 +39,16 @@ class Cache(Generic[KEY, VALUE]):
 
     def set(self, key: KEY, value: VALUE) -> None:
         self.store[key] = (value, datetime.now())
-        log.success(f"Cached value for key: {key}")
+        print(f"Cached value for key: {key}")
 
     def clear(self) -> None:
         self.store.clear()
-        log.success("Cache cleared")
+        print("Cache cleared")
 
     def remove(self, key: KEY) -> None:
         if key in self.store:
             del self.store[key]
-            log.success(f"Removed key from cache: {key}")
+            print(f"Removed key from cache: {key}")
 
 
 def _make_hashable(obj: Any) -> Any:
@@ -86,7 +86,7 @@ class CacheManager:
     def register(self, func_name: str, cache: Cache[Any, Any]) -> None:
         """Register a cache instance for a function."""
         self.caches[func_name] = cache
-        log.success(f"Registered cache for function: {func_name}")
+        print(f"Registered cache for function: {func_name}")
 
     def clear_cache(self, func_name: str) -> bool:
         """Clear cache for a specific function. Returns True if found and cleared."""

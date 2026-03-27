@@ -1,6 +1,6 @@
 from jays_tools import JsonDatabase
 
-from adapters import OsuFile
+from usecases.adapters.osu_file import OsuFile
 from constants.paths import OSU_FILES
 from models.database.osufiles.backup import OsuFileBackup, OsuFileEntry
 

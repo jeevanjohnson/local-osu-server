@@ -1,7 +1,7 @@
 import re
 from enum import Enum
 
-import calculator.performance
+import usecases.domain.calculator.performance
 from constants.network import OSU_CLIENT_REQUEST_URL
 from models.domain.gameplay import Mods
 from osuProtocol.server_packets import osuGameMode
@@ -85,7 +85,7 @@ async def pp_for(
         if accuracy is not None:
             kwargs["accuracy"] = accuracy
 
-        pp = calculator.performance.pp_for_acc(**kwargs)
+        pp = usecases.domain.calculator.performance.pp_for_acc(**kwargs)
 
         message.append(f"{acc}%: {pp:.2f}pp")
 

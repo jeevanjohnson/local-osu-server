@@ -11,7 +11,7 @@ from py3rijndael import Pkcs7Padding, RijndaelCbc
 from pydantic import BaseModel, ConfigDict
 from starlette.datastructures import UploadFile as StarletteUploadFile
 
-from adapters import log
+# from adapters import log
 from models.bancho.scores import LazerScore, Score, StableScore
 from models.database.scores import (
     CurrentScore as ProfileScore,
@@ -356,7 +356,7 @@ class Leaderboard:
 
 
 class LeaderboardWithScores(Leaderboard):
-    # @log_time
+    # # log
     def __init__(
         self,
         beatmap: "Beatmap",
@@ -788,9 +788,9 @@ def osu_direct_ranked_status_to_osu_api_v2(
             osuRankedStatus.GRAVEYARD: ossapi.enums.BeatmapsetSearchCategory.GRAVEYARD,
         }[ranked_status]
     except KeyError as e:
-        log.error(
-            f"Received unknown ranked status {ranked_status} in osu-direct request, defaulting to ranked"
-        )
+        # # log.error(
+        #     f"Received unknown ranked status {ranked_status} in osu-direct request, defaulting to ranked"
+        # )
         raise e
 
 
@@ -899,3 +899,4 @@ def decrypt_score_aes_data(
 
     # score data is delimited by colons (:).
     return parsed_score_data, client_hash_decoded
+

@@ -44,7 +44,7 @@ This directory contains personal notes I have taken while working on this projec
 - map updates (when md5s don't match but ids do)
 - convert db mods from stable format to lazer format (list[str])
 - forget about katu & geki count saving since lazer doesn't use them anymore
-- scoring algorithm probably a calculator folder of all calculators, example: calculator/pp.py, calculator/score.py, calculator/fundamentals.py, calculator/prediction.py
+- scoring algorithm probably a usecases.domain.calculator folder of all calculators, example: usecases.domain.calculator/pp.py, usecases.domain.calculator/score.py, usecases.domain.calculator/fundamentals.py, usecases.domain.calculator/prediction.py
 - btw for prediction.py we don't need to scan all 10k users we can just get a couple from a wide range and then map the line of best fit
 
 # 3.17.2026

@@ -5,11 +5,11 @@ import usecases.adapters.ossapi
 import usecases.application.client.state
 import usecases.application.client.update
 import usecases.application.commands
-import usecases.cho
+from osuProtocol.client_packets import parse_login_data
 import usecases.domain.bancho.users
 import usecases.domain.chats
 import usecases.domain.profiles
-import usecases.interface
+import usecases.domain.interface
 from models.database.client.state import ClientState
 from models.database.profiles import CurrentProfile as Profile
 from models.domain.gameplay import Mods
@@ -27,7 +27,7 @@ async def login(
     raw_login_data: bytes,
 ) -> LoginResponse:
 
-    if not await usecases.interface.logged_in():
+    if not await usecases.domain.interface.logged_in():
         content = LoginAuthFailed(
             "You must be logged in through the GUI to use the osu! client."
         ).build()
@@ -61,7 +61,7 @@ async def login(
             "status": "osu-api-credentials-not-found",
         }
 
-    login_data = usecases.cho.parse_login_data(raw_login_data)
+    login_data = parse_login_data(raw_login_data)
     utc_offset = login_data["utc_offset"]
 
     login_message = f"Welcome to LOS!, {client_state.profile_name} ʕ•̫͡•ʔ"

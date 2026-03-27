@@ -259,15 +259,15 @@ async def process_direct_search_result_request(
     if direct_response is None:
         return None
 
-    print(f"DEBUG service - cursor_string returned from API: {cursor_string}")
+    print(f"DEBUG service - cursor_string returned from API: {cursor_string}", )
 
     if cursor_string is not None:
-        print(f"DEBUG service - storing cursor for next pagination")
+        print(f"DEBUG service - storing cursor for next pagination", )
         client_state.direct_reference.cursor_string = cursor_string
         await usecases.application.client.state.update(client_state)
-        print(f"DEBUG service - cursor stored in state")
+        print(f"DEBUG service - cursor stored in state", )
     else:
-        print(f"DEBUG service - no cursor returned from API")
+        print(f"DEBUG service - no cursor returned from API", )
 
     return direct_response
 

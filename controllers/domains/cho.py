@@ -9,11 +9,7 @@ from fastapi import APIRouter, Depends, Header, Request, Response
 
 import services.cho
 import usecases.application.client.update
-import usecases.cho
-import usecases.domain.bancho.users
-import usecases.domain.chats
-import usecases.interface
-from adapters import log, log_time
+# from adapters import log, log_time
 from controllers.dependencies import client_state, profile
 from models.database.client.state import ClientState
 from models.database.profiles import CurrentProfile as Profile
@@ -65,9 +61,6 @@ async def client_request_handler(
 
     for packet in incoming_packets:
         if packet._id not in PACKET_HANDLERS:
-            log.warning(
-                f"Received packet with ID {ClientPackets(packet._id).name} but no handler is registered for this packet type."
-            )
             continue
 
         await PACKET_HANDLERS[ClientPackets(packet._id)](packet, client_state, profile)
@@ -109,7 +102,7 @@ async def handle_ping(
 
 
 @register_packet_handler(ClientPackets.CHANGE_ACTION, packet_type=ChangeAction)
-@log_time
+# log
 async def on_action_change(
     packet: ChangeAction, client_state: ClientState, profile: Profile
 ) -> None:
@@ -121,7 +114,7 @@ async def on_action_change(
 
 
 @register_packet_handler(ClientPackets.LOGOUT, packet_type=LogOut)
-@log_time
+# log
 async def on_logout(
     packet: LogOut, client_state: ClientState, profile: Profile
 ) -> None:
@@ -142,7 +135,7 @@ async def on_user_stats_request(
 
 
 @register_packet_handler(ClientPackets.FRIEND_REMOVE, packet_type=FriendRemove)
-@log_time
+# log
 async def on_friend_remove(
     packet: FriendRemove, client_state: ClientState, profile: Profile
 ) -> None:
@@ -155,7 +148,7 @@ async def on_friend_remove(
 
 
 @register_packet_handler(ClientPackets.FRIEND_ADD, packet_type=FriendAdd)
-@log_time
+# log
 async def on_friend_add(
     packet: FriendAdd, client_state: ClientState, profile: Profile
 ) -> None:
@@ -168,7 +161,7 @@ async def on_friend_add(
 @register_packet_handler(
     ClientPackets.SEND_PUBLIC_MESSAGE, packet_type=SendPublicMessage
 )
-@log_time
+# log
 async def on_send_public_message(
     packet: SendPublicMessage, client_state: ClientState, profile: Profile
 ) -> None:
@@ -184,7 +177,7 @@ async def on_send_public_message(
 @register_packet_handler(
     ClientPackets.SEND_PRIVATE_MESSAGE, packet_type=SendPrivateMessage
 )
-@log_time
+# log
 async def on_send_private_message(
     packet: SendPrivateMessage, client_state: ClientState, profile: Profile
 ) -> None:

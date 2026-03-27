@@ -3,7 +3,7 @@ from typing import TypedDict
 
 import aiohttp
 
-from adapters import OssapiAsync
+from usecases.adapters.ossapiasync import OssapiAsync
 from repositories.server_settings import ServerSettingsRepository
 
 

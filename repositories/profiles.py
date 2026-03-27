@@ -5,7 +5,7 @@ Purpose/Domain/Concept:
 
 from jays_tools.json_database import JsonDatabase
 
-from adapters import log_time
+# from adapters import log_time
 from constants.paths import PROFILES
 from models.database.profiles import CurrentProfile as Profile
 from models.database.profiles import CurrentProfiles as Profiles
@@ -19,7 +19,7 @@ class ProfilesRepository:
         async with self.profiles as profiles:
             return profiles
 
-    @log_time
+    # log
     async def get(self, name: str) -> Profile | None:
         async with self.profiles as profiles:
             if name not in profiles.all:
@@ -27,7 +27,7 @@ class ProfilesRepository:
 
             return profiles.all[name]
 
-    @log_time
+    # log
     async def create_new_profile(self, profile_name: str) -> None:
         async with self.profiles as profiles:
             if profile_name in profiles.all:
@@ -37,13 +37,13 @@ class ProfilesRepository:
 
             self.profiles.set(profiles)
 
-    @log_time
+    # log
     async def create_profile(self, profile_name: str, profile_data: Profile) -> None:
         async with self.profiles as profiles:
             profiles.all[profile_name] = profile_data
             self.profiles.set(profiles)
 
-    @log_time
+    # log
     async def delete_profile(self, profile_name: str) -> None:
         async with self.profiles as profiles:
             if profile_name in profiles.all:
@@ -53,7 +53,7 @@ class ProfilesRepository:
 
             self.profiles.set(profiles)
 
-    @log_time
+    # log
     async def update_profile(self, profile_name: str, profile: Profile) -> None:
         async with self.profiles as profiles:
             if profile_name in profiles.all:

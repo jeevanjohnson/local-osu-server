@@ -13,7 +13,7 @@ from nicegui.events import UploadEventArguments
 
 import usecases.application.client.state
 import usecases.domain.profiles
-import usecases.server_settings
+import usecases.domain.server_settings
 from models.database.profiles import CurrentProfiles as Profiles
 
 
@@ -170,7 +170,7 @@ async def server_settings():
 
     ui.label("Server Settings")
 
-    server_settings = await usecases.server_settings.get_server_settings()
+    server_settings = await usecases.domain.server_settings.get_server_settings()
 
     if server_settings is None:
         ui.label(
@@ -179,7 +179,7 @@ async def server_settings():
         return
 
     async def on_setting_change(setting_name: str, setting_value):
-        server_settings = await usecases.server_settings.get_server_settings()
+        server_settings = await usecases.domain.server_settings.get_server_settings()
 
         if server_settings is None:
             ui.notify(
@@ -193,7 +193,7 @@ async def server_settings():
         server_settings = server_settings.model_copy(
             update={setting_name: setting_value}
         )
-        await usecases.server_settings.update_server_settings(server_settings)
+        await usecases.domain.server_settings.update_server_settings(server_settings)
 
         ui.notify(f"Updated setting '{setting_name}' to '{setting_value}'")
 

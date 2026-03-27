@@ -16,12 +16,12 @@ from watchdog.events import FileSystemEventHandler
 from watchdog.observers import Observer
 
 try:
-    from adapters import log
+    # from adapters import log
     from constants.paths import CACHE_SONGS_FOLDER  # type: ignore
 except ImportError:
     # Ensure we are running from the project root
     sys.path.insert(0, str(Path(__file__).parent.parent))
-    from adapters import log
+    # from adapters import log
     from constants.paths import CACHE_SONGS_FOLDER
 
 """ ----- Process Start ----- """
@@ -58,7 +58,7 @@ def find_songs_folder() -> None:
             break
 
     if cfg_path is None:
-        log.warning("osu! cfg don't exists")
+        print("osu! cfg don't exists")
         return
 
     raw_cfg = cfg_path.read_text(errors="ignore")
@@ -78,7 +78,7 @@ def find_songs_folder() -> None:
     else:
         SONGS_FOLDER = osu_path.parent / songs_folder
 
-    log.success(f"Found songs folder at {SONGS_FOLDER}")
+    print(f"Found songs folder at {SONGS_FOLDER}")
 
 
 class ParseOsuFileResponse(TypedDict):
@@ -112,7 +112,7 @@ def load_cache() -> None:
     CACHE_SONGS_FOLDER.parent.mkdir(parents=True, exist_ok=True)
 
     if CACHE_SONGS_FOLDER.exists():
-        log.info("Loading songs folder cache...")
+        print("Loading songs folder cache...")
         content = orjson.loads(CACHE_SONGS_FOLDER.read_bytes())
         global \
             MD5_TO_PATH, \
@@ -130,12 +130,12 @@ def load_cache() -> None:
         PATH_TO_BEATMAP_ID = content[4]
         PATH_TO_FILENAME = content[5]
 
-        log.success("Songs folder cache loaded successfully.")
+        print("Songs folder cache loaded successfully.")
         return
 
     # Only build cache if SONGS_FOLDER is available
     if SONGS_FOLDER is None:
-        log.warning(
+        print(
             "No cache file found and songs folder not available, starting with empty cache"
         )
         return
@@ -147,7 +147,7 @@ def load_cache() -> None:
         futures = {executor.submit(parse_osu_file, f): f for f in osu_files}
         for future in as_completed(futures):
             response = future.result()
-            log.info(f"Processing {response['source']}...")
+            print(f"Processing {response['source']}...")
 
             md5 = response["md5"]
             beatmap_id = response["beatmap_id"]
@@ -166,13 +166,13 @@ def load_cache() -> None:
                 BEATMAP_ID_TO_PATH[beatmap_id].append(source_str)
                 PATH_TO_BEATMAP_ID[source_str] = beatmap_id
 
-            log.info(
+            print(
                 f"Processed {response['source']}, MD5: {md5}, BeatmapID: {beatmap_id}, Filename: {file_name}"
             )
 
     save_cache()
 
-    log.success("Songs folder cache built and saved successfully.")
+    print("Songs folder cache built and saved successfully.")
 
     return None
 
@@ -190,7 +190,7 @@ def save_cache() -> None:
             ]
         )
     )
-    # log.success("Songs folder cache saved successfully.")
+    # print("Songs folder cache saved successfully.")
 
 
 def update_cache(
@@ -237,7 +237,7 @@ class SongFolderHandler(FileSystemEventHandler):
 
         save_cache()
 
-        log.success(
+        print(
             f"File created: {event.src_path}, MD5: {md5}, BeatmapID: {beatmap_id}, Filename: {file_name}"
         )
 
@@ -260,7 +260,7 @@ class SongFolderHandler(FileSystemEventHandler):
 
         save_cache()
 
-        log.success(
+        print(
             f"File modified: {event.src_path}, MD5: {md5}, BeatmapID: {beatmap_id}, Filename: {file_name}"
         )
 
@@ -297,7 +297,7 @@ class SongFolderHandler(FileSystemEventHandler):
 
         save_cache()
 
-        log.success(
+        print(
             f"File deleted: {event.src_path}, MD5: {md5}, BeatmapID: {beatmap_id}, Filename: {file_name}"
         )
 
@@ -347,27 +347,25 @@ class SongFolderHandler(FileSystemEventHandler):
 
         save_cache()
 
-        log.success(
+        print(
             f"File moved: from {event.src_path} to {event.dest_path}, MD5: {md5}, BeatmapID: {beatmap_id}, Filename: {file_name}"
         )
 
 
 def songs_folder_process() -> None:
-    log.success("Running songs folder process!")
+    print("Running songs folder process!")
     global SONGS_FOLDER
 
     while SONGS_FOLDER is None:
         find_songs_folder()
         if SONGS_FOLDER is None:
-            log.warning("Waiting for osu! client to be launched")
+            # log.warning("Waiting for osu! client to be launched")
             time.sleep(1)
         else:
             break
 
-    def load_existing_cache():
-        load_cache()
-
-    threading.Thread(target=load_existing_cache, daemon=True).start()
+    # Load cache BEFORE starting the observer (blocking, not daemon)
+    load_cache()
 
     event_handler = SongFolderHandler()
     observer = Observer()
@@ -388,11 +386,11 @@ ALL_REGISTERED_COMMANDS: dict[str, Callable[[str], str]] = {}
 
 
 def print_help():
-    log.success("All avaliable commands: ")
+    print("All avaliable commands: ")
     for command_name in ALL_REGISTERED_COMMANDS.keys():
-        log.success(command_name)
+        print(command_name)
 
-    log.warning(
+    print(
         "WHEN FETCHING FROM PATH, MAKE SURE THE PARAMETER IS IN ABSOLUTE PATH FORMAT"
     )
 
@@ -457,7 +455,7 @@ def interactive_mode():
     while SONGS_FOLDER is None:
         find_songs_folder()
         if SONGS_FOLDER is None:
-            log.warning("Waiting for osu! client to be launched")
+            print("Waiting for osu! client to be launched")
             time.sleep(1)
 
     # Load cache
@@ -469,9 +467,8 @@ def interactive_mode():
     observer.schedule(event_handler, str(SONGS_FOLDER), recursive=True)
     observer.start()
 
-    print(json.dumps({"status": "ready"}))
-    sys.stdout.flush()
-    log.success("Subprocess ready for commands with file watcher active")
+    sys.stderr.write(json.dumps({"status": "ready"}) + "\n")
+    sys.stderr.flush()
 
     try:
         while True:
@@ -483,22 +480,22 @@ def interactive_mode():
 
                 parts = line.strip().split("|", 1)
                 if len(parts) != 2:
-                    print(json.dumps({"error": "Invalid format, use CMD|PARAM"}))
-                    sys.stdout.flush()
+                    sys.stderr.write(json.dumps({"error": "Invalid format, use CMD|PARAM"}) + "\n")
+                    sys.stderr.flush()
                     continue
 
                 request, parameter = parts
 
                 if request not in ALL_REGISTERED_COMMANDS:
-                    print(json.dumps({"error": f"Unknown command: {request}"}))
+                    sys.stderr.write(json.dumps({"error": f"Unknown command: {request}"}) + "\n")
                 else:
                     result = ALL_REGISTERED_COMMANDS[request](parameter)
-                    print(json.dumps({"result": result}))
+                    sys.stderr.write(json.dumps({"result": result}) + "\n")
 
-                sys.stdout.flush()
+                sys.stderr.flush()
             except Exception as e:
-                print(json.dumps({"error": str(e)}))
-                sys.stdout.flush()
+                sys.stderr.write(json.dumps({"error": str(e)}) + "\n")
+                sys.stderr.flush()
     finally:
         observer.stop()
         observer.join()

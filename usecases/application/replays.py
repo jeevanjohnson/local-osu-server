@@ -19,7 +19,7 @@ async def get_bancho_replay(
     if lazer_score:
         # Open in browser instead
         usecases.domain.replay.open_lazer_score(score_id=score_id)
-        return "LAZER"  # Special marker
+        return "lazer score opened in browser"  # Special marker
 
     api_client = await usecases.adapters.ossapi.get()
     if api_client is None:

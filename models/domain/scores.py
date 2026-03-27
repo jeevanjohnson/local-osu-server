@@ -3,7 +3,7 @@ from enum import Enum, IntEnum
 
 import ossapi.enums
 
-import calculator.rank
+import usecases.domain.calculator.rank
 from models.bancho.scores import LazerScore, StableScore
 from models.bancho.scores import Score as BanchoScore
 from models.database.scores import CurrentScore as ProfileScore
@@ -86,12 +86,12 @@ class AllScores(list[BanchoScore | ProfileScore]):
             raise ValueError(f"Unsupported scoring algorithm: {scoring_algorithm}")
 
         if scoring_algorithm == ScoringAlgorithm.LAZER:
-            return calculator.rank.position_for_score(
+            return usecases.domain.calculator.rank.position_for_score(
                 scores_total_score=target_score.total_score,
                 data_points=data_points,
             )
         elif scoring_algorithm == ScoringAlgorithm.PP:
-            return calculator.rank.position_for_score(
+            return usecases.domain.calculator.rank.position_for_score(
                 scores_total_score=target_score.performance_points or 0,
                 data_points=data_points,
             )

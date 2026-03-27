@@ -1,7 +1,7 @@
 from typing import Literal
 
-import adapters.osu_daily
-from adapters import log
+# import adapters.osu_daily
+# from adapters import log
 from models.domain.gameplay import osuGameMode
 
 from .linear_interpolation import linear_interpolation
@@ -62,14 +62,14 @@ async def rank_for_pp(pp: PP, game_mode: osuGameMode) -> RANK:
         # Linear interpolation for fetching this value
         return local(pp, "rank", game_mode)
 
-    rank = await adapters.osu_daily.get_rank_for_pp(pp, game_mode)
+    # rank = await adapters.osu_daily.get_rank_for_pp(pp, game_mode)
 
-    if rank is not None:
-        return rank
+    # if rank is not None:
+    #     return rank
 
     # rank for osu!daily isn't working (could be due to missing/invalid credentials or API error)
     # retrive rough estimate using local interpolation of known PP->rank points
-    log.warning(
+    print(
         f"Falling back to local rank estimation for pp={pp} due to osu!daily API failure or missing credentials."
     )
 
@@ -89,12 +89,12 @@ async def pp_for_rank(rank: RANK, game_mode: osuGameMode) -> PP:
     Returns:
         PP as integer (defaults to 0 if fetch fails)
     """
-    pp = await adapters.osu_daily.get_pp_for_rank(rank, game_mode)
+    # pp = await adapters.osu_daily.get_pp_for_rank(rank, game_mode)
 
-    if pp is not None:
-        return pp
+    # if pp is not None:
+    #     return pp
 
-    log.warning(
+    print(
         f"Falling back to local PP estimation for rank={rank} due to osu!daily API failure or missing credentials."
     )
     return local(rank, "pp", game_mode)

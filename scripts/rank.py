@@ -6,7 +6,7 @@ SCRIPT USED FOR BUILDING THE DATA POINTS FOR THE RANKING SYSTEM.
 # from asyncio import log
 import sys
 
-# from adapters import log
+# # from adapters import log
 from pathlib import Path
 
 import ossapi

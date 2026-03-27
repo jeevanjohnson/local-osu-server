@@ -4,7 +4,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from adapters import OsuFile
+from usecases.adapters.osu_file import OsuFile
 from processes.songs_folder import Commands
 
 
@@ -34,9 +34,9 @@ class OsuFileRepository:
 
             # Wait for "ready" confirmation with timeout
             try:
-                assert self._process.stdout is not None
+                assert self._process.stderr is not None
                 line = await asyncio.wait_for(
-                    self._process.stdout.readline(), timeout=5.0
+                    self._process.stderr.readline(), timeout=5.0
                 )
                 response = line.decode().strip()
                 if "ready" not in response.lower():
@@ -59,9 +59,9 @@ class OsuFileRepository:
             process.stdin.write(cmd_line.encode())
             await process.stdin.drain()
 
-            # Read response from stdout
-            assert process.stdout is not None
-            response_line = await process.stdout.readline()
+            # Read response from stderr
+            assert process.stderr is not None
+            response_line = await process.stderr.readline()
             decoded = response_line.decode().strip()
 
             if not decoded:

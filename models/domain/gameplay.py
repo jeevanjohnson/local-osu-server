@@ -2,8 +2,8 @@ from typing import Any, Iterable, TypedDict
 
 import ossapi.models
 
-from adapters import log
-from calculator.linear_interpolation import linear_interpolation
+# from adapters import log
+from usecases.domain.calculator.linear_interpolation import linear_interpolation
 from osuProtocol.server_packets import osuGameMode, osuMods
 
 LAZER_MODS = list[str]
@@ -93,10 +93,7 @@ class Mods(ACRONYMS):
                 try:
                     return float(mod[:-1])
                 except ValueError:
-                    log.warning(f"Invalid rate change mod format: {mod}")
-                    continue
-
-        if "DT" in self or "NC" in self:
+                    print(f"Invalid rate change mod format: {mod}")
             return 1.5
 
         if "HT" in self or "DC" in self:
@@ -106,7 +103,7 @@ class Mods(ACRONYMS):
 
     def post_init(self):
         if "NC" in self and "DT" in self:
-            log.warning("Both NC and DT mods found, removing DT since NC includes DT")
+            print("Both NC and DT mods found, removing DT since NC includes DT")
             self.remove("DT")
 
     @property
@@ -182,7 +179,7 @@ class Mods(ACRONYMS):
         if game_mode == osuGameMode.STANDARD:
             return self.mod_multiplier_standard()
 
-        log.warning(
+        print(
             f"Mod multiplier for game mode {game_mode} not implemented, defaulting to 1.0"
         )
         return 1.0
@@ -262,10 +259,10 @@ class Mods(ACRONYMS):
             elif mod.startswith(_NON_SCORING_ATTRIBUTE_PREFIXES):
                 # DA settings like AR10.5/OD8/HP6/CS4 affect map attributes, not score multiplier.
                 continue
-            else:
-                log.warning(
-                    f"Unknown mod {mod} with no defined multiplier, ignoring in score calculation"
-                )
+            # else:
+                # log.warning(
+                #     f"Unknown mod {mod} with no defined multiplier, ignoring in score calculation"
+                # )
 
         return multiplier
 
@@ -276,23 +273,20 @@ class Mods(ACRONYMS):
             mod_settings: dict[str, Any] = mod.settings
 
             if mod_settings:
-                try:
-                    score_mods.append(mod.acronym)
+                score_mods.append(mod.acronym)
 
-                    if mod_settings.get("speed_change"):
-                        speed_change = mod_settings["speed_change"]
-                        if speed_change != 1.5 and speed_change != 0.75:
-                            score_mods.append(f"{speed_change}x")
+                if mod_settings.get("speed_change"):
+                    speed_change = mod_settings["speed_change"]
+                    if speed_change != 1.5 and speed_change != 0.75:
+                        score_mods.append(f"{speed_change}x")
 
-                    if mod.acronym == "DA":
-                        score_mods.extend(
-                            parse_difficulty_adjustment_settings(mod_settings)
-                        )
-
-                except Exception as e:
-                    log.warning(
-                        f"Error processing mod settings for mod {mod.acronym}: {e}\nMod settings: {mod.settings}"
+                if mod.acronym == "DA":
+                    score_mods.extend(
+                        parse_difficulty_adjustment_settings(mod_settings)
                     )
+                    # log.warning(
+                    #     f"Error processing mod settings for mod {mod.acronym}: {e}\nMod settings: {mod.settings}"
+                    # )
             else:
                 score_mods.append(mod.acronym)
 

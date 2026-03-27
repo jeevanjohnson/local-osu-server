@@ -5,8 +5,8 @@ import ossapi.models
 from ossapi import UserCompact
 from ossapi.enums import ScoreType
 
-import calculator.performance
-from adapters import OssapiAsync, log
+import usecases.domain.calculator.performance
+from usecases.adapters.ossapiasync import OssapiAsync
 from models.bancho.scores import Combo, LazerScore, Mods, Scores, StableScore
 from models.database.beatmaps import (
     CurrentBeatmap as Beatmap,
@@ -27,7 +27,7 @@ def api_to_score_id(score: ossapi.models.Score) -> int:
         if score.id is not None:
             return score.id
         else:
-            log.warning(
+            print(
                 f"Score with legacy_score_id {score.legacy_score_id} is missing id field, defaulting score_id to 0"
             )
             return 0
@@ -59,7 +59,7 @@ async def api_to_score_model(
     osu_file = await osu_file_resolver.from_md5(beatmap_md5)
 
     if osu_file is None:
-        log.warning(
+        print(
             f"Could not find .osu file for beatmap {beatmap_id} with md5 {beatmap_md5}, "
             f"performance points will not be calculated for score {score_id}"
         )
@@ -67,7 +67,7 @@ async def api_to_score_model(
 
     if score.pp is None:
         if scoring_algorithm == ScoringAlgorithm.PP and pp_calc_fallback:
-            pp = calculator.performance.pp(
+            pp = usecases.domain.calculator.performance.pp(
                 map_file=osu_file,
                 game_mode=game_mode,
                 mods=score_mods,
@@ -131,13 +131,13 @@ async def get_score_for_user_on_beatmap(
             raise e
 
     if beatmap_user_score is None:
-        log.info(f"No score found for user {user_id} on beatmap {beatmap.id}")
+        # log.info(f"No score found for user {user_id} on beatmap {beatmap.id}")
         return None
 
     score = beatmap_user_score.score
 
     if score is None:
-        log.info(f"No score data found for user {user_id} on beatmap {beatmap.id}")
+        # log.info(f"No score data found for user {user_id} on beatmap {beatmap.id}")
         return None
 
     score = await api_to_score_model(
@@ -186,8 +186,6 @@ async def get_friends_scores_for_beatmap(
     return Scores(all_scores=friends_scores)
 
 
-@log.log_time
-# @cached_for_10_minutes
 async def get_scores_for(
     api_client: OssapiAsync,
     beatmap: Beatmap,
@@ -218,11 +216,11 @@ async def get_scores_for(
             type=scoring_algorithm.to_api_v2(),
         )
     except ValueError:
-        # log.error(f"Error fetching scores for beatmap {beatmap.id}: {e}")
+        # # log.error(f"Error fetching scores for beatmap {beatmap.id}: {e}")
         return Scores(all_scores=[])
 
     if not requested_scores:
-        # log.info(f"No scores found for beatmap {beatmap.id} with mods {mods} and ranking type {ranking_type}")
+        # # log.info(f"No scores found for beatmap {beatmap.id} with mods {mods} and ranking type {ranking_type}")
         return Scores(all_scores=[])
 
     scores = Scores(all_scores=[])
@@ -242,22 +240,19 @@ async def get_scores_for(
             if "DT" in mods and "NC" in score_mods:
                 continue
 
-        scores.append(
-            await api_to_score_model(
-                score=score,
-                beatmap_md5=beatmap.md5,
-                beatmap_id=beatmap.id,
-                beatmap_max_combo=beatmap.max_combo,
-                game_mode=game_mode,
-                scoring_algorithm=scoring_algorithm,
-            )
+        score_model = await api_to_score_model(
+            score=score,
+            beatmap_md5=beatmap.md5,
+            beatmap_id=beatmap.id,
+            beatmap_max_combo=beatmap.max_combo,
+            game_mode=game_mode,
+            scoring_algorithm=scoring_algorithm,
         )
+        scores.append(score_model)
 
     return scores
 
 
-# @cached_for_10_minutes
-@log.log_time
 async def get_any_scores_for(
     api_client: OssapiAsync,
     beatmap: Beatmap,
@@ -317,7 +312,7 @@ async def get_replay(
         replay_frames, replay_beatmap_md5 = extract_replay_frames_from_osr(replay_data)
 
         if beatmap_md5 and replay_beatmap_md5 != beatmap_md5:
-            log.error(
+            print(
                 f"Replay beatmap md5 {replay_beatmap_md5} does not match expected {beatmap_md5}"
             )
             return None
@@ -325,7 +320,7 @@ async def get_replay(
             return replay_frames
 
     except ValueError as e:
-        log.error(f"Error fetching replay for score {score_id}: {e}")
+        # log.error(f"Error fetching replay for score {score_id}: {e}")
         raise
 
 

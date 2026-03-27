@@ -3,8 +3,8 @@ Purpose/Domain/Concept:
 - This file contains the logic related to user profiles.
 """
 
-import calculator.rank
-from adapters import log_time
+import usecases.domain.calculator.rank
+# from adapters import log_time
 from models.database.profiles import (
     CurrentProfile as Profile,
 )
@@ -18,33 +18,33 @@ from repositories.profiles import ProfilesRepository
 from repositories.scores import ScoresRepository
 
 
-@log_time
+# log
 async def get_profiles() -> Profiles | None:
     profiles_repo = ProfilesRepository()
     return await profiles_repo.get_all()
 
 
-@log_time
+# log
 async def get_profile(profile_name: str) -> Profile | None:
     profiles_repo = ProfilesRepository()
     return await profiles_repo.get(profile_name)
 
 
-@log_time
+# log
 async def create_profile(profile_name: str) -> None:
     profiles_repo = ProfilesRepository()
     await profiles_repo.create_new_profile(profile_name)
     return
 
 
-@log_time
+# log
 async def delete_profile(profile_name: str) -> None:
     profiles_repo = ProfilesRepository()
     await profiles_repo.delete_profile(profile_name)
     return
 
 
-@log_time
+# log
 async def update_profile(profile_name: str, updated_profile: Profile) -> None:
     profiles_repo = ProfilesRepository()
     await profiles_repo.update_profile(profile_name, updated_profile)
@@ -167,7 +167,7 @@ async def recalculate_stats(
     if score_submitted_combo and score_submitted_combo > profile_stats.max_combo:
         profile_stats.max_combo = score_submitted_combo
 
-    profile_stats.rank = await calculator.rank.rank_for_pp(
+    profile_stats.rank = await usecases.domain.calculator.rank.rank_for_pp(
         profile_stats.performance_points,
         game_mode,
     )

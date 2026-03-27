@@ -6,7 +6,7 @@ Purpose/Domain/Concept:
 from fastapi import APIRouter, status
 from fastapi.responses import RedirectResponse
 
-from adapters import log_time
+# from adapters import log_time
 
 beatmaps = APIRouter(
     prefix="/b",
@@ -14,7 +14,7 @@ beatmaps = APIRouter(
 
 
 @beatmaps.get("/{full_path:path}")
-@log_time
+# log
 async def all(full_path: str):
     return RedirectResponse(
         url=f"https://b.ppy.sh/{full_path}",

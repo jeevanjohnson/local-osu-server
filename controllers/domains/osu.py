@@ -18,17 +18,8 @@ from fastapi import (
 from fastapi.responses import RedirectResponse
 
 import services.osu
-import usecases.application.beatmaps
 import usecases.application.client.update
-import usecases.application.direct
-import usecases.application.leaderboards
-import usecases.domain.osufile
-import usecases.domain.profiles
-import usecases.domain.replay
-import usecases.domain.scores
-import usecases.osufiles.backup
-import usecases.server_settings
-from adapters import log_time
+# from adapters import log_time
 from controllers.dependencies import (
     client_state,
     profile,
@@ -51,7 +42,7 @@ osu = APIRouter(
 
 
 @osu.get("/web/osu-getseasonal.php")
-@log_time
+# log
 async def get_seasonal_backgrounds(
     client_state: ClientState = Depends(client_state),
     profile: Profile | None = Depends(profile),
@@ -64,7 +55,7 @@ async def get_seasonal_backgrounds(
 
 
 @osu.get("/beatmap{full_path:path}")
-@log_time
+# log
 async def get_beatmap(
     full_path: str,
     client_state: ClientState = Depends(client_state),
@@ -79,7 +70,7 @@ async def get_beatmap(
 
 
 @osu.get("/users/{user_id}")
-@log_time
+# log
 async def get_user_page(
     user_id: int = Path(...),
     client_state: ClientState = Depends(client_state),
@@ -93,7 +84,7 @@ async def get_user_page(
 
 
 @osu.get("/home/account/edit")
-@log_time
+# log
 async def get_avatar_page(
     client_state: ClientState = Depends(client_state),
     profile: Profile | None = Depends(profile),
@@ -107,7 +98,7 @@ async def get_avatar_page(
 
 
 @osu.get("/web/osu-osz2-getscores.php")
-@log_time
+# log
 async def get_leaderboard(
     requesting_from_editor_song_select: bool = Query(..., alias="s"),
     leaderboard_version: int = Query(..., alias="vv"),
@@ -146,7 +137,7 @@ async def get_leaderboard(
 
 
 @osu.get("/web/maps/{map_filename}")
-@log_time
+# log
 async def get_map_file(
     request: Request,
     map_filename: str,
@@ -169,7 +160,7 @@ async def get_map_file(
 
 
 @osu.post("/web/osu-submit-modular-selector.php")
-@log_time
+# log
 async def osuSubmitModularSelector(
     request: Request,
     token: str = Header(...),
@@ -210,7 +201,7 @@ async def osuSubmitModularSelector(
 
 
 @osu.get("/web/osu-rate.php")
-@log_time
+# log
 async def osu_rate(
     map_md5: str = Query(..., alias="c"),
     rating: int | None = Query(None, alias="v"),
@@ -233,7 +224,7 @@ async def osu_rate(
 
 
 @osu.get("/web/osu-getreplay.php")
-@log_time
+# log
 async def get_replay(
     score_id: int = Query(..., alias="c"),
     mode: int = Query(..., alias="m"),
@@ -255,7 +246,7 @@ async def get_replay(
 
 
 @osu.get("/web/osu-search.php")
-@log_time
+# log
 async def osu_direct(
     q: str = Query(..., alias="q"),
     mode: int = Query(..., alias="m"),

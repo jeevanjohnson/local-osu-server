@@ -1,7 +1,7 @@
 import rosu_pp_py as rosu
 
-from adapters import log, log_time
-from adapters.osu_file import OsuFile
+# from adapters import log, log_time
+from usecases.adapters.osu_file import OsuFile
 from models.domain.gameplay import Mods, osuGameMode, osuMods
 
 # Mapping from osuGameMode to rosu GameMode
@@ -33,7 +33,7 @@ def pp_for_acc(
     rosu_map = rosu.Beatmap(content=map_file.raw_file)
 
     if rosu_map.is_suspicious():
-        log.warning("Beatmap is marked as suspicious, pp calculation denied to 0")
+        # log.warning("Beatmap is marked as suspicious, pp calculation denied to 0")
         return 0
 
     stable_mods, lazer_mods = mods.to_stable_mods()
@@ -47,19 +47,19 @@ def pp_for_acc(
         stable_mods,  # type: ignore
     )
 
-    calculator = rosu.Performance(
+    usecases.domain.calculator = rosu.Performance(
         mods=stable_mods,  # type: ignore
         accuracy=accuracy,
         combo=combo,
         misses=misses,
     )
 
-    result = calculator.calculate(rosu_map)
+    result = usecases.domain.calculator.calculate(rosu_map)
 
     return int(result.pp)
 
 
-@log_time
+# log
 # @cached_forever
 def pp(
     map_file: OsuFile,
@@ -72,7 +72,7 @@ def pp(
     nmiss: int,
 ) -> int:
     if "WU" in mods or "WD" in mods:
-        log.warning("Score has WU or WD mods, pp calculation denied to 0")
+        # log.warning("Score has WU or WD mods, pp calculation denied to 0")
         return 0
 
     assert map_file.raw_file is not None, (
@@ -82,7 +82,7 @@ def pp(
     rosu_map = rosu.Beatmap(content=map_file.raw_file)
 
     if rosu_map.is_suspicious():
-        log.warning("Beatmap is marked as suspicious, pp calculation denied to 0")
+        # log.warning("Beatmap is marked as suspicious, pp calculation denied to 0")
         return 0
 
     stable_mods, lazer_mods = mods.to_stable_mods()
@@ -127,8 +127,8 @@ def pp(
             kwargs["cs"] = adjustments["cs_change"]
             kwargs["cs_with_mods"] = True
 
-    calculator = rosu.Performance(**kwargs)
+    usecases.domain.calculator = rosu.Performance(**kwargs)
 
-    result = calculator.calculate(rosu_map)
+    result = usecases.domain.calculator.calculate(rosu_map)
 
     return int(result.pp)

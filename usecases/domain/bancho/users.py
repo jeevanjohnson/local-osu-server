@@ -6,8 +6,8 @@ from typing import overload
 import ossapi.models
 from ossapi import ScoreType
 
-import calculator.bancho
-from adapters import OssapiAsync
+import usecases.domain.calculator.bancho
+from usecases.adapters.ossapiasync import OssapiAsync
 from models.domain.gameplay import Mods
 from osuProtocol.server_packets import (
     ALL_PRIVILEGES,
@@ -54,7 +54,7 @@ async def get(
             )
             return bancho_user
         except ValueError:
-            print(f"User with identifier {user_identifiers} not found in osu! API.")
+            print(f"User with identifier {user_identifiers} not found in osu! API.", )
             return None
     else:
         try:
@@ -64,7 +64,7 @@ async def get(
             )
             return bancho_users
         except ValueError:
-            print(f"Users with identifiers {user_identifiers} not found in osu! API.")
+            print(f"Users with identifiers {user_identifiers} not found in osu! API.", )
             return []
 
 
@@ -86,7 +86,7 @@ def current_action(
         f"Estimating player state for user {user.username} (ID: {user.id}) using monthly playcount data and recent score times."
     )
 
-    probabilities, state = calculator.bancho.estimate_player_state(
+    probabilities, state = usecases.domain.calculator.bancho.estimate_player_state(
         monthly_playcount_data,
         score_times=score_times,  # type: ignore
     )
@@ -104,7 +104,7 @@ async def get_presences_and_stats(
     game_mode: osuGameMode,
 ) -> Packets:
     if not user_ids:
-        print("No user IDs provided for fetching presences and stats.")
+        print("No user IDs provided for fetching presences and stats.", )
         return Packets()
 
     bancho_friends = await get(api_client=api_client, user_identifiers=user_ids)

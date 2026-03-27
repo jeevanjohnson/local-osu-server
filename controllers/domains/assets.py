@@ -6,7 +6,7 @@ Purpose/Domain/Concept:
 from fastapi import APIRouter, status
 from fastapi.responses import RedirectResponse
 
-from adapters import log_time
+# from adapters import log_time
 
 assets = APIRouter(
     prefix="/assets",
@@ -14,7 +14,7 @@ assets = APIRouter(
 
 
 @assets.get("/{full_path:path}")
-@log_time
+# log
 async def all_assets(full_path: str):
     return RedirectResponse(
         url=f"https://assets.ppy.sh/{full_path}",

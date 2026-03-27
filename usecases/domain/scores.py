@@ -1,4 +1,3 @@
-from adapters.log import log_time
 from models.bancho.scores import Scores as BanchoScores
 from models.database.beatmaps import (
     CurrentBeatmap as Beatmap,
@@ -54,7 +53,7 @@ async def get_scores_for_beatmap(
     return map_scores
 
 
-@log_time
+# log
 async def score_rank(
     profile_score: ProfileScore,
     bancho_scores: BanchoScores,
@@ -83,7 +82,7 @@ async def score_rank(
     )
 
 
-@log_time
+# log
 async def previous_best_score(
     beatmap: Beatmap,
     new_score: ProfileScore,
@@ -113,7 +112,7 @@ async def previous_best_score(
     return temp_map.scores[0]
 
 
-@log_time
+# log
 async def personal_best_for_beatmap(
     beatmap: Beatmap,
     profile_name: str,
@@ -147,7 +146,7 @@ async def personal_best_for_beatmap(
     return filtered_scores.scores[0]
 
 
-@log_time
+# log
 # @cached_forever
 async def get_replay_frames_for_score_id(score_id: int) -> bytes | None:
     """Get replay frames for a given score ID, if available."""

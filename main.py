@@ -10,7 +10,7 @@ install_dependencies()
 import multiprocessing
 import sys
 
-from adapters import log
+# from adapters import log
 from processes import (
     interface_process,
     los_process,
@@ -33,16 +33,16 @@ def main():
     ]
 
     for process in processes:
-        log.info(f"Starting {process.name}...")
+        print(f"Starting {process.name}...")
         process.start()
-        log.success(f"Succesfully started {process.name}")
+        print(f"Succesfully started {process.name}")
 
     try:
         while any(p.is_alive() for p in processes):
             for process in processes:
                 process.join(timeout=1)
-                if not process.is_alive() and process.exitcode != 0:
-                    log.error(f"{process.name} exited with code {process.exitcode}")
+                # if not process.is_alive() and process.exitcode != 0:
+                #     # log.error(f"{process.name} exited with code {process.exitcode}")
 
     except KeyboardInterrupt:
         pass
@@ -50,18 +50,18 @@ def main():
     finally:
         for process in processes:
             if process.is_alive():
-                log.info(f"Terminating {process.name}...")
+                print(f"Terminating {process.name}...")
                 process.terminate()
                 process.join(timeout=5)
 
                 if process.is_alive():
-                    log.warning(f"{process.name} did not stop, killing...")
+                    print(f"{process.name} did not stop, killing...")
                     process.kill()
                     process.join()
 
-                log.success(f"Succesfully terminated {process.name}!")
-            else:
-                log.warning(f"{process.name} was already dead")
+                print(f"Succesfully terminated {process.name}!")
+            # else:
+            #     # log.warning(f"{process.name} was already dead")
 
     sys.exit(130)
 

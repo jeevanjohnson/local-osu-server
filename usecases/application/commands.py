@@ -1,8 +1,8 @@
 from typing import Any, Callable, Coroutine
 
 import cache
-import calculator.performance
-import calculator.rank
+import usecases.domain.calculator.performance
+import usecases.domain.calculator.rank
 import usecases.adapters.ossapi
 import usecases.application.beatmaps
 import usecases.application.client
@@ -12,12 +12,13 @@ import usecases.domain.beatmaps
 import usecases.domain.chats
 import usecases.domain.profiles
 import usecases.domain.scores
-import usecases.server_settings
+import usecases.domain.server_settings
 from models.database.beatmaps import CurrentBeatmap as Beatmap
 from models.database.client.state import ClientState
 from models.database.profiles import CurrentProfile as Profile
 from models.domain.gameplay import Mods
 from osuProtocol.client_web import osuMapStatus
+from pprint import pformat
 
 CommandFunc = Callable[[ClientState, Profile, str], Coroutine[Any, Any, str]]
 
@@ -352,7 +353,7 @@ async def rank_for_command(
     except ValueError:
         return f"Invalid pp value: {pp_str}. Please provide a valid number."
 
-    rank = await calculator.rank.rank_for_pp(pp, game_mode=client_state.game_mode)
+    rank = await usecases.domain.calculator.rank.rank_for_pp(pp, game_mode=client_state.game_mode)
 
     return (
         f"For {pp}pp in {client_state.game_mode.name}, the estimated rank is #{rank}."
@@ -368,10 +369,44 @@ async def pp_for_command(
     except ValueError:
         return f"Invalid rank value: {rank_str}. Please provide a valid number."
 
-    pp = await calculator.rank.pp_for_rank(rank, game_mode=client_state.game_mode)
+    pp = await usecases.domain.calculator.rank.pp_for_rank(rank, game_mode=client_state.game_mode)
 
     return f"For rank #{rank} in {client_state.game_mode.name}, the estimated pp is {pp}pp."
 
+@register_command(["py"])
+async def python_command(
+    client_state: ClientState, profile: Profile, code: str
+) -> str:
+    """DEVELOPER-ONLY COMMAND. Use with extreme caution. Executes arbitrary Python code and returns the result."""
+    try:
+        # Use the module’s actual globals (including all imports and functions)
+        exec_globals = globals().copy()  # start with a copy to avoid accidental pollution
+        exec_globals.update({
+            "client_state": client_state,
+            "profile": profile,
+            "cache": cache,
+            "usecases": usecases,
+            "usecases.domain.calculator": usecases.domain.calculator,
+            "__builtins__": __builtins__,  # ensure built-ins are available
+        })
+
+        # Local variables for the executed function
+        local_vars = {}
+
+        exec(f"async def __temp_func():\n    return {code}", exec_globals, local_vars)
+        result = await local_vars["__temp_func"]()
+        return f"Result: {pformat(result)}"
+    except Exception as e:
+        return f"Error executing code: {e}"
+
+@register_command("latency")
+async def latency_command(
+    client_state: ClientState, profile: Profile, none: str
+) -> str:
+    """DEVELOPER-ONLY COMMAND. Use with extreme caution. Measures latency of various operations."""
+    latency = await usecases.adapters.ossapi.latency()
+
+    return f"API latency: {latency:.2f} ms"
 
 async def handle_command(
     client_state: ClientState, profile: Profile, message: str

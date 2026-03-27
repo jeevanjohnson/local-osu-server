@@ -10,7 +10,7 @@ from enum import IntEnum, unique
 from pprint import pformat
 from typing import Callable, Type, TypedDict, TypeVar, get_type_hints
 
-from adapters import log
+# from adapters import log
 from osuProtocol.osuTypes import (
     osuBaseType,
     osuIntSigned32Bit,
@@ -19,6 +19,60 @@ from osuProtocol.osuTypes import (
     osuString,
     osuUnsignedChar,
 )
+from typing import TypedDict
+
+
+class LoginData(TypedDict):
+    username: str
+    password_md5: bytes
+    osu_version: str
+    utc_offset: int
+    display_city: bool
+    pm_private: bool
+    osu_path_md5: str
+    adapters_str: str
+    adapters_md5: str
+    uninstall_md5: str
+    disk_signature_md5: str
+
+
+def parse_login_data(raw_login_data: bytes) -> LoginData:
+    (
+        username,
+        password_md5,
+        remainder,
+    ) = raw_login_data.decode().split("\n", maxsplit=2)
+
+    (
+        osu_version,
+        utc_offset,
+        display_city,
+        client_hashes,
+        pm_private,
+    ) = remainder.split("|", maxsplit=4)
+
+    (
+        osu_path_md5,
+        adapters_str,
+        adapters_md5,
+        uninstall_md5,
+        disk_signature_md5,
+    ) = client_hashes[:-1].split(":", maxsplit=4)
+
+    return {
+        "username": username,
+        "password_md5": password_md5.encode(),
+        "osu_version": osu_version,
+        "utc_offset": int(utc_offset),
+        "display_city": display_city == "1",
+        "pm_private": pm_private == "1",
+        "osu_path_md5": osu_path_md5,
+        "adapters_str": adapters_str,
+        "adapters_md5": adapters_md5,
+        "uninstall_md5": uninstall_md5,
+        "disk_signature_md5": disk_signature_md5,
+    }
+
 
 
 @unique
@@ -316,12 +370,12 @@ class Packets(list[Packet]):
             try:
                 packet_id = ClientPackets(packet_id_raw)
             except ValueError:
-                log.warning(f"Skipping unknown packet ID: {packet_id_raw}")
+                # log.warning(f"Skipping unknown packet ID: {packet_id_raw}")
                 self.offset += packet_length
                 continue
 
             if packet_id not in READABLE_PACKETS:
-                log.warning(f"Skipping unimplemented packet with ID: {packet_id.name}")
+                # log.warning(f"Skipping unimplemented packet with ID: {packet_id.name}")
                 self.offset += packet_length
                 continue
 

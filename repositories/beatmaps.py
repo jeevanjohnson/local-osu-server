@@ -1,6 +1,6 @@
 from jays_tools import JsonDatabase
 
-from adapters import log_time
+# from adapters import log_time
 from constants.paths import BEATMAPS
 from models.database.beatmaps import CurrentBeatmap as Beatmap
 from models.database.beatmaps import CurrentBeatmaps as Beatmaps
@@ -11,7 +11,7 @@ class BeatmapsRepository:
     def __init__(self) -> None:
         self.beatmaps = JsonDatabase(path=BEATMAPS, models=Beatmaps)
 
-    @log_time
+    # log
     async def from_md5(self, md5: str) -> Beatmap | None:
         async with self.beatmaps as beatmaps:
             if md5 not in beatmaps.all["by_md5"]:
@@ -33,7 +33,7 @@ class BeatmapsRepository:
 
             return beatmaps.all["by_set_id"][set_id]
 
-    @log_time
+    # log
     async def insert_beatmap(self, bmap: Beatmap) -> None:
         async with self.beatmaps as beatmaps:
             beatmaps.all["by_id"][bmap.id] = bmap
@@ -41,7 +41,7 @@ class BeatmapsRepository:
 
             self.beatmaps.set(beatmaps)
 
-    @log_time
+    # log
     async def insert_beatmap_set(self, beatmap_set: BeatmapSet) -> None:
         async with self.beatmaps as beatmaps:
             beatmaps.all["by_set_id"][beatmap_set.id] = beatmap_set
@@ -52,7 +52,7 @@ class BeatmapsRepository:
 
             self.beatmaps.set(beatmaps)
 
-    @log_time
+    # log
     async def delete_beatmap(self, beatmap: Beatmap) -> None:
         async with self.beatmaps as beatmaps:
             beatmaps.all["by_id"].pop(beatmap.id, None)

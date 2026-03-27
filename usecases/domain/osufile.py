@@ -4,8 +4,8 @@ from typing import TypedDict
 
 from osupyparser import HitObject
 
-from adapters import log
-from adapters.osu_file import OsuFile
+# from adapters import log
+from usecases.adapters.osu_file import OsuFile
 from models.database.beatmaps import CurrentBeatmap as Beatmap
 from repositories.osufiles.backup import OsuFileBackupRepository
 from repositories.osufiles.songs_folder import OsuFileRepository
@@ -140,7 +140,7 @@ async def difficulty_adjusted_map_was_modified(
         return False
 
     if len(original_osu_files) != 1:
-        log.warning(
+        print(
             f"Expected exactly 1 original osu file for beatmap id {original_beatmap_id}, but found {len(original_osu_files)}. Skipping hit object comparison."
         )
         return False
@@ -251,14 +251,14 @@ async def store(osu_file: OsuFile, store_audio: bool = False) -> None:
     osu_file_backup_repository = OsuFileBackupRepository()
 
     if store_audio:
-        log.info(
+        print(
             f"Storing osu! file and audio for map {osu_file.artist} - {osu_file.title} [{osu_file.version}] (MD5: {osu_file.md5})"
         )
         osu_file.get_audio_file()
 
     await osu_file_backup_repository.save_backup(osu_file)
 
-    log.success(
+    print(
         f"Successfully stored osu! file for map {osu_file.artist} - {osu_file.title} [{osu_file.version}] (MD5: {osu_file.md5})"
     )
 
