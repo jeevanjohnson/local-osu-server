@@ -1,6 +1,7 @@
 from typing import Any, Callable, Coroutine
 
-import cache
+import usecases.adapters.cache
+import usecases.domain.cache_control
 import usecases.domain.calculator.performance
 import usecases.domain.calculator.rank
 import usecases.adapters.ossapi
@@ -38,69 +39,6 @@ def register_command(
 
     return decorator
 
-
-# ============================================================================
-# Cache Control Commands
-# ============================================================================
-
-
-@register_command(["cache", "c"])
-async def cache_command(client_state: ClientState, profile: Profile, args: str) -> str:
-    """Cache control command. Usage: !cache [clear|stats|clear-all|help] [pattern]"""
-    subcommand = args.split()[0].lower() if args else "help"
-
-    if subcommand == "help":
-        return (
-            "DEVELOPER-ONLY COMMANDS. Use with caution.\n"
-            "Cache Control Commands:\n"
-            "!cache stats - Show all cached functions and their sizes\n"
-            "!cache clear <function_name> - Clear cache for specific function\n"
-            "!cache clear-pattern <pattern> - Clear caches matching pattern (e.g., '*bancho*')\n"
-            "!cache clear-all - Clear ALL caches\n"
-            "Example: !cache clear-pattern *bancho*"
-        )
-
-    elif subcommand == "stats":
-        stats = cache.get_cache_stats()
-        if not stats:
-            return "No caches registered."
-        msg = "Cache Statistics:\n"
-        total_size = 0
-        for func_name, size in sorted(stats.items()):
-            msg += f"  {func_name}: {size} entries\n"
-            total_size += size
-        msg += f"\nTotal entries cached: {total_size}"
-        return msg
-
-    elif subcommand == "clear":
-        if len(args.split()) < 2:
-            return "Usage: !cache clear <function_name>"
-        func_name = " ".join(args.split()[1:])
-        if cache.clear_cache(func_name):
-            return f"✓ Cleared cache for {func_name}"
-        else:
-            return f"✗ Cache not found for {func_name}"
-
-    elif subcommand == "clear-pattern":
-        if len(args.split()) < 2:
-            return "Usage: !cache clear-pattern <pattern>"
-        pattern = " ".join(args.split()[1:])
-        cleared = cache.clear_cache_pattern(pattern)
-        return f"✓ Cleared {cleared} cache(s) matching pattern '{pattern}'"
-
-    elif subcommand == "clear-all":
-        cleared = cache.clear_all_caches()
-        return f"✓ Cleared ALL {cleared} cache(s)"
-
-    else:
-        return f"Unknown cache subcommand '{subcommand}'. Use !cache help"
-
-
-# ============================================================================
-# Original Commands
-# ============================================================================
-
-
 async def change_beatmap_status(
     beatmap_md5: str,
     profile_name: str,
@@ -114,6 +52,10 @@ async def change_beatmap_status(
 
     if beatmap is None:
         return
+
+    usecases.domain.cache_control.clear_beatmaps_cache()
+    usecases.domain.cache_control.clear_scores_cache()
+    usecases.domain.cache_control.clear_leaderboard_cache()
 
     return beatmap
 
@@ -243,20 +185,19 @@ async def add_friend_command(
     if friend is None:
         return f"User '{friend_name}' not found. Cannot add friend."
 
-    await usecases.domain.profiles.add_friend(
+    updated_profile = await usecases.domain.profiles.add_friend(
         profile_name=client_state.profile_name, friend_user_id=friend.id
     )
 
-    updated_profile = await usecases.domain.profiles.get_profile(
-        client_state.profile_name
-    )
     if updated_profile is None:
         return "Profile not found after adding friend. Please relog to run commands."
 
-    await usecases.application.client.update.friend_add(
-        user_id=friend.id,
+    await usecases.application.client.update.friends(
+        user_ids=updated_profile.friend_ids,
         game_mode=client_state.game_mode,
     )
+
+    usecases.domain.cache_control.clear_profiles_cache()
 
     return f"User '{friend_name}' has been added as a friend."
 
@@ -286,6 +227,8 @@ async def remove_friend_command(
     await usecases.application.client.update.friend_remove(
         user_id=friend.id,
     )
+
+    usecases.domain.cache_control.clear_profiles_cache()
 
     return f"User '{friend_name}' has been removed from friends."
 
@@ -341,6 +284,9 @@ async def delete_score_command(
         game_mode=client_state.game_mode,
     )
 
+    usecases.domain.cache_control.clear_scores_cache()
+    usecases.domain.cache_control.clear_leaderboard_cache()
+
     return "Score deleted successfully and stats recalculated."
 
 
@@ -384,9 +330,7 @@ async def python_command(
         exec_globals.update({
             "client_state": client_state,
             "profile": profile,
-            "cache": cache,
             "usecases": usecases,
-            "usecases.domain.calculator": usecases.domain.calculator,
             "__builtins__": __builtins__,  # ensure built-ins are available
         })
 
@@ -407,6 +351,14 @@ async def latency_command(
     latency = await usecases.adapters.ossapi.latency()
 
     return f"API latency: {latency:.2f} ms"
+
+@register_command("refresh_cache")
+async def refresh_cache_command(
+    client_state: ClientState, profile: Profile, none: str
+) -> str:
+    """DEVELOPER-ONLY COMMAND. Use with extreme caution. Refreshes all caches."""
+    usecases.domain.cache_control.clear_all_domain_caches()
+    return "All caches have been cleared and will be refreshed on next access."
 
 async def handle_command(
     client_state: ClientState, profile: Profile, message: str

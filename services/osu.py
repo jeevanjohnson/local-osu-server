@@ -26,7 +26,12 @@ from osuProtocol.client_web import (
     NotSubmittedLeaderboard,
     UpdateBeatmapRequestLeaderboard,
 )
-
+import usecases.application.score_submission
+import usecases.domain.beatmaps
+import usecases.domain.osufile
+import usecases.domain.score_submission
+import usecases.domain.scores
+from osuProtocol.client_web import SubmissionCharts
 
 async def process_seasonal_backgrounds_request(
     seasonal_background_urls: list[str],
@@ -150,12 +155,7 @@ async def process_map_file_request(
     return MapFileRequestResponse(url=f"https://osu.ppy.sh{url_path}", status_code=301)
 
 
-import usecases.application.score_submission
-import usecases.domain.beatmaps
-import usecases.domain.osufile
-import usecases.domain.score_submission
-import usecases.domain.scores
-from osuProtocol.client_web import SubmissionCharts
+
 
 
 async def process_modular_selector_submission(
@@ -222,8 +222,10 @@ async def process_replay_request(
 
         return replay_data
 
+    score_id = abs(score_id)
+
     replay_frames = await usecases.domain.scores.get_replay_frames_for_score_id(
-        score_id=abs(score_id)
+        score_id=score_id
     )
 
     client_state.loaded_score_id = score_id

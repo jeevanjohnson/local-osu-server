@@ -82,11 +82,18 @@ class CacheManager:
 
     def __init__(self):
         self.caches: dict[str, Cache[Any, Any]] = {}
+        self.domains: dict[str, list[str]] = {}
 
-    def register(self, func_name: str, cache: Cache[Any, Any]) -> None:
-        """Register a cache instance for a function."""
+    def register(self, func_name: str, cache: Cache[Any, Any], domain: str | None = None) -> None:
+        """Register a cache instance for a function, optionally under a domain."""
         self.caches[func_name] = cache
-        print(f"Registered cache for function: {func_name}")
+        if domain:
+            if domain not in self.domains:
+                self.domains[domain] = []
+            self.domains[domain].append(func_name)
+            print(f"Registered cache for function: {func_name} (domain: {domain})")
+        else:
+            print(f"Registered cache for function: {func_name}")
 
     def clear_cache(self, func_name: str) -> bool:
         """Clear cache for a specific function. Returns True if found and cleared."""
@@ -94,6 +101,17 @@ class CacheManager:
             self.caches[func_name].clear()
             return True
         return False
+
+    def clear_domain(self, domain: str) -> int:
+        """Clear all caches in a domain. Returns count cleared."""
+        if domain not in self.domains:
+            return 0
+        cleared = 0
+        for func_name in self.domains[domain]:
+            if func_name in self.caches:
+                self.caches[func_name].clear()
+                cleared += 1
+        return cleared
 
     def clear_cache_pattern(self, pattern: str) -> int:
         """Clear all caches matching a pattern (e.g., 'bancho*'). Returns count cleared."""
@@ -125,7 +143,7 @@ _cache_manager = CacheManager()
 class CacheFunction(Cache[Any, F]):
     """A decorator class that caches the results of function calls based on their arguments."""
 
-    def function(self, func: F) -> F:
+    def function(self, func: F, domain: str | None = None) -> F:
         try:
             is_method = list(inspect.signature(func).parameters)[0] in ("self", "cls")
         except IndexError:
@@ -191,7 +209,7 @@ class CacheFunction(Cache[Any, F]):
         wrapper.__cache_function_name__ = func.__qualname__  # type: ignore
 
         # Register this cache globally
-        _cache_manager.register(func.__qualname__, self)
+        _cache_manager.register(func.__qualname__, self, domain)
 
         return cast(F, wrapper)
 
@@ -201,6 +219,14 @@ def cached(
     save_on_none: bool = True,
 ) -> Callable[[F], F]:
     return CacheFunction(time_to_live=time_to_live, save_on_none=save_on_none).function
+
+
+def cache_group(domain: str, ttl: timedelta | Literal["forever"] = timedelta(minutes=10)) -> Callable[[F], F]:
+    """Create a cache decorator for a specific domain with optional TTL override."""
+    def decorator(func: F) -> F:
+        cache = CacheFunction(time_to_live=ttl)
+        return cache.function(func, domain=domain)
+    return decorator
 
 
 def cached_for_one_minute(func: F) -> F:
@@ -240,6 +266,16 @@ def clear_cache(func_name: str) -> bool:
     Returns True if cache was found and cleared, False otherwise.
     """
     return _cache_manager.clear_cache(func_name)
+
+
+def clear_domain(domain: str) -> int:
+    """
+    Clear all caches in a specific domain.
+
+    Example: clear_domain("leaderboard")
+    Returns count of caches cleared.
+    """
+    return _cache_manager.clear_domain(domain)
 
 
 def clear_cache_pattern(pattern: str) -> int:

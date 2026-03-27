@@ -16,15 +16,15 @@ from osuProtocol.server_packets import osuGameMode
 from repositories.beatmaps import BeatmapsRepository
 from repositories.profiles import ProfilesRepository
 from repositories.scores import ScoresRepository
+import usecases.domain.cache_control
 
 
-# log
 async def get_profiles() -> Profiles | None:
     profiles_repo = ProfilesRepository()
     return await profiles_repo.get_all()
 
 
-# log
+@usecases.domain.cache_control.cache_profiles
 async def get_profile(profile_name: str) -> Profile | None:
     profiles_repo = ProfilesRepository()
     return await profiles_repo.get(profile_name)
@@ -64,7 +64,6 @@ async def remove_friend_from_profile(profile_name: str, friend_user_id: int) -> 
         await profiles_repo.update_profile(profile_name, profile)
 
     return
-
 
 async def recalculate_stats(
     profile_name: str, game_mode: osuGameMode, score_submitted_combo: int | None = None
@@ -177,7 +176,7 @@ async def recalculate_stats(
     return profile
 
 
-async def add_friend(profile_name: str, friend_user_id: int) -> None:
+async def add_friend(profile_name: str, friend_user_id: int) -> Profile | None:
     profiles_repo = ProfilesRepository()
 
     profile = await profiles_repo.get(profile_name)
@@ -188,4 +187,4 @@ async def add_friend(profile_name: str, friend_user_id: int) -> None:
         profile.friend_ids.append(friend_user_id)
         await profiles_repo.update_profile(profile_name, profile)
 
-    return
+    return profile

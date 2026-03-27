@@ -1,10 +1,9 @@
 from typing import Literal
 
-# import adapters.osu_daily
-# from adapters import log
 from models.domain.gameplay import osuGameMode
 
 from .linear_interpolation import linear_interpolation
+import usecases.domain.cache_control
 
 PP = int
 RANK = int
@@ -13,7 +12,7 @@ RANK = int
 # TODO: Make a script that gets data points & then these functions can just read from a file instead of hardcoding these values
 
 
-# @cached_forever
+@usecases.domain.cache_control.cache_group("performance")
 def local(
     input: PP | RANK, output_type: Literal["pp", "rank"], game_mode: osuGameMode
 ) -> RANK | PP:
@@ -45,7 +44,7 @@ def local(
     return int(round(result))
 
 
-# @cached_forever
+@usecases.domain.cache_control.cache_group("performance")
 async def rank_for_pp(pp: PP, game_mode: osuGameMode) -> RANK:
     """
     Fetch rank for given PP value using osu!daily API.
@@ -76,7 +75,7 @@ async def rank_for_pp(pp: PP, game_mode: osuGameMode) -> RANK:
     return local(pp, "rank", game_mode)
 
 
-# @cached_forever
+@usecases.domain.cache_control.cache_group("performance")
 async def pp_for_rank(rank: RANK, game_mode: osuGameMode) -> PP:
     """
     Fetch PP for given rank using osu!daily API.

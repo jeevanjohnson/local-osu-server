@@ -16,6 +16,7 @@ from models.domain.scores import AcceptedScores
 from osuProtocol.client_web import ScoringAlgorithm
 from osuProtocol.replay import extract_replay_frames_from_osr
 from repositories.osufiles.songs_folder import OsuFileRepository
+import usecases.domain.cache_control
 
 
 def api_is_score_lazer(score: ossapi.models.Score) -> bool:
@@ -101,7 +102,7 @@ async def api_to_score_model(
     )
 
 
-# @cached_for_10_minutes
+@usecases.domain.cache_control.cache_scores
 async def get_score_for_user_on_beatmap(
     api_client: OssapiAsync,
     beatmap: Beatmap,
@@ -154,7 +155,7 @@ async def get_score_for_user_on_beatmap(
     return score
 
 
-# @cached_for_10_minutes
+@usecases.domain.cache_control.cache_scores
 async def get_friends_scores_for_beatmap(
     api_client: OssapiAsync,
     beatmap: Beatmap,
@@ -185,7 +186,7 @@ async def get_friends_scores_for_beatmap(
 
     return Scores(all_scores=friends_scores)
 
-
+@usecases.domain.cache_control.cache_scores
 async def get_scores_for(
     api_client: OssapiAsync,
     beatmap: Beatmap,
@@ -252,7 +253,7 @@ async def get_scores_for(
 
     return scores
 
-
+@usecases.domain.cache_control.cache_scores
 async def get_any_scores_for(
     api_client: OssapiAsync,
     beatmap: Beatmap,
@@ -269,8 +270,7 @@ async def get_any_scores_for(
         scoring_algorithm=scoring_algorithm,
     )
 
-
-# @cached_for_10_minutes
+@usecases.domain.cache_control.cache_scores
 async def get_mod_specific_scores_for(
     api_client: OssapiAsync,
     beatmap: Beatmap,
@@ -288,8 +288,7 @@ async def get_mod_specific_scores_for(
         scoring_algorithm=scoring_algorithm,
     )
 
-
-# @cached_for_10_minutes
+@usecases.domain.cache_control.cache_scores
 async def get_replay(
     api_client: OssapiAsync, score_id: int, beatmap_md5: str | None = None
 ) -> bytes | None:
@@ -324,7 +323,7 @@ async def get_replay(
         raise
 
 
-# @cached_for_five_minutes
+@usecases.domain.cache_control.cache_scores
 async def get_recent_from(
     api_client: OssapiAsync,
     user_id: int,

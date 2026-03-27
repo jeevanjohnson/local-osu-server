@@ -33,9 +33,6 @@ async def decrypt(
 
     return score_data, client_hash_decoded, replay_file
 
-
-
-
 async def submit(
     score_id: int,
     map_file: OsuFile,

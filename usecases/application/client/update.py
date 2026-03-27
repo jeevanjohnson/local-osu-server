@@ -13,9 +13,11 @@ from osuProtocol.server_packets import (
     osuAction,
     osuCountryCode,
     osuGameMode,
+    UserFriendList
 )
 from repositories.client.state import ClientStateRepository
 from repositories.client.update import ClientUpdateRepository
+import usecases.domain.cache_control
 
 
 async def clear() -> bytes:
@@ -234,22 +236,9 @@ async def friends(
 
     await client_update_repo.queue(friends_packets)
 
-
-async def friend_add(user_id: int, game_mode: osuGameMode) -> None:
-    client_update_repo = ClientUpdateRepository()
-
-    api_client = await usecases.adapters.ossapi.get()
-    if api_client is None:
-        await restart_client()
-        return
-
-    friend_packets = await usecases.domain.bancho.users.get_presences_and_stats(
-        api_client=api_client,
-        user_ids=[user_id],
-        game_mode=game_mode,
+    await client_update_repo.queue(
+        UserFriendList(friend_ids=user_ids)
     )
-
-    await client_update_repo.queue(friend_packets)
 
 
 async def message(recipient: str, sender: str, message: str, sender_id: int) -> None:

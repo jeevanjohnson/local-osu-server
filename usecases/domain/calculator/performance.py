@@ -3,6 +3,7 @@ import rosu_pp_py as rosu
 # from adapters import log, log_time
 from usecases.adapters.osu_file import OsuFile
 from models.domain.gameplay import Mods, osuGameMode, osuMods
+import usecases.domain.cache_control
 
 # Mapping from osuGameMode to rosu GameMode
 ROSU_GAME_MODE_MAP: dict[osuGameMode, rosu.GameMode] = {
@@ -13,7 +14,7 @@ ROSU_GAME_MODE_MAP: dict[osuGameMode, rosu.GameMode] = {
 }
 
 
-# @cached_forever
+@usecases.domain.cache_control.cache_group("performance")
 def pp_for_acc(
     map_file: OsuFile,
     game_mode: osuGameMode,
@@ -47,20 +48,19 @@ def pp_for_acc(
         stable_mods,  # type: ignore
     )
 
-    usecases.domain.calculator = rosu.Performance(
+    calculator = rosu.Performance(
         mods=stable_mods,  # type: ignore
         accuracy=accuracy,
         combo=combo,
         misses=misses,
     )
 
-    result = usecases.domain.calculator.calculate(rosu_map)
+    result = calculator.calculate(rosu_map)
 
     return int(result.pp)
 
 
-# log
-# @cached_forever
+@usecases.domain.cache_control.cache_group("performance")
 def pp(
     map_file: OsuFile,
     game_mode: osuGameMode,
@@ -127,8 +127,8 @@ def pp(
             kwargs["cs"] = adjustments["cs_change"]
             kwargs["cs_with_mods"] = True
 
-    usecases.domain.calculator = rosu.Performance(**kwargs)
+    calculator = rosu.Performance(**kwargs)
 
-    result = usecases.domain.calculator.calculate(rosu_map)
+    result = calculator.calculate(rosu_map)
 
     return int(result.pp)

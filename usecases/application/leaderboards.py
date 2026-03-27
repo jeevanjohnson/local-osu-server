@@ -15,6 +15,7 @@ from osuProtocol.client_web import (
     LeaderboardWithScores,
     ScoringAlgorithm,
 )
+import usecases.domain.cache_control
 
 Position = int
 TotalScore = int
@@ -24,7 +25,7 @@ UserIDs = int
 
 NO_LEADERBOARD_LIMIT = 1000000
 
-
+@usecases.domain.cache_control.cache_leaderboard
 async def personal_scores_leaderboard(
     profile_name: str,
     beatmap: Beatmap,
@@ -55,7 +56,7 @@ async def personal_scores_leaderboard(
         accepted_scores=AcceptedScores.BOTH,
     )
 
-
+@usecases.domain.cache_control.cache_leaderboard
 async def friends_leaderboard(
     profile_name: str,
     beatmap: Beatmap,
@@ -101,7 +102,7 @@ async def friends_leaderboard(
         accepted_scores=accepted_scores,
     )
 
-
+@usecases.domain.cache_control.cache_leaderboard
 async def selected_mods_leaderboard(
     profile_name: str,
     beatmap: Beatmap,
@@ -154,7 +155,7 @@ async def selected_mods_leaderboard(
         accepted_scores=accepted_scores,
     )
 
-
+@usecases.domain.cache_control.cache_leaderboard
 async def global_leaderboard(
     profile_name: str,
     beatmap: Beatmap,
@@ -200,7 +201,7 @@ async def global_leaderboard(
         accepted_scores=accepted_scores,
     )
 
-
+@usecases.domain.cache_control.cache_leaderboard
 async def from_request(
     beatmap: Beatmap,
     leaderboard_type: LeaderboardType,

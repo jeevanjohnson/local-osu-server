@@ -7,9 +7,9 @@ from osuProtocol.client_web import osuMapStatus
 from osuProtocol.server_packets import osuGameMode
 from repositories.beatmaps import BeatmapsRepository
 from repositories.osufiles.songs_folder import OsuFileRepository
-import usecases.domain.osufile
+import usecases.domain.cache_control
 
-
+@usecases.domain.cache_control.cache_beatmaps
 async def from_db(
     beatmap_md5: str | None = None, beatmap_id: int | None = None
 ) -> Beatmap | None:
@@ -27,7 +27,7 @@ async def from_db(
 
     return None
 
-
+@usecases.domain.cache_control.cache_beatmaps
 async def from_api_md5(
     api_client: OssapiAsync,
     beatmap_md5: str,
@@ -92,7 +92,7 @@ async def from_api_md5(
 
     return bmap
 
-
+@usecases.domain.cache_control.cache_beatmaps
 async def from_api_id(
     api_client: OssapiAsync,
     profile_name: str,
@@ -144,7 +144,7 @@ async def from_api_id(
 
     return bmap
 
-
+@usecases.domain.cache_control.cache_beatmaps
 async def find_unsubmitted_map(
     profile_name: str, beatmap_md5: str, beatmap_set_id: int, map_filename: str
 ) -> Beatmap | None:
@@ -180,7 +180,7 @@ async def find_unsubmitted_map(
 
     return None
 
-
+@usecases.domain.cache_control.cache_beatmaps
 async def from_difficulty_adjusted_request(
     api_client: OssapiAsync,
     profile_name: str,

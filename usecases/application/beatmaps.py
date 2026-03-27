@@ -4,6 +4,7 @@ import usecases.domain.osufile
 from models.database.beatmaps import (
     CurrentBeatmap as Beatmap,
 )
+import usecases.domain.cache_control
 
 
 async def from_osu_scheme_request(
@@ -40,7 +41,7 @@ async def from_osu_scheme_request(
 
     return None
 
-
+@usecases.domain.cache_control.cache_beatmaps
 async def from_leaderboard_request(
     beatmap_md5: str,
     beatmap_set_id: int,
@@ -95,7 +96,7 @@ async def from_leaderboard_request(
     # Phase 5: Call the user to update the map
     return None
 
-
+@usecases.domain.cache_control.cache_beatmaps
 async def from_score_submission_request(
     beatmap_md5: str, profile_name: str
 ) -> Beatmap | None:
@@ -137,7 +138,7 @@ async def refresh_status_from_api(profile_name: str, beatmap: Beatmap) -> Beatma
 
     return refreshed_beatmap
 
-
+@usecases.domain.cache_control.cache_beatmaps
 async def from_md5(beatmap_md5: str, profile_name: str) -> Beatmap | None:
     beatmap = await usecases.domain.beatmaps.from_db(beatmap_md5)
     if beatmap:
