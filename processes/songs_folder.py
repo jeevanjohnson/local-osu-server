@@ -40,9 +40,12 @@ PATH_TO_FILENAME: dict[str, str] = {}
 def find_songs_folder() -> None:
     global SONGS_FOLDER
 
-    processes = [
-        process for process in psutil.process_iter() if process.name() == "osu!.exe"
-    ]
+    try:
+        processes = [
+            process for process in psutil.process_iter() if process.name() == "osu!.exe"
+        ]
+    except psutil.NoSuchProcess:
+        return
 
     if not processes:
         return
