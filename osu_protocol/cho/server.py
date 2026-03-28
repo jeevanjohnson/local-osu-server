@@ -306,14 +306,13 @@ class osuGameMode(IntEnum):
             "mania": cls.MANIA,
         }[playmode.lower()]
 
-    # @classmethod
-    # def from_api_v2_beatmap(cls, bmap: ossapi.models.Beatmap) -> "osuGameMode":
-    #     return {
-    #         ossapi.enums.GameMode.OSU: cls.STANDARD,
-    #         ossapi.enums.GameMode.TAIKO: cls.TAIKO,
-    #         ossapi.enums.GameMode.CATCH: cls.CATCH_THE_BEAT,
-    #         ossapi.enums.GameMode.MANIA: cls.MANIA
-    #     }[mode]
+    def to_snapshot(self) -> str:
+        return {
+            self.STANDARD: "osu",
+            self.TAIKO: "taiko",
+            self.CATCH_THE_BEAT: "fruits",
+            self.MANIA: "mania",
+        }[self]
 
 
 @unique

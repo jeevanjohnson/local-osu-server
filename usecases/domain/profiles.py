@@ -51,6 +51,18 @@ async def update_profile(profile_name: str, updated_profile: Profile) -> None:
     return
 
 
+async def increment_playcount(
+    profile_name: str,
+    profile: Profile,
+    game_mode: osuGameMode,
+) -> Profile:
+    """Increment player's playcount and save to database."""
+    profile.performance[game_mode].playcount += 1
+    profiles_repo = ProfilesRepository()
+    await profiles_repo.update_profile(profile_name, profile)
+    return profile
+
+
 async def remove_friend_from_profile(profile_name: str, friend_user_id: int) -> None:
     profiles_repo = ProfilesRepository()
 

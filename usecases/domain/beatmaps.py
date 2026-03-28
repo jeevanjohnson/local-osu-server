@@ -69,8 +69,9 @@ async def from_api_md5(
 
     beatmap_set = api_beatmap.beatmapset()
 
+    now = datetime.now()
     bmap = Beatmap(
-        time_inserted=datetime.now(),
+        time_inserted=now,
         id=api_beatmap.id,
         set_id=api_beatmap.beatmapset_id,
         md5=api_beatmap.checksum or beatmap_md5,
@@ -82,7 +83,9 @@ async def from_api_md5(
         mode=osuGameMode.from_api_v2(api_beatmap.mode),
         difficulty_adjusted=False,
         play_count=api_beatmap.playcount,
+        play_count_timestamp=now,
         pass_count=api_beatmap.passcount,
+        pass_count_timestamp=now,
         last_updated=api_beatmap.last_updated,
         average_rating=beatmap_set.rating,
     )
@@ -121,8 +124,9 @@ async def from_api_id(
 
     beatmap_set = api_beatmap.beatmapset()
 
+    now = datetime.now()
     bmap = Beatmap(
-        time_inserted=datetime.now(),
+        time_inserted=now,
         id=api_beatmap.id,
         set_id=api_beatmap.beatmapset_id,
         md5=api_beatmap.checksum,
@@ -131,7 +135,9 @@ async def from_api_id(
         difficulty_name=api_beatmap.version,
         max_combo=api_beatmap.max_combo or 0,
         play_count=api_beatmap.playcount,
+        play_count_timestamp=now,
         pass_count=api_beatmap.passcount,
+        pass_count_timestamp=now,
         last_updated=api_beatmap.last_updated,
         status={profile_name: osuMapStatus.from_api_v2(api_beatmap.ranked)},
         mode=osuGameMode.from_api_v2(api_beatmap.mode),
@@ -157,8 +163,9 @@ async def find_unsubmitted_map(
         return
 
     if osu_file.unsubmitted:
+        now = datetime.now()
         unsubmitted_beatmap = Beatmap(
-            time_inserted=datetime.now(),
+            time_inserted=now,
             id=osu_file.beatmap_id,
             set_id=beatmap_set_id,
             md5=beatmap_md5,
@@ -170,8 +177,10 @@ async def find_unsubmitted_map(
             mode=osuGameMode.STANDARD,
             difficulty_adjusted=False,
             play_count=0,
+            play_count_timestamp=now,
             pass_count=0,
-            last_updated=datetime.now(),
+            pass_count_timestamp=now,
+            last_updated=now,
             average_rating=0.0,
         )
 
@@ -233,7 +242,9 @@ async def from_difficulty_adjusted_request(
         mode=original_beatmap.mode,
         difficulty_adjusted=True,
         play_count=original_beatmap.play_count,
+        play_count_timestamp=original_beatmap.play_count_timestamp,
         pass_count=original_beatmap.pass_count,
+        pass_count_timestamp=original_beatmap.pass_count_timestamp,
         last_updated=original_beatmap.last_updated,
         average_rating=original_beatmap.average_rating,
     )
@@ -246,6 +257,39 @@ async def from_difficulty_adjusted_request(
     await beatmap_repo.insert_beatmap(difficulty_adjusted_beatmap)
 
     return difficulty_adjusted_beatmap
+
+
+async def ensure_counts_fresh(
+    beatmap: Beatmap,
+    api_client: OssapiAsync,
+    stale_after_hours: int = 5,
+) -> Beatmap:
+    """Refresh play_count and pass_count if older than stale_after_hours."""
+    now = datetime.now()
+    
+    # Check if play_count is stale
+    play_count_age = (now - beatmap.play_count_timestamp).total_seconds()
+    if play_count_age > stale_after_hours * 3600:
+        try:
+            api_beatmap = await api_client.beatmap(beatmap_id=beatmap.id)
+            if api_beatmap:
+                beatmap.play_count = api_beatmap.playcount
+                beatmap.play_count_timestamp = now
+        except Exception as e:
+            print(f"[DEBUG] Error refreshing play_count for beatmap {beatmap.id}: {e}")
+    
+    # Check if pass_count is stale
+    pass_count_age = (now - beatmap.pass_count_timestamp).total_seconds()
+    if pass_count_age > stale_after_hours * 3600:
+        try:
+            api_beatmap = await api_client.beatmap(beatmap_id=beatmap.id)
+            if api_beatmap:
+                beatmap.pass_count = api_beatmap.passcount
+                beatmap.pass_count_timestamp = now
+        except Exception as e:
+            print(f"[DEBUG] Error refreshing pass_count for beatmap {beatmap.id}: {e}")
+    
+    return beatmap
 
 
 async def refresh_beatmapset_status_from_api(

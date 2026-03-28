@@ -79,6 +79,10 @@ async def rank_command(client_state: ClientState, profile: Profile, none: str) -
     if not beatmaps:
         return "Beatmap not found. Cannot change status without a beatmap."
 
+    # Clear caches since beatmap status changed
+    usecases.domain.cache_control.clear_beatmaps_cache()
+    usecases.domain.cache_control.clear_leaderboard_cache()
+
     primary = beatmaps[0]
     count = len(beatmaps)
     if count == 1:

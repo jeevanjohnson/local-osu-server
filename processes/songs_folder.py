@@ -122,13 +122,13 @@ def load_cache() -> None:
             PATH_TO_FILENAME, \
             FILENAME_TO_PATH
 
-        MD5_TO_PATH = content[0]
-        BEATMAP_ID_TO_PATH = content[1]
-        FILENAME_TO_PATH = content[2]
+        MD5_TO_PATH = content.get("md5_to_path", {})
+        BEATMAP_ID_TO_PATH = content.get("beatmap_id_to_path", {})
+        FILENAME_TO_PATH = content.get("filename_to_path", {})
 
-        PATH_TO_MD5 = content[3]
-        PATH_TO_BEATMAP_ID = content[4]
-        PATH_TO_FILENAME = content[5]
+        PATH_TO_MD5 = content.get("path_to_md5", {})
+        PATH_TO_BEATMAP_ID = content.get("path_to_beatmap_id", {})
+        PATH_TO_FILENAME = content.get("path_to_filename", {})
 
         print("Songs folder cache loaded successfully.")
         return
@@ -180,14 +180,14 @@ def load_cache() -> None:
 def save_cache() -> None:
     CACHE_SONGS_FOLDER.write_bytes(
         orjson.dumps(
-            [
-                MD5_TO_PATH,
-                BEATMAP_ID_TO_PATH,
-                FILENAME_TO_PATH,
-                PATH_TO_MD5,
-                PATH_TO_BEATMAP_ID,
-                PATH_TO_FILENAME,
-            ]
+            {
+                "md5_to_path": MD5_TO_PATH,
+                "beatmap_id_to_path": BEATMAP_ID_TO_PATH,
+                "filename_to_path": FILENAME_TO_PATH,
+                "path_to_md5": PATH_TO_MD5,
+                "path_to_beatmap_id": PATH_TO_BEATMAP_ID,
+                "path_to_filename": PATH_TO_FILENAME,
+            }
         )
     )
     # print("Songs folder cache saved successfully.")
@@ -352,6 +352,34 @@ class SongFolderHandler(FileSystemEventHandler):
         )
 
 
+def validate_cache_on_startup() -> None:
+    """Check for new maps added while server offline and update cache."""
+    if SONGS_FOLDER is None:
+        return
+
+    current_files = set(str(f.absolute()) for f in SONGS_FOLDER.glob("**/*.osu"))
+    cached_files = set(PATH_TO_MD5.keys())
+    new_files = current_files - cached_files
+
+    if not new_files:
+        return
+
+    print(f"Found {len(new_files)} new maps, updating cache...")
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        futures = {executor.submit(parse_osu_file, Path(f)): f for f in new_files}
+        for future in as_completed(futures):
+            response = future.result()
+            update_cache(
+                response["source"],
+                response["md5"],
+                response["beatmap_id"],
+                response["file_name"],
+            )
+
+    save_cache()
+    print(f"Cache validation complete, {len(new_files)} new maps added")
+
+
 def songs_folder_process() -> None:
     print("Running songs folder process!")
     global SONGS_FOLDER
@@ -367,6 +395,9 @@ def songs_folder_process() -> None:
     # Load cache BEFORE starting the observer (blocking, not daemon)
     load_cache()
 
+    # Detect and update cache for maps added while offline
+    validate_cache_on_startup()
+
     event_handler = SongFolderHandler()
     observer = Observer()
     observer.schedule(event_handler, str(SONGS_FOLDER), recursive=True)
@@ -381,149 +412,3 @@ def songs_folder_process() -> None:
 
 
 """ ----- Process End ----- """
-
-ALL_REGISTERED_COMMANDS: dict[str, Callable[[str], str]] = {}
-
-
-def print_help():
-    print("All avaliable commands: ")
-    for command_name in ALL_REGISTERED_COMMANDS.keys():
-        print(command_name)
-
-    print(
-        "WHEN FETCHING FROM PATH, MAKE SURE THE PARAMETER IS IN ABSOLUTE PATH FORMAT"
-    )
-
-
-def register_command(func: Callable[[str], Any]) -> Callable[[str], Any]:
-    ALL_REGISTERED_COMMANDS[func.__name__] = func
-    return func
-
-
-""" ----- Command Handlers ----- """
-
-
-@register_command
-def get_path_by_md5(md5: str) -> str:
-    return MD5_TO_PATH.get(md5, "")
-
-
-@register_command
-def get_path_by_beatmap_id(beatmap_id: str) -> list[str]:
-    return BEATMAP_ID_TO_PATH.get(beatmap_id, [])
-
-
-@register_command
-def get_path_by_filename(filename: str) -> str:
-    return FILENAME_TO_PATH.get(filename, "")
-
-
-@register_command
-def get_md5_by_path(abs_path: str) -> str:
-    return PATH_TO_MD5.get(abs_path, "")
-
-
-@register_command
-def get_beatmap_id_by_path(abs_path: str) -> str:
-    return PATH_TO_BEATMAP_ID.get(abs_path, "")
-
-
-@register_command
-def get_filename_by_path(abs_path: str) -> str:
-    return PATH_TO_FILENAME.get(abs_path, "")
-
-
-class Commands(Enum):
-    GET_PATH_BY_MD5 = "get_path_by_md5"
-    GET_PATH_BY_BEATMAP_ID = "get_path_by_beatmap_id"
-    GET_PATH_BY_FILENAME = "get_path_by_filename"
-    GET_MD5_BY_PATH = "get_md5_by_path"
-    GET_BEATMAP_ID_BY_PATH = "get_beatmap_id_by_path"
-    GET_FILENAME_BY_PATH = "get_filename_by_path"
-
-
-""" ----- Command Handlers End ----- """
-
-""" ----- Main Entry Point ----- """
-
-
-def interactive_mode():
-    """Run in interactive mode, listening for commands on stdin."""
-    global SONGS_FOLDER
-
-    # Find songs folder if not already found
-    while SONGS_FOLDER is None:
-        find_songs_folder()
-        if SONGS_FOLDER is None:
-            print("Waiting for osu! client to be launched")
-            time.sleep(1)
-
-    # Load cache
-    load_cache()
-
-    # Start file watcher in background thread
-    event_handler = SongFolderHandler()
-    observer = Observer()
-    observer.schedule(event_handler, str(SONGS_FOLDER), recursive=True)
-    observer.start()
-
-    sys.stderr.write(json.dumps({"status": "ready"}) + "\n")
-    sys.stderr.flush()
-
-    try:
-        while True:
-            try:
-                # Read command from stdin (blocking)
-                line = sys.stdin.readline()
-                if not line:
-                    break
-
-                parts = line.strip().split("|", 1)
-                if len(parts) != 2:
-                    sys.stderr.write(json.dumps({"error": "Invalid format, use CMD|PARAM"}) + "\n")
-                    sys.stderr.flush()
-                    continue
-
-                request, parameter = parts
-
-                if request not in ALL_REGISTERED_COMMANDS:
-                    sys.stderr.write(json.dumps({"error": f"Unknown command: {request}"}) + "\n")
-                else:
-                    result = ALL_REGISTERED_COMMANDS[request](parameter)
-                    sys.stderr.write(json.dumps({"result": result}) + "\n")
-
-                sys.stderr.flush()
-            except Exception as e:
-                sys.stderr.write(json.dumps({"error": str(e)}) + "\n")
-                sys.stderr.flush()
-    finally:
-        observer.stop()
-        observer.join()
-
-
-if __name__ == "__main__":
-    if not CACHE_SONGS_FOLDER.exists():
-        raise SystemExit("only run when cache file exists")
-
-    args: list[str] = sys.argv[1:]
-    args_len = len(args)
-
-    # Check if running in interactive mode (no args or --interactive flag)
-    if args_len == 0 or (args_len == 1 and args[0] == "--interactive"):
-        interactive_mode()
-    elif args_len == 1:
-        print_help()
-        raise SystemExit(0)
-    elif args_len > 2:
-        raise SystemExit("Bad arguments passed in, format {request} {parameter}")
-    else:
-        # Legacy single-command mode
-        request, parameter = args
-
-        if request not in ALL_REGISTERED_COMMANDS:
-            print_help()
-            raise SystemExit("command doesn't exists")
-
-        load_cache()
-
-        print(json.dumps(ALL_REGISTERED_COMMANDS[request](parameter)))

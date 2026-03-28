@@ -2,6 +2,7 @@ from pathlib import Path
 
 DATA = Path("./.data")
 RESOURCES = Path("./resources")
+SNAPSHOTS = Path("./usecases/domain/calculator/snapshots")
 
 PROFILES = DATA / "profiles.json"  # The file where user profiles will be stored
 SESSIONS = DATA / "sessions.json"  # The file where session information will be stored

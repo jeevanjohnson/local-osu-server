@@ -57,6 +57,13 @@ async def process_submission(
         )
         return OsuErrors.NON, 0
 
+    # Increment player's playcount for every play attempt (passed or failed)
+    profile = await usecases.domain.profiles.increment_playcount(
+        profile_name=profile_name,
+        profile=profile,
+        game_mode=score_data.game_mode,
+    )
+
     if not score_data.passed:  # player quit or failed map
         return OsuErrors.NON, 0
 

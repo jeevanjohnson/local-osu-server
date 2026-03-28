@@ -2,6 +2,7 @@ import asyncio
 
 import usecases.adapters.ossapi
 import usecases.application.client.state
+import usecases.domain.beatmaps
 import usecases.domain.bancho.scores
 import usecases.domain.scores
 from models.database.beatmaps import (
@@ -70,6 +71,12 @@ async def friends_leaderboard(
     if not api_client:
         raise ConnectionError("Failed to get API client for fetching friends' scores.")
 
+    # Refresh play_count/pass_count if stale
+    beatmap = await usecases.domain.beatmaps.ensure_counts_fresh(
+        beatmap=beatmap,
+        api_client=api_client,
+    )
+
     friends_scores = await usecases.domain.bancho.scores.get_friends_scores_for_beatmap(
         api_client=api_client,
         beatmap=beatmap,
@@ -122,6 +129,12 @@ async def selected_mods_leaderboard(
             "Failed to get API client for fetching mod-specific scores."
         )
 
+    # Refresh play_count/pass_count if stale
+    beatmap = await usecases.domain.beatmaps.ensure_counts_fresh(
+        beatmap=beatmap,
+        api_client=api_client,
+    )
+
     bancho, personal_best = await asyncio.gather(
         usecases.domain.bancho.scores.get_mod_specific_scores_for(
             api_client=api_client,
@@ -168,6 +181,12 @@ async def global_leaderboard(
     api_client = await usecases.adapters.ossapi.get()
     if not api_client:
         raise ConnectionError("Failed to get API client for fetching global scores.")
+
+    # Refresh play_count/pass_count if stale
+    beatmap = await usecases.domain.beatmaps.ensure_counts_fresh(
+        beatmap=beatmap,
+        api_client=api_client,
+    )
 
     bancho, personal_best = await asyncio.gather(
         usecases.domain.bancho.scores.get_any_scores_for(
