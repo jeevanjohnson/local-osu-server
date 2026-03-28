@@ -20,6 +20,8 @@ from models.database.profiles import CurrentProfile as Profile
 from models.domain.gameplay import Mods
 from osu_protocol.osu.types import osuMapStatus
 from pprint import pformat
+import usecases.domain.server
+import asyncio
 
 CommandFunc = Callable[[ClientState, Profile, str], Coroutine[Any, Any, str]]
 
@@ -354,7 +356,21 @@ async def latency_command(
     """DEVELOPER-ONLY COMMAND. Use with extreme caution. Measures latency of various operations."""
     latency = await usecases.adapters.ossapi.latency()
 
-    return f"API latency: {latency:.2f} ms"
+    return f"API latency: {latency}"
+
+@register_command("update")
+async def update_command(
+    client_state: ClientState, profile: Profile, none: str
+) -> str:
+    """Checks for updates to the server and provides instructions to update if an update is available."""
+    async def perform_update():
+        msg = await usecases.domain.server.update()
+
+        await usecases.application.client.update.notify(msg)
+
+    asyncio.create_task(perform_update())
+
+    return "Update process started. You will receive a notification in the client when it is complete."
 
 @register_command("refresh_cache")
 async def refresh_cache_command(

@@ -38,11 +38,22 @@ async def credentials_exist() -> CredentialsExistResponse | None:
         "osu_api_v2_client_secret": server_settings.osu_api_v2_client_secret,
     }
 
+def format_time_delta(delta: float) -> str:
+    if delta < 1:
+        return f"{round(delta * 1000, 2)}ms"
+    elif delta < 60:
+        return f"{round(delta, 2)}s"
+    else:
+        minutes = int(delta // 60)
+        seconds = round(delta % 60, 2)
+        return f"{minutes}m {seconds}s"
 
-async def latency() -> float:
+async def latency() -> str:
     start = time.perf_counter()
     async with aiohttp.ClientSession() as session:
         async with session.get("https://osu.ppy.sh/api/v2/") as response:
             await response.read()
 
-    return (time.perf_counter() - start) * 1000  # ms
+    latency = time.perf_counter() - start
+
+    return format_time_delta(latency)

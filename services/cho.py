@@ -14,6 +14,7 @@ from models.database.client.state import ClientState
 from models.database.profiles import CurrentProfile as Profile
 from models.domain.gameplay import Mods
 from osu_protocol.cho.server import Login, LoginAuthFailed, osuAction, osuGameMode
+import usecases.domain.server
 
 
 class LoginResponse(TypedDict):
@@ -60,6 +61,7 @@ async def login(
             "status": "osu-api-credentials-not-found",
         }
 
+
     login_data = parse_login_data(raw_login_data)
     utc_offset = login_data["utc_offset"]
 
@@ -75,6 +77,12 @@ async def login(
     total_score = profile.performance[client_state.game_mode].total_score
     performance_points = profile.performance[client_state.game_mode].performance_points
 
+    update = await usecases.domain.server.is_update_available()
+    if update:
+        update_available_version = update
+    else:
+        update_available_version = None
+    
     login_response = Login(
         username=client_state.profile_name,
         friend_ids=profile.friend_ids,
@@ -90,7 +98,7 @@ async def login(
         total_score=total_score,
         performance_points=performance_points,
         login_message=login_message,
-        latency=api_latency,
+        update_available_version=update_available_version,
     )
 
     login_response += await usecases.domain.bancho.users.get_presences_and_stats(

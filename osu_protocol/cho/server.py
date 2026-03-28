@@ -1014,27 +1014,8 @@ def BanchoUser(
 
     return packets
 
-
-def readable_latency(ms: float) -> str:
-    ms_abs = abs(ms)
-
-    minutes = int(ms_abs // 60000)  # total minutes
-    seconds = int((ms_abs % 60000) // 1000)  # remaining seconds
-    milliseconds = int(ms_abs % 1000)  # remaining milliseconds
-
-    if minutes > 0:
-        return f"{minutes}m {seconds}s {milliseconds}ms"
-    elif seconds > 0:
-        return f"{seconds}s {milliseconds}ms"
-    else:
-        return f"{milliseconds}ms"
-
-
-def BanchoBot(latency: float | None = None) -> Packets:
-    if latency is not None:
-        info_text = f"API V2 latency: {readable_latency(latency)} ʕ•̫͡•ʔ"
-    else:
-        info_text = "over the server... ʕ•̫͡•ʔ"
+def BanchoBot() -> Packets:
+    info_text = "over the server... ʕ•̫͡•ʔ"
 
     packets = Packets()
 
@@ -1084,7 +1065,7 @@ def Login(
     total_score: int,
     performance_points: int,
     login_message: str | None = None,
-    latency: float | None = None,
+    update_available_version: str | None = None,
 ) -> Packets:
     packets = Packets()
 
@@ -1093,12 +1074,13 @@ def Login(
 
     packets += UserPrivileges(ALL_PRIVILEGES)
 
-    if login_message is not None:
-        if "{api_latency}" in login_message and latency is not None:
-            login_message = login_message.replace(
-                "{api_latency}", readable_latency(latency)
-            )
+    if update_available_version is not None:
+        packets += Notification(
+            f"A new LOS version {update_available_version} is available!\n\n"
+            "To update, run the !update command in #osu"
+        )
 
+    if login_message is not None:
         packets += Notification(login_message)
 
     for channel in ["#osu", "#nothing"]:
@@ -1143,7 +1125,7 @@ def Login(
         performance_points=performance_points,
     )
 
-    packets += BanchoBot(latency=latency)
+    packets += BanchoBot()
 
     return packets
 

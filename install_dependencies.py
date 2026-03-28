@@ -12,7 +12,7 @@ def install_dependencies():
         text=True,
     )
     if result.returncode != 0:
-        print("Failed to install Playwright browsers:")
+        print("Failed to install dependencies:")
         print(result.stderr)
         sys.exit(1)
 
