@@ -178,6 +178,12 @@ class Mods(ACRONYMS):
     def mod_multipler(self, game_mode: osuGameMode) -> float:
         if game_mode == osuGameMode.STANDARD:
             return self.mod_multiplier_standard()
+        elif game_mode == osuGameMode.TAIKO:
+            return self.mod_multiplier_taiko()
+        elif game_mode == osuGameMode.CATCH_THE_BEAT:
+            return self.mod_multiplier_catch()
+        elif game_mode == osuGameMode.MANIA:
+            return self.mod_multiplier_mania()
 
         print(
             f"Mod multiplier for game mode {game_mode} not implemented, defaulting to 1.0"
@@ -185,23 +191,23 @@ class Mods(ACRONYMS):
         return 1.0
 
     def mod_multiplier_standard(self) -> float:
+        """Calculate mod multiplier for osu!Standard."""
         multiplier = 1.0
 
         mod_multipliers = {
             "EZ": 0.50,
-            "NF": 0.50,
+            "NF": 1.0,  # Override: No Fail always 1.0, doesn't affect multiplier
             "HT": 0.30,
             "DC": 0.30,
-            "RX": 1.00,
-            "AP": 1.00,
-            "SV2": 1.00,
+            "RX": 1.0,  # Override: Relax multiplier set to 1.0
+            "AP": 1.0,  # Override: Autopilot multiplier set to 1.0
+            "HD": 1.06,
             "HR": 1.06,
             "SD": 1.00,
             "PF": 1.00,
-            "DT": 1.10,
-            "NC": 1.10,
+            "DT": 1.12,
+            "NC": 1.12,
             "FI": 1.00,
-            "HD": 1.06,
             "CO": 1.00,
             "FL": 1.12,
             "BL": 1.12,
@@ -242,6 +248,7 @@ class Mods(ACRONYMS):
             "BU": 1.00,
             "SY": 0.80,
             "DP": 1.00,
+            "SV2": 1.0,  # Override: Score V2 always 1.0, doesn't affect multiplier
         }
 
         rate_change = [m for m in self if m.endswith("x")]
@@ -249,7 +256,6 @@ class Mods(ACRONYMS):
         for mod in self:
             if mod in mod_multipliers:
                 if mod in ["DT", "NC", "HT", "DC"] and rate_change:
-                    # Ignore DT/NC/HT/DC if there's a rate change mod, since the rate change mod will handle the multiplier for those mods
                     continue
                 else:
                     multiplier *= mod_multipliers[mod]
@@ -257,12 +263,174 @@ class Mods(ACRONYMS):
                 rate = float(mod[:-1])
                 multiplier *= self.approximate_score_multiplier_for(rate)
             elif mod.startswith(_NON_SCORING_ATTRIBUTE_PREFIXES):
-                # DA settings like AR10.5/OD8/HP6/CS4 affect map attributes, not score multiplier.
                 continue
-            # else:
-                # log.warning(
-                #     f"Unknown mod {mod} with no defined multiplier, ignoring in score calculation"
-                # )
+
+        return multiplier
+
+    def mod_multiplier_taiko(self) -> float:
+        """Calculate mod multiplier for osu!Taiko."""
+        multiplier = 1.0
+
+        mod_multipliers = {
+            "EZ": 0.50,
+            "NF": 1.0,  # Override: No Fail always 1.0, doesn't affect multiplier
+            "HT": 0.30,
+            "DC": 0.30,
+            "HD": 1.06,
+            "HR": 1.06,
+            "DT": 1.12,
+            "NC": 1.12,
+            "FL": 1.12,
+            "RX": 1.0,  # Override: Relax multiplier set to 1.0
+            "SD": 1.00,
+            "PF": 1.00,
+            "AT": 1.00,
+            "CN": 1.00,
+            "DA": 0.50,
+            "CL": 0.96,
+            "RD": 1.00,
+            "SG": 1.00,
+            "CS": 0.90,
+            "TR": 1.00,
+            "WG": 1.00,
+            "SI": 1.00,
+            "GR": 1.00,
+            "DF": 1.00,
+            "WU": 0.50,
+            "WD": 0.50,
+            "MU": 1.00,
+            "MG": 0.50,
+            "AS": 0.50,
+            "SY": 0.80,
+            "DP": 1.00,
+            "SV2": 1.0,  # Override: Score V2 always 1.0, doesn't affect multiplier
+        }
+
+        rate_change = [m for m in self if m.endswith("x")]
+
+        for mod in self:
+            if mod in mod_multipliers:
+                if mod in ["DT", "NC", "HT", "DC"] and rate_change:
+                    continue
+                else:
+                    multiplier *= mod_multipliers[mod]
+            elif mod.endswith("x"):
+                rate = float(mod[:-1])
+                multiplier *= self.approximate_score_multiplier_for(rate)
+            elif mod.startswith(_NON_SCORING_ATTRIBUTE_PREFIXES):
+                continue
+
+        return multiplier
+
+    def mod_multiplier_catch(self) -> float:
+        """Calculate mod multiplier for osu!Catch."""
+        multiplier = 1.0
+
+        mod_multipliers = {
+            "EZ": 0.50,
+            "NF": 1.0,  # Override: No Fail always 1.0, doesn't affect multiplier
+            "HT": 0.30,
+            "DC": 0.30,
+            "HD": 1.06,
+            "HR": 1.06,
+            "DT": 1.06,
+            "NC": 1.06,
+            "FL": 1.12,
+            "RX": 1.0,  # Override: Relax multiplier set to 1.0
+            "SD": 1.00,
+            "PF": 1.00,
+            "AT": 1.00,
+            "CN": 1.00,
+            "DA": 0.50,
+            "CL": 0.96,
+            "RD": 1.00,
+            "MR": 1.00,
+            "TR": 1.00,
+            "WG": 1.00,
+            "SI": 1.00,
+            "GR": 1.00,
+            "DF": 1.00,
+            "WU": 0.50,
+            "WD": 0.50,
+            "NS": 1.00,
+            "FF": 1.00,
+            "MU": 1.00,
+            "SY": 0.80,
+            "DP": 1.00,
+            "SV2": 1.0,  # Override: Score V2 always 1.0, doesn't affect multiplier
+        }
+
+        rate_change = [m for m in self if m.endswith("x")]
+
+        for mod in self:
+            if mod in mod_multipliers:
+                if mod in ["DT", "NC", "HT", "DC"] and rate_change:
+                    continue
+                else:
+                    multiplier *= mod_multipliers[mod]
+            elif mod.endswith("x"):
+                rate = float(mod[:-1])
+                multiplier *= self.approximate_score_multiplier_for(rate)
+            elif mod.startswith(_NON_SCORING_ATTRIBUTE_PREFIXES):
+                continue
+
+        return multiplier
+
+    def mod_multiplier_mania(self) -> float:
+        """Calculate mod multiplier for osu!Mania."""
+        multiplier = 1.0
+
+        mod_multipliers = {
+            "EZ": 0.50,
+            "NF": 1.0,  # Override: No Fail always 1.0, doesn't affect multiplier
+            "HT": 0.50,
+            "DC": 0.50,
+            "HD": 1.06,
+            "HR": 1.06,
+            "DT": 1.0,  # Rate increase mods get 1x in Mania
+            "NC": 1.0,
+            "FL": 1.12,
+            "SD": 1.00,
+            "PF": 1.00,
+            "AT": 1.00,
+            "CN": 1.00,
+            "DA": 0.50,
+            "CL": 0.96,
+            "RD": 1.00,
+            "CO": 1.00,
+            "FI": 1.00,
+            "IN": 1.00,
+            "HO": 1.00,
+            "TR": 1.00,
+            "WG": 1.00,
+            "SI": 1.00,
+            "GR": 1.00,
+            "DF": 1.00,
+            "WU": 0.50,
+            "WD": 0.50,
+            "TC": 1.00,
+            "BR": 1.00,
+            "MU": 1.00,
+            "SY": 0.80,
+            "DP": 1.00,
+            "SV2": 1.0,  # Override: Score V2 always 1.0, doesn't affect multiplier
+        }
+
+        rate_change = [m for m in self if m.endswith("x")]
+
+        for mod in self:
+            if mod in mod_multipliers:
+                if mod in ["DT", "NC", "HT", "DC"] and rate_change:
+                    continue
+                else:
+                    multiplier *= mod_multipliers[mod]
+            elif mod.endswith("x"):
+                rate = float(mod[:-1])
+                multiplier *= self.approximate_score_multiplier_for(rate)
+            elif mod.startswith(_NON_SCORING_ATTRIBUTE_PREFIXES):
+                continue
+            elif mod in ["1K", "2K", "3K", "4K", "5K", "6K", "7K", "8K", "9K", "10K"]:
+                multiplier *= 0.9
 
         return multiplier
 
