@@ -11,6 +11,9 @@ from models.database.profiles import (
 from models.database.profiles import (
     CurrentProfiles as Profiles,
 )
+from models.database.scores import (
+    CurrentScore as Score,
+)
 from osu_protocol.osu.types import osuMapStatus
 from osu_protocol.cho.server import osuGameMode
 from repositories.beatmaps import BeatmapsRepository
@@ -99,13 +102,13 @@ async def recalculate_stats(
         await profile_repo.update_profile(profile_name, profile)
         return profile
 
-    best_scores_per_map = []
+    best_scores_per_map: list[Score] = []
     total_score = 0
     ranked_score = 0
 
     # Gather all scores for this profile + mode.
     for map_scores in profile_scores.scores.values():
-        mode_scores = []
+        mode_scores: list[Score] = []
 
         for score in map_scores.scores:
             if score.game_mode != game_mode:

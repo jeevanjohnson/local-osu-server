@@ -261,11 +261,20 @@ async def delete_score_command(
     await usecases.application.client.state.update(client_state)
 
     # Recalculate the profile stats without a specific max combo (it's deleted)
-    await usecases.domain.profiles.recalculate_stats(
+    updated_profile = await usecases.domain.profiles.recalculate_stats(
         profile_name=client_state.profile_name,
         game_mode=client_state.game_mode,
     )
 
+    if updated_profile is None:
+        return "Profile not found after deleting score. Please relog to run commands."
+
+    await usecases.application.client.update.stats_with_state_and_profile(
+        client_state=client_state,
+        profile=updated_profile,
+    )
+
+    usecases.domain.cache_control.clear_profiles_cache()
     usecases.domain.cache_control.clear_scores_cache()
     usecases.domain.cache_control.clear_leaderboard_cache()
 
