@@ -204,6 +204,8 @@ async def global_leaderboard(
         ),
     )
 
+    print(f"DEBUG global_leaderboard() - fetched {len(bancho.scores)} scores from Bancho API")
+
     if bancho.total != 0:
         await usecases.application.client.state.update_avaliable_stable_replay_ids_from_scores(
             bancho

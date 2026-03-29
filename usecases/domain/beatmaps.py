@@ -429,4 +429,8 @@ async def change_beatmapset_status(
         await beatmap_repo.insert_beatmap(beatmap)
         updated_beatmaps.append(beatmap)
 
+    usecases.domain.cache_control.clear_beatmaps_cache()
+    usecases.domain.cache_control.clear_scores_cache()
+    usecases.domain.cache_control.clear_leaderboard_cache()
+
     return updated_beatmaps

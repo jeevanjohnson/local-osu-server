@@ -114,8 +114,6 @@ async def process_leaderboard_request(
     client_state.beatmap.set_id = beatmap.set_id
     client_state.beatmap.is_difficulty_adjusted = beatmap.difficulty_adjusted
 
-    client_state.beatmap.watchable_replays = []  # TODO: just wait
-
     await usecases.application.client.state.update(client_state)
 
     bmap_status = beatmap.status[client_state.profile_name]
@@ -178,6 +176,7 @@ async def process_modular_selector_submission(
         profile_name=client_state.profile_name,
     )
 
+    print(f"DEBUG service - score submission result: {charts}, score_id: {score_id}")
     client_state.loaded_score_id = score_id
     await usecases.application.client.state.update(client_state)
 

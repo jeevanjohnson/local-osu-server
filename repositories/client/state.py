@@ -25,14 +25,5 @@ class ClientStateRepository:
             return client_state
 
     async def update_client_state(self, new_state: ClientState) -> None:
-        async with self.client_state as client_state:
-            # Update all fields from new_state
-            client_state.profile_name = new_state.profile_name
-            client_state.logged_in = new_state.logged_in
-            client_state.status = new_state.status
-            client_state.status_message = new_state.status_message
-            client_state.beatmap = new_state.beatmap
-            client_state.mods = new_state.mods
-            client_state.game_mode = new_state.game_mode
-            client_state.direct_reference = new_state.direct_reference
-            self.client_state.set(client_state)
+        async with self.client_state as old_client_state:
+            self.client_state.set(new_state)

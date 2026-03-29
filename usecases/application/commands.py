@@ -13,7 +13,7 @@ import usecases.domain.beatmaps
 import usecases.domain.chats
 import usecases.domain.profiles
 import usecases.domain.scores
-import usecases.domain.server_settings
+import usecases.application.client.state
 from models.database.beatmaps import CurrentBeatmap as Beatmap
 from models.database.client.state import ClientState
 from models.database.profiles import CurrentProfile as Profile
@@ -41,27 +41,6 @@ def register_command(
 
     return decorator
 
-async def change_beatmap_status(
-    beatmap_md5: str,
-    profile_name: str,
-    new_status: osuMapStatus,
-) -> Beatmap | None:
-    beatmap = await usecases.domain.beatmaps.change_beatmap_status(
-        beatmap_md5=beatmap_md5,
-        profile_name=profile_name,
-        new_status=new_status,
-    )
-
-    if beatmap is None:
-        return
-
-    usecases.domain.cache_control.clear_beatmaps_cache()
-    usecases.domain.cache_control.clear_scores_cache()
-    usecases.domain.cache_control.clear_leaderboard_cache()
-
-    return beatmap
-
-
 @register_command(["rank"])
 async def rank_command(client_state: ClientState, profile: Profile, none: str) -> str:
     if not client_state.beatmap.md5:
@@ -80,10 +59,6 @@ async def rank_command(client_state: ClientState, profile: Profile, none: str) -
 
     if not beatmaps:
         return "Beatmap not found. Cannot change status without a beatmap."
-
-    # Clear caches since beatmap status changed
-    usecases.domain.cache_control.clear_beatmaps_cache()
-    usecases.domain.cache_control.clear_leaderboard_cache()
 
     primary = beatmaps[0]
     count = len(beatmaps)
@@ -283,6 +258,7 @@ async def delete_score_command(
     await usecases.domain.scores.delete(score_id=client_state.loaded_score_id)
 
     client_state.loaded_score_id = 0
+    await usecases.application.client.state.update(client_state)
 
     # Recalculate the profile stats without a specific max combo (it's deleted)
     await usecases.domain.profiles.recalculate_stats(
