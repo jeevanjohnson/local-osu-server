@@ -4,12 +4,13 @@ from typing import TypedDict
 
 from osupyparser import HitObject
 
-# from adapters import log
-from usecases.adapters.osu_file import OsuFile
+import usecases.domain.cache_control
 from models.database.beatmaps import CurrentBeatmap as Beatmap
 from repositories.osufiles.backup import OsuFileBackupRepository
 from repositories.osufiles.songs_folder import OsuFileRepository
-import usecases.domain.cache_control
+
+# from adapters import log
+from usecases.adapters.osu_file import OsuFile
 
 FILENAME_REGEX = re.compile(
     r"(?P<artist>.*) - (?P<song_name>.*) ((?P<mapper>.*) \[)(?P<diff_name>.*)\]\.osu"
@@ -117,6 +118,7 @@ def extract_adjustments_from_filename(filename: str) -> tuple[Rate, Adjustments]
         adjustments[attribute_name] = attribute_value
 
     return rate, adjustments
+
 
 @usecases.domain.cache_control.cache_beatmaps
 async def difficulty_adjusted_map_was_modified(
@@ -236,10 +238,22 @@ def is_difficulty_adjusted(osu_file: OsuFile, filename_check: bool = True) -> bo
 
     return True
 
+
 @usecases.domain.cache_control.cache_beatmaps
 async def for_beatmap(beatmap: Beatmap) -> OsuFile | None:
     osu_file_repository = OsuFileRepository()
     osu_file = await osu_file_repository.from_md5(beatmap.md5)
+
+    if not osu_file:
+        return None
+
+    return osu_file
+
+
+@usecases.domain.cache_control.cache_beatmaps
+async def for_beatmap_md5(md5: str) -> OsuFile | None:
+    osu_file_repository = OsuFileRepository()
+    osu_file = await osu_file_repository.from_md5(md5)
 
     if not osu_file:
         return None

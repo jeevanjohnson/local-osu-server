@@ -2,8 +2,9 @@ import asyncio
 
 import usecases.adapters.ossapi
 import usecases.application.client.state
-import usecases.domain.beatmaps
 import usecases.domain.bancho.scores
+import usecases.domain.beatmaps
+import usecases.domain.cache_control
 import usecases.domain.scores
 from models.database.beatmaps import (
     CurrentBeatmap as Beatmap,
@@ -15,7 +16,6 @@ from osu_protocol.osu.leaderboard import (
     LeaderboardWithScores,
 )
 from osu_protocol.osu.types import LeaderboardType
-import usecases.domain.cache_control
 from usecases.domain.scores import ScoringAlgorithm
 
 Position = int
@@ -25,6 +25,7 @@ TotalScore = int
 UserIDs = int
 
 NO_LEADERBOARD_LIMIT = 1000000
+
 
 @usecases.domain.cache_control.cache_leaderboard
 async def personal_scores_leaderboard(
@@ -56,6 +57,7 @@ async def personal_scores_leaderboard(
         limit=NO_LEADERBOARD_LIMIT,
         accepted_scores=AcceptedScores.BOTH,
     )
+
 
 @usecases.domain.cache_control.cache_leaderboard
 async def friends_leaderboard(
@@ -108,6 +110,7 @@ async def friends_leaderboard(
         limit=NO_LEADERBOARD_LIMIT,
         accepted_scores=accepted_scores,
     )
+
 
 @usecases.domain.cache_control.cache_leaderboard
 async def selected_mods_leaderboard(
@@ -168,6 +171,7 @@ async def selected_mods_leaderboard(
         accepted_scores=accepted_scores,
     )
 
+
 @usecases.domain.cache_control.cache_leaderboard
 async def global_leaderboard(
     profile_name: str,
@@ -204,7 +208,9 @@ async def global_leaderboard(
         ),
     )
 
-    print(f"DEBUG global_leaderboard() - fetched {len(bancho.scores)} scores from Bancho API")
+    print(
+        f"DEBUG global_leaderboard() - fetched {len(bancho.scores)} scores from Bancho API"
+    )
 
     if bancho.total != 0:
         await usecases.application.client.state.update_avaliable_stable_replay_ids_from_scores(
@@ -221,6 +227,7 @@ async def global_leaderboard(
         limit=limit,
         accepted_scores=accepted_scores,
     )
+
 
 @usecases.domain.cache_control.cache_leaderboard
 async def from_request(

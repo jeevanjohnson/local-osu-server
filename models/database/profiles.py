@@ -10,7 +10,7 @@ from pydantic import Field, field_validator
 
 from models.domain.accuracy import UnitAccuracy, to_unit_accuracy
 from models.domain.gameplay import osuGameMode
-from osu_protocol.client_web import ScoringAlgorithm
+from models.domain.scores import ScoringAlgorithm
 from osu_protocol.cho.server import osuCountryCode
 
 

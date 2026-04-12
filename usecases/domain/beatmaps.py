@@ -1,13 +1,14 @@
 import hashlib
 from datetime import datetime
 
-from usecases.adapters.ossapiasync import OssapiAsync
+import usecases.domain.cache_control
 from models.database.beatmaps import CurrentBeatmap as Beatmap
-from osu_protocol.osu.types import osuMapStatus
 from osu_protocol.cho.server import osuGameMode
+from osu_protocol.osu.types import osuMapStatus
 from repositories.beatmaps import BeatmapsRepository
 from repositories.osufiles.songs_folder import OsuFileRepository
-import usecases.domain.cache_control
+from usecases.adapters.ossapiasync import OssapiAsync
+
 
 @usecases.domain.cache_control.cache_beatmaps
 async def from_db(
@@ -26,6 +27,7 @@ async def from_db(
             return bmap
 
     return None
+
 
 @usecases.domain.cache_control.cache_beatmaps
 async def from_api_md5(
@@ -50,7 +52,9 @@ async def from_api_md5(
         return None
 
     if api_beatmap is None:
-        print(f"[DEBUG] API returned None for beatmap checksum: {beatmap_md5}", )
+        print(
+            f"[DEBUG] API returned None for beatmap checksum: {beatmap_md5}",
+        )
         return None
 
     # get .osu file from songs folder
@@ -94,6 +98,7 @@ async def from_api_md5(
     await beatmaps_repo.insert_beatmap(bmap)
 
     return bmap
+
 
 @usecases.domain.cache_control.cache_beatmaps
 async def from_api_id(
@@ -150,6 +155,7 @@ async def from_api_id(
 
     return bmap
 
+
 @usecases.domain.cache_control.cache_beatmaps
 async def find_unsubmitted_map(
     profile_name: str, beatmap_md5: str, beatmap_set_id: int, map_filename: str
@@ -157,7 +163,11 @@ async def find_unsubmitted_map(
     beatmaps_repo = BeatmapsRepository()
     osu_files_repo = OsuFileRepository()
 
-    osu_file = await osu_files_repo.from_md5(beatmap_md5)
+    try:
+        osu_file = await osu_files_repo.from_md5(beatmap_md5)
+    except Exception as e:
+        print(f"[DEBUG] Error fetching osu file for MD5 {beatmap_md5}: {e}")
+        return None
 
     if osu_file is None:
         return
@@ -189,6 +199,7 @@ async def find_unsubmitted_map(
 
     return None
 
+
 @usecases.domain.cache_control.cache_beatmaps
 async def from_difficulty_adjusted_request(
     api_client: OssapiAsync,
@@ -203,7 +214,9 @@ async def from_difficulty_adjusted_request(
     difficulty_adjusted_osu_file = await osu_file_repo.from_filename(map_filename)
 
     if difficulty_adjusted_osu_file is None:
-        print(f"[DEBUG] Could not find osu file: {map_filename}", )
+        print(
+            f"[DEBUG] Could not find osu file: {map_filename}",
+        )
         return None
 
     print(
@@ -226,7 +239,9 @@ async def from_difficulty_adjusted_request(
         )
 
     if original_beatmap is None:
-        print(f"[DEBUG] Could not find or fetch original beatmap", )
+        print(
+            f"[DEBUG] Could not find or fetch original beatmap",
+        )
         return None
 
     difficulty_adjusted_beatmap = Beatmap(
@@ -266,7 +281,7 @@ async def ensure_counts_fresh(
 ) -> Beatmap:
     """Refresh play_count and pass_count if older than stale_after_hours."""
     now = datetime.now()
-    
+
     # Check if play_count is stale
     play_count_age = (now - beatmap.play_count_timestamp).total_seconds()
     if play_count_age > stale_after_hours * 3600:
@@ -277,7 +292,7 @@ async def ensure_counts_fresh(
                 beatmap.play_count_timestamp = now
         except Exception as e:
             print(f"[DEBUG] Error refreshing play_count for beatmap {beatmap.id}: {e}")
-    
+
     # Check if pass_count is stale
     pass_count_age = (now - beatmap.pass_count_timestamp).total_seconds()
     if pass_count_age > stale_after_hours * 3600:
@@ -288,7 +303,7 @@ async def ensure_counts_fresh(
                 beatmap.pass_count_timestamp = now
         except Exception as e:
             print(f"[DEBUG] Error refreshing pass_count for beatmap {beatmap.id}: {e}")
-    
+
     return beatmap
 
 
@@ -387,14 +402,18 @@ async def change_beatmapset_status(
         file_content = osu_file_in_folder.read_bytes()
         md5 = hashlib.md5(file_content).hexdigest()
 
-        print(f"[DEBUG] Processing osu file: {osu_file_in_folder.name}, MD5: {md5}", )
+        print(
+            f"[DEBUG] Processing osu file: {osu_file_in_folder.name}, MD5: {md5}",
+        )
 
         # First check if already in database
         beatmap = await from_db(beatmap_md5=md5)
 
         # If not found in database, check the file itself to see if it's difficulty-adjusted
         if beatmap is None:
-            print(f"[DEBUG] Beatmap not in database for MD5: {md5}", )
+            print(
+                f"[DEBUG] Beatmap not in database for MD5: {md5}",
+            )
             # Try to create it as a difficulty-adjusted map first
             beatmap = await from_difficulty_adjusted_request(
                 api_client=api_client,
@@ -406,7 +425,9 @@ async def change_beatmapset_status(
 
             # If it's not a difficulty-adjusted map, try fetching from API
             if beatmap is None:
-                print(f"[DEBUG] Not difficulty-adjusted, trying from API", )
+                print(
+                    f"[DEBUG] Not difficulty-adjusted, trying from API",
+                )
                 beatmap = await from_api_md5(
                     api_client=api_client,
                     beatmap_md5=md5,
@@ -420,11 +441,15 @@ async def change_beatmapset_status(
 
         # If still not found, skip this file
         if beatmap is None:
-            print(f"[DEBUG] Skipping, beatmap still None", )
+            print(
+                f"[DEBUG] Skipping, beatmap still None",
+            )
             continue
 
         # Update the status
-        print(f"[DEBUG] Updating status for beatmap {beatmap.id} to {new_status}", )
+        print(
+            f"[DEBUG] Updating status for beatmap {beatmap.id} to {new_status}",
+        )
         beatmap.status.update({profile_name: new_status})
         await beatmap_repo.insert_beatmap(beatmap)
         updated_beatmaps.append(beatmap)

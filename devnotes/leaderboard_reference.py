@@ -244,7 +244,9 @@ class Leaderboard:
 
         if glob.config.pp_leaderboard:
             await bmap.get_file()
-            scores.sort(key=lambda s: utils.usecases.domain.calculator(s, bmap)[0], reverse=True)
+            scores.sort(
+                key=lambda s: utils.usecases.domain.calculator(s, bmap)[0], reverse=True
+            )
 
         lb.scores = scores
         if not glob.player or not glob.current_profile:

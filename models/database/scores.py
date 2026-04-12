@@ -9,9 +9,8 @@ from models.domain.gameplay import Mods
 from osu_protocol.cho.server import osuGameMode
 
 if TYPE_CHECKING:
-    from usecases.score_submission import ScoreData
-
-    from osu_protocol.client_web import ScoringAlgorithm
+    from models.domain.scores import ScoringAlgorithm
+    from osu_protocol.osu.score_submission import ScoreData
 
 EpochTime = int
 
@@ -154,8 +153,7 @@ class MapScoresV1(MigratableModel):
         self.scores.sort(key=lambda s: (s.total_score, -s.time_set), reverse=True)
 
     def sort(self, algorithm: "ScoringAlgorithm") -> None:
-        # Lazy import prevents circular import at module load time.
-        from osu_protocol.client_web import ScoringAlgorithm
+        from models.domain.scores import ScoringAlgorithm
 
         if algorithm == ScoringAlgorithm.PP:
             self.sort_by_pp()

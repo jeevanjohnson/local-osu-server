@@ -1,17 +1,19 @@
+import json
 from typing import Literal
 
-from models.domain.gameplay import osuGameMode
-
-from usecases.domain.calculator.linear_interpolation import (
-    linear_interpolation as usecases_domain_calculator_interpolation,
-    power_law_interpolation as usecases_domain_calculator_power_law,
-)
 import usecases.domain.cache_control
 from constants.paths import SNAPSHOTS
-import json
+from models.domain.gameplay import osuGameMode
+from usecases.domain.calculator.linear_interpolation import (
+    linear_interpolation as usecases_domain_calculator_interpolation,
+)
+from usecases.domain.calculator.linear_interpolation import (
+    power_law_interpolation as usecases_domain_calculator_power_law,
+)
 
 PP = int
 RANK = int
+
 
 @usecases.domain.cache_control.cache_group("performance")
 def local(
@@ -43,16 +45,20 @@ def local(
         )
     return int(round(result))
 
+
 @usecases.domain.cache_control.cache_group("performance")
 async def rank_for_pp(pp: PP, game_mode: osuGameMode) -> RANK:
     return local(pp, "rank", game_mode)
+
 
 @usecases.domain.cache_control.cache_group("performance")
 async def pp_for_rank(rank: RANK, game_mode: osuGameMode) -> PP:
     return local(rank, "pp", game_mode)
 
+
 Position = int
 TotalScore = int
+
 
 def position_for_score(
     scores_total_score: TotalScore, data_points: list[tuple[Position, TotalScore]]

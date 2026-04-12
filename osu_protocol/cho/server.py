@@ -1014,6 +1014,7 @@ def BanchoUser(
 
     return packets
 
+
 def BanchoBot() -> Packets:
     info_text = "over the server... ʕ•̫͡•ʔ"
 

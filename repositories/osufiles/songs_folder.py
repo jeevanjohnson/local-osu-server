@@ -10,6 +10,7 @@ try:
     from constants.paths import CACHE_SONGS_FOLDER
 except ImportError:
     import sys
+
     sys.path.insert(0, str(Path(__file__).parent.parent.parent))
     from constants.paths import CACHE_SONGS_FOLDER
 
@@ -19,6 +20,7 @@ class OsuFileRepository:
     Singleton repository for accessing songs folder data.
     Loads JSON cache once, keeps it in memory, refreshes only if file is modified.
     """
+
     _instance: "OsuFileRepository | None" = None
     _lock: asyncio.Lock | None = None
     _data: dict[str, Any] | None = None
@@ -77,7 +79,6 @@ class OsuFileRepository:
             return None
         return self._data["path_to_md5"].get(path)
 
-
     @cache_beatmaps
     async def from_path_to_md5(self, path: Path) -> str | None:
         """Get MD5 hash from file path."""
@@ -95,7 +96,7 @@ class OsuFileRepository:
         async with self._lock:
             await self._ensure_loaded()
             osu_file_paths = self._get_paths_by_beatmap_id(beatmap_id)
-        
+
         if osu_file_paths is None:
             return None
 
@@ -118,7 +119,7 @@ class OsuFileRepository:
         async with self._lock:
             await self._ensure_loaded()
             osu_file_path = self._get_path_by_md5(md5)
-        
+
         if osu_file_path is None or osu_file_path == "":
             return None
 
@@ -133,7 +134,7 @@ class OsuFileRepository:
         async with self._lock:
             await self._ensure_loaded()
             osu_file_path = self._get_path_by_md5(md5)
-        
+
         if osu_file_path is None or osu_file_path == "":
             return None
 
@@ -146,7 +147,7 @@ class OsuFileRepository:
         async with self._lock:
             await self._ensure_loaded()
             osu_file_path = self._get_path_by_filename(filename)
-        
+
         if osu_file_path is None or osu_file_path == "":
             return None
 

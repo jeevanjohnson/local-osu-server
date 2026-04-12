@@ -62,7 +62,9 @@ class OssapiAsync(BaseOssapiAsync):
                 stored_cursor = (
                     await usecases.application.client.state.get_direct_cursor_string()
                 )
-                print(f"DEBUG adapter - using stored cursor: {stored_cursor}", )
+                print(
+                    f"DEBUG adapter - using stored cursor: {stored_cursor}",
+                )
                 params["cursor_string"] = stored_cursor
 
         # Initialize or reset rate limit window

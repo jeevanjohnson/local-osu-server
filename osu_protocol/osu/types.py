@@ -1,7 +1,7 @@
+from enum import IntEnum, unique
+
 import ossapi.enums
 import ossapi.models
-
-from enum import IntEnum, unique
 
 
 @unique

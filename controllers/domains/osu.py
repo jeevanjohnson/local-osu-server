@@ -19,6 +19,7 @@ from fastapi.responses import RedirectResponse
 
 import services.osu
 import usecases.application.client.update
+
 # from adapters import log_time
 from controllers.dependencies import (
     client_state,
@@ -30,12 +31,12 @@ from models.database.profiles import CurrentProfile as Profile
 from models.database.server_settings import CurrentServerSettings as ServerSettings
 from models.domain.errors import OsuErrors
 from models.domain.gameplay import Mods, osuGameMode
-from osu_protocol.osu.types import (
-    LeaderboardType,
-)
 from osu_protocol.osu.direct import (
     osu_direct_mode_to_osu_api_v2,
     osu_direct_ranked_status_to_osu_api_v2,
+)
+from osu_protocol.osu.types import (
+    LeaderboardType,
 )
 
 osu = APIRouter(

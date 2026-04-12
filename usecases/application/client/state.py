@@ -74,7 +74,9 @@ async def update(client_state: ClientState) -> None:
 async def beatmap_watchable_replays(replay_ids: list[int]) -> None:
     client_state_repo = ClientStateRepository()
     client_state = await client_state_repo.get_client_state()
-    print(f"DEBUG beatmap_watchable_replays() - updating watchable replays to: {replay_ids}")
+    print(
+        f"DEBUG beatmap_watchable_replays() - updating watchable replays to: {replay_ids}"
+    )
     client_state.beatmap.watchable_replays.clear()
     client_state.beatmap.watchable_replays = replay_ids
 

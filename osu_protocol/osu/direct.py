@@ -1,8 +1,10 @@
 from dataclasses import dataclass
-from models.domain.gameplay import osuGameMode
 from datetime import datetime
+
 import ossapi.enums
 import ossapi.models
+
+from models.domain.gameplay import osuGameMode
 
 DIRECT_DIFF_FORMAT = (
     "[{difficulty:.2f}⭐] {version} {{CS{cs} OD{accuracy} AR{ar} HP{drain}}}@{mode_int}"

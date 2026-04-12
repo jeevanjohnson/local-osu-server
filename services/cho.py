@@ -5,16 +5,16 @@ import usecases.adapters.ossapi
 import usecases.application.client.state
 import usecases.application.client.update
 import usecases.application.commands
-from osu_protocol.cho.client import parse_login_data, ChangeAction
 import usecases.domain.bancho.users
 import usecases.domain.chats
-import usecases.domain.profiles
 import usecases.domain.interface
+import usecases.domain.profiles
+import usecases.domain.server
 from models.database.client.state import ClientState
 from models.database.profiles import CurrentProfile as Profile
 from models.domain.gameplay import Mods
+from osu_protocol.cho.client import ChangeAction, parse_login_data
 from osu_protocol.cho.server import Login, LoginAuthFailed, osuAction, osuGameMode
-import usecases.domain.server
 
 
 class LoginResponse(TypedDict):
@@ -61,7 +61,6 @@ async def login(
             "status": "osu-api-credentials-not-found",
         }
 
-
     login_data = parse_login_data(raw_login_data)
     utc_offset = login_data["utc_offset"]
 
@@ -82,7 +81,7 @@ async def login(
         update_available_version = update
     else:
         update_available_version = None
-    
+
     login_response = Login(
         username=client_state.profile_name,
         friend_ids=profile.friend_ids,

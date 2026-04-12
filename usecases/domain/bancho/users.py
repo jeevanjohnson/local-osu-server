@@ -7,7 +7,6 @@ import ossapi.models
 from ossapi import ScoreType
 
 import usecases.domain.calculator.bancho
-from usecases.adapters.ossapiasync import OssapiAsync
 from models.domain.gameplay import Mods
 from osu_protocol.cho.server import (
     ALL_PRIVILEGES,
@@ -19,6 +18,7 @@ from osu_protocol.cho.server import (
     osuGameMode,
 )
 from osu_protocol.cho.server import LogOut as PlayerLogOut
+from usecases.adapters.ossapiasync import OssapiAsync
 
 
 @overload
@@ -54,7 +54,9 @@ async def get(
             )
             return bancho_user
         except ValueError:
-            print(f"User with identifier {user_identifiers} not found in osu! API.", )
+            print(
+                f"User with identifier {user_identifiers} not found in osu! API.",
+            )
             return None
     else:
         try:
@@ -64,7 +66,9 @@ async def get(
             )
             return bancho_users
         except ValueError:
-            print(f"Users with identifiers {user_identifiers} not found in osu! API.", )
+            print(
+                f"Users with identifiers {user_identifiers} not found in osu! API.",
+            )
             return []
 
 
@@ -104,7 +108,9 @@ async def get_presences_and_stats(
     game_mode: osuGameMode,
 ) -> Packets:
     if not user_ids:
-        print("No user IDs provided for fetching presences and stats.", )
+        print(
+            "No user IDs provided for fetching presences and stats.",
+        )
         return Packets()
 
     bancho_friends = await get(api_client=api_client, user_identifiers=user_ids)

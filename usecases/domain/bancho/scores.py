@@ -5,18 +5,17 @@ import ossapi.models
 from ossapi import UserCompact
 from ossapi.enums import ScoreType
 
+import usecases.domain.cache_control
 import usecases.domain.calculator.performance
-from usecases.adapters.ossapiasync import OssapiAsync
 from models.bancho.scores import Combo, LazerScore, Mods, Scores, StableScore
 from models.database.beatmaps import (
     CurrentBeatmap as Beatmap,
 )
 from models.domain.gameplay import osuGameMode
-from models.domain.scores import AcceptedScores
-from osu_protocol.client_web import ScoringAlgorithm
+from models.domain.scores import AcceptedScores, ScoringAlgorithm
 from osu_protocol.domain.replay import extract_replay_frames_from_osr
 from repositories.osufiles.songs_folder import OsuFileRepository
-import usecases.domain.cache_control
+from usecases.adapters.ossapiasync import OssapiAsync
 
 
 def api_is_score_lazer(score: ossapi.models.Score) -> bool:
@@ -186,6 +185,7 @@ async def get_friends_scores_for_beatmap(
 
     return Scores(all_scores=friends_scores)
 
+
 @usecases.domain.cache_control.cache_scores
 async def get_scores_for(
     api_client: OssapiAsync,
@@ -253,6 +253,7 @@ async def get_scores_for(
 
     return scores
 
+
 @usecases.domain.cache_control.cache_scores
 async def get_any_scores_for(
     api_client: OssapiAsync,
@@ -269,6 +270,7 @@ async def get_any_scores_for(
         mods=None,
         scoring_algorithm=scoring_algorithm,
     )
+
 
 @usecases.domain.cache_control.cache_scores
 async def get_mod_specific_scores_for(
@@ -287,6 +289,7 @@ async def get_mod_specific_scores_for(
         mods=mods,
         scoring_algorithm=scoring_algorithm,
     )
+
 
 @usecases.domain.cache_control.cache_scores
 async def get_replay(

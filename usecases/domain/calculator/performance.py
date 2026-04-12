@@ -1,9 +1,10 @@
 import rosu_pp_py as rosu
 
+import usecases.domain.cache_control
+from models.domain.gameplay import Mods, osuGameMode, osuMods
+
 # from adapters import log, log_time
 from usecases.adapters.osu_file import OsuFile
-from models.domain.gameplay import Mods, osuGameMode, osuMods
-import usecases.domain.cache_control
 
 # Mapping from osuGameMode to rosu GameMode
 ROSU_GAME_MODE_MAP: dict[osuGameMode, rosu.GameMode] = {

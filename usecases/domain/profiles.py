@@ -3,7 +3,9 @@ Purpose/Domain/Concept:
 - This file contains the logic related to user profiles.
 """
 
+import usecases.domain.cache_control
 import usecases.domain.calculator.rank
+
 # from adapters import log_time
 from models.database.profiles import (
     CurrentProfile as Profile,
@@ -14,12 +16,11 @@ from models.database.profiles import (
 from models.database.scores import (
     CurrentScore as Score,
 )
-from osu_protocol.osu.types import osuMapStatus
 from osu_protocol.cho.server import osuGameMode
+from osu_protocol.osu.types import osuMapStatus
 from repositories.beatmaps import BeatmapsRepository
 from repositories.profiles import ProfilesRepository
 from repositories.scores import ScoresRepository
-import usecases.domain.cache_control
 
 
 async def get_profiles() -> Profiles | None:
@@ -79,6 +80,7 @@ async def remove_friend_from_profile(profile_name: str, friend_user_id: int) -> 
         await profiles_repo.update_profile(profile_name, profile)
 
     return
+
 
 async def recalculate_stats(
     profile_name: str, game_mode: osuGameMode, score_submitted_combo: int | None = None

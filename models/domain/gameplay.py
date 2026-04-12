@@ -2,9 +2,10 @@ from typing import Any, Iterable, TypedDict
 
 import ossapi.models
 
+from osu_protocol.cho.server import osuGameMode, osuMods
+
 # from adapters import log
 from usecases.domain.calculator.linear_interpolation import linear_interpolation
-from osu_protocol.cho.server import osuGameMode, osuMods
 
 LAZER_MODS = list[str]
 _NON_SCORING_ATTRIBUTE_PREFIXES = ("AR", "OD", "HP", "CS")

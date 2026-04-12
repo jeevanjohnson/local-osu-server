@@ -91,11 +91,14 @@ class OsuFile(BaseOsuFile):
 
         header_line = lines[0]
         if not header_line.startswith(OSU_FILE_HEADER):
-            # First line should have osu special header.
-            raise ValueError(
-                f"Unknown file error! Excepted: {OSU_FILE_HEADER}, got {header_line}"
+            print(
+                f"Warning: osu file {self.file_name} does not start with expected header. Attempting to parse anyway."
             )
-        self.file_version = int(header_line[len(OSU_FILE_HEADER) :])
+        else:
+            print(
+                f"Parsing osu file version {header_line[len(OSU_FILE_HEADER) :]} for {self.file_name}"
+            )
+            self.file_version = int(header_line[len(OSU_FILE_HEADER) :])
 
         section_name = ""
         for line in lines[1:]:

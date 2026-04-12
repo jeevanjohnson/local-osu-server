@@ -9,8 +9,8 @@ from models.database.scores import (
     CurrentScore as ProfileScore,
 )
 from models.domain.gameplay import Mods, osuGameMode
-from models.domain.scores import AllScores
-from osu_protocol.client_web import (
+from models.domain.scores import (
+    AllScores,
     ScoringAlgorithm,
 )
 from osu_protocol.domain.replay import extract_replay_frames_from_osr
@@ -144,6 +144,12 @@ async def personal_best_for_beatmap(
     filtered_scores.sort(scoring_algorithm)
 
     return filtered_scores.scores[0]
+
+
+async def get_score_from_id(score_id: int) -> ProfileScore | None:
+    """Get a score by its ID."""
+    scores_repo = ScoresRepository()
+    return await scores_repo.get_score_by_id(score_id)
 
 
 # log

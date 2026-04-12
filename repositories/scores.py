@@ -13,7 +13,7 @@ from models.database.scores import (
 from models.database.scores import (
     CurrentScoresForProfile as ScoresForProfile,
 )
-from osu_protocol.client_web import ScoringAlgorithm
+from models.domain.scores import ScoringAlgorithm
 from osu_protocol.cho.server import osuGameMode
 
 

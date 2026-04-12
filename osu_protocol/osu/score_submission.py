@@ -1,11 +1,13 @@
+from base64 import b64decode
+from datetime import UTC, datetime
+
 from fastapi.datastructures import FormData
 from py3rijndael import Pkcs7Padding, RijndaelCbc
 from pydantic import BaseModel, ConfigDict
 from starlette.datastructures import UploadFile as StarletteUploadFile
 
 from models.domain.gameplay import Mods, osuGameMode
-from datetime import UTC, datetime
-from base64 import b64decode
+
 
 def parse_form_data(form_data: FormData) -> tuple[bytes, StarletteUploadFile] | None:
     try:

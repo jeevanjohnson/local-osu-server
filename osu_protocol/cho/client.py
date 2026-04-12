@@ -19,7 +19,6 @@ from osu_protocol.cho.types import (
     osuString,
     osuUnsignedChar,
 )
-from typing import TypedDict
 
 
 class LoginData(TypedDict):
@@ -72,7 +71,6 @@ def parse_login_data(raw_login_data: bytes) -> LoginData:
         "uninstall_md5": uninstall_md5,
         "disk_signature_md5": disk_signature_md5,
     }
-
 
 
 @unique

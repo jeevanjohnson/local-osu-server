@@ -9,6 +9,7 @@ from fastapi import APIRouter
 from fastapi.responses import FileResponse, RedirectResponse
 
 import services.avatar
+
 # from adapters import log_time
 
 avatar = APIRouter(

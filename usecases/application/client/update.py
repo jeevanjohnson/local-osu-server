@@ -1,5 +1,6 @@
 import usecases.adapters.ossapi
 import usecases.domain.bancho.users
+import usecases.domain.cache_control
 from models.database.client.state import ClientState
 from models.database.profiles import CurrentProfile as Profile
 from models.domain.gameplay import Mods
@@ -10,14 +11,13 @@ from osu_protocol.cho.server import (
     Notification,
     PlayerPresence,
     PlayerStats,
+    UserFriendList,
     osuAction,
     osuCountryCode,
     osuGameMode,
-    UserFriendList
 )
 from repositories.client.state import ClientStateRepository
 from repositories.client.update import ClientUpdateRepository
-import usecases.domain.cache_control
 
 
 async def clear() -> bytes:
@@ -236,9 +236,7 @@ async def friends(
 
     await client_update_repo.queue(friends_packets)
 
-    await client_update_repo.queue(
-        UserFriendList(friend_ids=user_ids)
-    )
+    await client_update_repo.queue(UserFriendList(friend_ids=user_ids))
 
 
 async def message(recipient: str, sender: str, message: str, sender_id: int) -> None:

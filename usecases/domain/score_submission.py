@@ -1,9 +1,14 @@
 from starlette.datastructures import FormData, UploadFile
+
 import usecases.domain.calculator.performance
-from usecases.adapters.osu_file import OsuFile
 from models.database.scores import CurrentScore as Score
-from osu_protocol.osu.score_submission import ScoreData, decrypt_score_aes_data, parse_form_data
+from osu_protocol.osu.score_submission import (
+    ScoreData,
+    decrypt_score_aes_data,
+    parse_form_data,
+)
 from repositories.scores import ScoresRepository
+from usecases.adapters.osu_file import OsuFile
 
 
 async def decrypt(
@@ -31,6 +36,7 @@ async def decrypt(
     )
 
     return score_data, client_hash_decoded, replay_file
+
 
 async def submit(
     score_id: int,

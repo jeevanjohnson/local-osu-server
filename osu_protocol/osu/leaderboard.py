@@ -1,12 +1,11 @@
-from models.domain.gameplay import osuMods
-from osu_protocol.osu.types import osuMapStatus
-from models.bancho.scores import LazerScore, Score, StableScore
-from models.database.scores import CurrentScore as ProfileScore
-from models.domain.scores import AcceptedScores, AllScores, ScoringAlgorithm
-from models.database.beatmaps import CurrentBeatmap as Beatmap
-
 from dataclasses import dataclass
 
+from models.bancho.scores import LazerScore, Score, StableScore
+from models.database.beatmaps import CurrentBeatmap as Beatmap
+from models.database.scores import CurrentScore as ProfileScore
+from models.domain.gameplay import osuMods
+from models.domain.scores import AcceptedScores, AllScores, ScoringAlgorithm
+from osu_protocol.osu.types import osuMapStatus
 
 LEADERBOARD_SCORE_FMT = (
     "{id}|{name}|{score}|{max_combo}|"

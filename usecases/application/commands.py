@@ -1,27 +1,26 @@
+import asyncio
+from pprint import pformat
 from typing import Any, Callable, Coroutine
 
 import usecases.adapters.cache
-import usecases.domain.cache_control
-import usecases.domain.calculator.performance
-import usecases.domain.calculator.rank
 import usecases.adapters.ossapi
 import usecases.application.beatmaps
 import usecases.application.client
+import usecases.application.client.state
 import usecases.application.client.update
 import usecases.domain.bancho.users
 import usecases.domain.beatmaps
+import usecases.domain.cache_control
+import usecases.domain.calculator.performance
+import usecases.domain.calculator.rank
 import usecases.domain.chats
 import usecases.domain.profiles
 import usecases.domain.scores
-import usecases.application.client.state
-from models.database.beatmaps import CurrentBeatmap as Beatmap
+import usecases.domain.server
 from models.database.client.state import ClientState
 from models.database.profiles import CurrentProfile as Profile
 from models.domain.gameplay import Mods
 from osu_protocol.osu.types import osuMapStatus
-from pprint import pformat
-import usecases.domain.server
-import asyncio
 
 CommandFunc = Callable[[ClientState, Profile, str], Coroutine[Any, Any, str]]
 
@@ -40,6 +39,7 @@ def register_command(
         return func
 
     return decorator
+
 
 @register_command(["rank"])
 async def rank_command(client_state: ClientState, profile: Profile, none: str) -> str:
@@ -290,7 +290,9 @@ async def rank_for_command(
     except ValueError:
         return f"Invalid pp value: {pp_str}. Please provide a valid number."
 
-    rank = await usecases.domain.calculator.rank.rank_for_pp(pp, game_mode=client_state.game_mode)
+    rank = await usecases.domain.calculator.rank.rank_for_pp(
+        pp, game_mode=client_state.game_mode
+    )
 
     return (
         f"For {pp}pp in {client_state.game_mode.name}, the estimated rank is #{rank}."
@@ -306,24 +308,29 @@ async def pp_for_command(
     except ValueError:
         return f"Invalid rank value: {rank_str}. Please provide a valid number."
 
-    pp = await usecases.domain.calculator.rank.pp_for_rank(rank, game_mode=client_state.game_mode)
+    pp = await usecases.domain.calculator.rank.pp_for_rank(
+        rank, game_mode=client_state.game_mode
+    )
 
     return f"For rank #{rank} in {client_state.game_mode.name}, the estimated pp is {pp}pp."
 
+
 @register_command(["py"])
-async def python_command(
-    client_state: ClientState, profile: Profile, code: str
-) -> str:
+async def python_command(client_state: ClientState, profile: Profile, code: str) -> str:
     """DEVELOPER-ONLY COMMAND. Use with extreme caution. Executes arbitrary Python code and returns the result."""
     try:
         # Use the module’s actual globals (including all imports and functions)
-        exec_globals = globals().copy()  # start with a copy to avoid accidental pollution
-        exec_globals.update({
-            "client_state": client_state,
-            "profile": profile,
-            "usecases": usecases,
-            "__builtins__": __builtins__,  # ensure built-ins are available
-        })
+        exec_globals = (
+            globals().copy()
+        )  # start with a copy to avoid accidental pollution
+        exec_globals.update(
+            {
+                "client_state": client_state,
+                "profile": profile,
+                "usecases": usecases,
+                "__builtins__": __builtins__,  # ensure built-ins are available
+            }
+        )
 
         # Local variables for the executed function
         local_vars = {}
@@ -334,6 +341,7 @@ async def python_command(
     except Exception as e:
         return f"Error executing code: {e}"
 
+
 @register_command("latency")
 async def latency_command(
     client_state: ClientState, profile: Profile, none: str
@@ -343,11 +351,11 @@ async def latency_command(
 
     return f"API latency: {latency}"
 
+
 @register_command("update")
-async def update_command(
-    client_state: ClientState, profile: Profile, none: str
-) -> str:
+async def update_command(client_state: ClientState, profile: Profile, none: str) -> str:
     """Checks for updates to the server and provides instructions to update if an update is available."""
+
     async def perform_update():
         msg = await usecases.domain.server.update()
 
@@ -357,6 +365,7 @@ async def update_command(
 
     return "Update process started. You will receive a notification in the client when it is complete."
 
+
 @register_command("refresh_cache")
 async def refresh_cache_command(
     client_state: ClientState, profile: Profile, none: str
@@ -364,6 +373,7 @@ async def refresh_cache_command(
     """DEVELOPER-ONLY COMMAND. Use with extreme caution. Refreshes all caches."""
     usecases.domain.cache_control.clear_all_domain_caches()
     return "All caches have been cleared and will be refreshed on next access."
+
 
 async def handle_command(
     client_state: ClientState, profile: Profile, message: str

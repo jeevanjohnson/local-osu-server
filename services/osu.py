@@ -10,31 +10,30 @@ import usecases.application.client.update
 import usecases.application.direct
 import usecases.application.leaderboards
 import usecases.application.replays
+import usecases.application.score_submission
+import usecases.domain.beatmaps
 import usecases.domain.osufile
+import usecases.domain.score_submission
+import usecases.domain.scores
 from constants.network import LOS_INTERFACE_PORT
 from models.database.client.state import ClientState
 from models.database.profiles import CurrentProfile as Profile
 from models.domain.errors import OsuErrors
 from models.domain.gameplay import Mods, osuGameMode
 from models.domain.scores import AcceptedScores
+from osu_protocol.osu.charts import SubmissionCharts
 from osu_protocol.osu.direct import (
     DirectBeatmapSet,
     DirectSearchResult,
 )
 from osu_protocol.osu.leaderboard import (
-    Leaderboard, 
-    NotSubmittedLeaderboard, 
-    GraveyardLeaderboard, 
-    UpdateBeatmapRequestLeaderboard
+    GraveyardLeaderboard,
+    Leaderboard,
+    NotSubmittedLeaderboard,
+    UpdateBeatmapRequestLeaderboard,
 )
-from osu_protocol.osu.charts import SubmissionCharts
 from osu_protocol.osu.types import LeaderboardType
 
-import usecases.application.score_submission
-import usecases.domain.beatmaps
-import usecases.domain.osufile
-import usecases.domain.score_submission
-import usecases.domain.scores
 
 async def process_seasonal_backgrounds_request(
     seasonal_background_urls: list[str],
@@ -156,9 +155,6 @@ async def process_map_file_request(
     return MapFileRequestResponse(url=f"https://osu.ppy.sh{url_path}", status_code=301)
 
 
-
-
-
 async def process_modular_selector_submission(
     raw_score_parameters: FormData,
     client_hash_b64: bytes,
@@ -263,15 +259,23 @@ async def process_direct_search_result_request(
     if direct_response is None:
         return None
 
-    print(f"DEBUG service - cursor_string returned from API: {cursor_string}", )
+    print(
+        f"DEBUG service - cursor_string returned from API: {cursor_string}",
+    )
 
     if cursor_string is not None:
-        print(f"DEBUG service - storing cursor for next pagination", )
+        print(
+            f"DEBUG service - storing cursor for next pagination",
+        )
         client_state.direct_reference.cursor_string = cursor_string
         await usecases.application.client.state.update(client_state)
-        print(f"DEBUG service - cursor stored in state", )
+        print(
+            f"DEBUG service - cursor stored in state",
+        )
     else:
-        print(f"DEBUG service - no cursor returned from API", )
+        print(
+            f"DEBUG service - no cursor returned from API",
+        )
 
     return direct_response
 

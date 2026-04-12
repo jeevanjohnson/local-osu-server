@@ -84,7 +84,9 @@ class CacheManager:
         self.caches: dict[str, Cache[Any, Any]] = {}
         self.domains: dict[str, list[str]] = {}
 
-    def register(self, func_name: str, cache: Cache[Any, Any], domain: str | None = None) -> None:
+    def register(
+        self, func_name: str, cache: Cache[Any, Any], domain: str | None = None
+    ) -> None:
         """Register a cache instance for a function, optionally under a domain."""
         self.caches[func_name] = cache
         if domain:
@@ -221,11 +223,15 @@ def cached(
     return CacheFunction(time_to_live=time_to_live, save_on_none=save_on_none).function
 
 
-def cache_group(domain: str, ttl: timedelta | Literal["forever"] = timedelta(minutes=10)) -> Callable[[F], F]:
+def cache_group(
+    domain: str, ttl: timedelta | Literal["forever"] = timedelta(minutes=10)
+) -> Callable[[F], F]:
     """Create a cache decorator for a specific domain with optional TTL override."""
+
     def decorator(func: F) -> F:
         cache = CacheFunction(time_to_live=ttl)
         return cache.function(func, domain=domain)
+
     return decorator
 
 

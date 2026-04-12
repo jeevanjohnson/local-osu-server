@@ -3,8 +3,8 @@ from typing import TypedDict
 
 import aiohttp
 
-from usecases.adapters.ossapiasync import OssapiAsync
 from repositories.server_settings import ServerSettingsRepository
+from usecases.adapters.ossapiasync import OssapiAsync
 
 
 async def get() -> OssapiAsync | None:
@@ -38,6 +38,7 @@ async def credentials_exist() -> CredentialsExistResponse | None:
         "osu_api_v2_client_secret": server_settings.osu_api_v2_client_secret,
     }
 
+
 def format_time_delta(delta: float) -> str:
     if delta < 1:
         return f"{round(delta * 1000, 2)}ms"
@@ -47,6 +48,7 @@ def format_time_delta(delta: float) -> str:
         minutes = int(delta // 60)
         seconds = round(delta % 60, 2)
         return f"{minutes}m {seconds}s"
+
 
 async def latency() -> str:
     start = time.perf_counter()

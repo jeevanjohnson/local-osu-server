@@ -6,6 +6,7 @@ import usecases.application.client.update
 import usecases.application.score_submission
 import usecases.application.scores
 import usecases.domain.achievements
+import usecases.domain.cache_control
 import usecases.domain.osufile
 import usecases.domain.profiles
 import usecases.domain.score_submission
@@ -13,7 +14,6 @@ import usecases.domain.scores
 from models.database.profiles import CurrentProfile as Profile
 from models.domain.errors import OsuErrors
 from osu_protocol.osu.charts import UNRANKED_CHARTS, SubmissionCharts
-import usecases.domain.cache_control
 
 
 async def process_submission(
@@ -78,8 +78,6 @@ async def process_submission(
         )
         return OsuErrors.BEATMAP, 0
 
-    usecases.domain.cache_control.clear_leaderboard_cache()
-
     # Refresh beatmap status from API to detect any status changes (e.g., PENDING → RANKED)
     bmap_status = beatmap.status[profile_name]
     if not bmap_status.permanent:
@@ -113,6 +111,8 @@ async def process_submission(
     )
 
     usecases.domain.cache_control.clear_profiles_cache()
+    usecases.domain.cache_control.clear_scores_cache()
+    usecases.domain.cache_control.clear_leaderboard_cache()
 
     # Incase of any difficulty adjustment corruption
     # lets save the .osu file & audio file here so we can

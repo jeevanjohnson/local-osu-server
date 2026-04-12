@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, Header, Request, Response
 
 import services.cho
 import usecases.application.client.update
+
 # from adapters import log, log_time
 from controllers.dependencies import client_state, profile
 from models.database.client.state import ClientState

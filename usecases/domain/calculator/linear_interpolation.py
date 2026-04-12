@@ -1,5 +1,5 @@
-from typing import Callable, Sequence
 import math
+from typing import Callable, Sequence
 
 DATA_POINT = tuple[float, float]  # (x, y)
 
@@ -100,11 +100,11 @@ def logarithmic_interpolation(
 ) -> float:
     """
     Perform logarithmic interpolation on a set of points.
-    
+
     Converts output values to log space, performs linear interpolation there,
     then converts back to linear space. This is better for exponential/power-law
     distributions like osu! PP vs rank.
-    
+
     Parameters
     ----------
     input_value : float
@@ -118,7 +118,7 @@ def logarithmic_interpolation(
     clamp : bool, optional
         If True, values outside range are clamped to nearest endpoint.
         If False, logarithmic extrapolation is performed.
-    
+
     Returns
     -------
     float
@@ -132,7 +132,7 @@ def logarithmic_interpolation(
 
     inputs = [input_key(p) for p in sorted_points]
     outputs = [output_key(p) for p in sorted_points]
-    
+
     # Convert outputs to log scale (with safety check for values <= 0)
     log_outputs = []
     for out in outputs:
@@ -151,8 +151,12 @@ def logarithmic_interpolation(
             slope = None
             for i in range(len(inputs) - 1, 0, -1):
                 if inputs[i] != inputs[i - 1]:
-                    slope = (log_outputs[i] - log_outputs[i - 1]) / (inputs[i] - inputs[i - 1])
-                    log_result = log_outputs[i - 1] + (input_value - inputs[i - 1]) * slope
+                    slope = (log_outputs[i] - log_outputs[i - 1]) / (
+                        inputs[i] - inputs[i - 1]
+                    )
+                    log_result = (
+                        log_outputs[i - 1] + (input_value - inputs[i - 1]) * slope
+                    )
                     return math.exp(log_result)
             # If all inputs are the same, can't extrapolate
             return outputs[0]
@@ -165,10 +169,14 @@ def logarithmic_interpolation(
             # Skip the flat tail region where outputs don't change
             for i in range(len(inputs) - 1, 0, -1):
                 if outputs[i] != outputs[i - 1]:  # Find where output actually changes
-                    slope = (log_outputs[i] - log_outputs[i - 1]) / (inputs[i] - inputs[i - 1])
-                    log_result = log_outputs[i - 1] + (input_value - inputs[i - 1]) * slope
+                    slope = (log_outputs[i] - log_outputs[i - 1]) / (
+                        inputs[i] - inputs[i - 1]
+                    )
+                    log_result = (
+                        log_outputs[i - 1] + (input_value - inputs[i - 1]) * slope
+                    )
                     return math.exp(log_result)
-            # If all outputs are the same, can't extrapolate  
+            # If all outputs are the same, can't extrapolate
             return outputs[0]
 
     # Find the interval containing input_value
@@ -176,7 +184,7 @@ def logarithmic_interpolation(
         if inputs[i] <= input_value <= inputs[i + 1]:
             x1, y_log1 = inputs[i], log_outputs[i]
             x2, y_log2 = inputs[i + 1], log_outputs[i + 1]
-            
+
             if x2 == x1:
                 # vertical segment – use average of log outputs
                 result = math.exp((y_log1 + y_log2) / 2)
@@ -199,12 +207,12 @@ def power_law_interpolation(
 ) -> float:
     """
     Perform smart interpolation tailored for osu! PP vs rank distribution.
-    
+
     Instead of fitting a mathematical model, this uses the actual data distribution
     to extrapolate smoothly. For PP outside the data range, it estimates based on:
     1. The observed PP density in the data (players per PP bracket)
     2. Assumes similar density continues below the lowest observed PP
-    
+
     Parameters
     ----------
     input_value : float
@@ -218,7 +226,7 @@ def power_law_interpolation(
     clamp : bool, optional
         If True, values outside range are clamped to nearest endpoint.
         If False, uses smart extrapolation.
-    
+
     Returns
     -------
     float
@@ -226,12 +234,12 @@ def power_law_interpolation(
     """
     if not points:
         raise ValueError("points cannot be empty")
-    
+
     # Extract and sort points by input coordinate
     sorted_points = sorted(points, key=input_key)
     inputs = [input_key(p) for p in sorted_points]
     outputs = [output_key(p) for p in sorted_points]
-    
+
     # For within-range values, use linear interpolation
     if inputs[0] <= input_value <= inputs[-1]:
         # Standard linear interpolation
@@ -244,7 +252,7 @@ def power_law_interpolation(
                 else:
                     return y1 + (input_value - x1) * (y2 - y1) / (x2 - x1)
         return outputs[-1]
-    
+
     # For out-of-range extrapolation, use smart approach
     if clamp:
         # Clamp to nearest data point
@@ -261,13 +269,13 @@ def power_law_interpolation(
                 # Calculate average "spacing" in this region
                 pp_range = inputs[middle_idx] - inputs[0]
                 rank_range = outputs[middle_idx] - outputs[0]
-                
+
                 if pp_range > 0:
                     # Average change in rank per PP in the populated region
                     avg_slope = rank_range / pp_range
                 else:
                     avg_slope = 0
-                
+
                 # Extrapolate using this slope
                 extrapolated = outputs[0] + (input_value - inputs[0]) * avg_slope
                 return extrapolated
@@ -280,14 +288,13 @@ def power_law_interpolation(
                 start_idx = max(0, len(inputs) - max(1, len(inputs) // 100))
                 pp_range = inputs[-1] - inputs[start_idx]
                 rank_range = outputs[-1] - outputs[start_idx]
-                
+
                 if pp_range > 0:
                     avg_slope = rank_range / pp_range
                 else:
                     avg_slope = 0
-                
+
                 extrapolated = outputs[-1] + (input_value - inputs[-1]) * avg_slope
                 return extrapolated
             else:
                 return outputs[-1]
-
