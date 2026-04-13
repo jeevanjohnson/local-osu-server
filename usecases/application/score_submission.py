@@ -110,10 +110,6 @@ async def process_submission(
         calc_pp=bmap_status.ranked(),
     )
 
-    usecases.domain.cache_control.clear_profiles_cache()
-    usecases.domain.cache_control.clear_scores_cache()
-    usecases.domain.cache_control.clear_leaderboard_cache()
-
     # Incase of any difficulty adjustment corruption
     # lets save the .osu file & audio file here so we can
     # if needed, recover the beatmap & replay
@@ -139,6 +135,10 @@ async def process_submission(
 
     if "RX" in score.enabled_mods or "AP" in score.enabled_mods:
         await usecases.application.client.update.stats_with_profile(current_profile)
+        # Clear caches AFTER sending stats to prevent race conditions with stale cached profiles
+        usecases.domain.cache_control.clear_profiles_cache()
+        usecases.domain.cache_control.clear_scores_cache()
+        usecases.domain.cache_control.clear_leaderboard_cache()
         return OsuErrors.NON, score.id
 
     (
@@ -170,5 +170,10 @@ async def process_submission(
 
     # ClientState is already updated above for RX/AP path, ensure it's updated here too
     await usecases.application.client.update.stats_with_profile(current_profile)
+
+    # Clear caches AFTER sending stats to prevent race conditions with stale cached profiles
+    usecases.domain.cache_control.clear_profiles_cache()
+    usecases.domain.cache_control.clear_scores_cache()
+    usecases.domain.cache_control.clear_leaderboard_cache()
 
     return submission_charts, score.id

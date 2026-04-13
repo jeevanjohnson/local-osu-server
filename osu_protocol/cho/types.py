@@ -91,7 +91,12 @@ class osuInteger(osuBaseType):
         else:  # self.bit_width == 64
             length_of_int = 8
 
-        return self.value.to_bytes(length_of_int, "little", signed=self.signed)
+        try:
+            return self.value.to_bytes(length_of_int, "little", signed=self.signed)
+        except OverflowError as e:
+            raise ValueError(
+                f"Value {self.value} cannot be represented in {length_of_int * 8} bits"
+            ) from e
 
 
 @dataclass

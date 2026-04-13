@@ -299,30 +299,52 @@ async def get_replay(
     # Check if replay is available for this score & md5's match
 
     try:
+        print(
+            f"DEBUG get_replay: Downloading replay for score_id={score_id}, beatmap_md5={beatmap_md5}"
+        )
+
         # Full replay payload
         replay_data = await api_client.download_score(
             score_id=score_id,
             raw=True,
         )
 
-        assert replay_data is not None, "Expected replay data to be bytes"
+        print(
+            f"DEBUG get_replay: replay_data type={type(replay_data)}, is_none={replay_data is None}"
+        )
+
+        if replay_data is None:
+            print(f"DEBUG get_replay: Replay data is None for score_id={score_id}")
+            return None
+
         assert isinstance(replay_data, bytes), (
             f"Expected replay data to be bytes, got {type(replay_data)}"
         )
 
+        print(
+            f"DEBUG get_replay: Replay data size={len(replay_data)}, extracting frames..."
+        )
+
         # Extract replay frames from .osr replay data
         replay_frames, replay_beatmap_md5 = extract_replay_frames_from_osr(replay_data)
+
+        print(
+            f"DEBUG get_replay: Extracted frames size={len(replay_frames)}, replay_beatmap_md5={replay_beatmap_md5}"
+        )
 
         if beatmap_md5 and replay_beatmap_md5 != beatmap_md5:
             print(
                 f"Replay beatmap md5 {replay_beatmap_md5} does not match expected {beatmap_md5}"
             )
             return None
-        else:
-            return replay_frames
 
-    except ValueError as e:
-        # log.error(f"Error fetching replay for score {score_id}: {e}")
+        print(f"DEBUG get_replay: Returning replay frames for score_id={score_id}")
+        return replay_frames
+
+    except Exception as e:
+        print(
+            f"ERROR get_replay: Exception fetching replay for score {score_id}: {type(e).__name__}: {e}"
+        )
         raise
 
 

@@ -1,4 +1,5 @@
 import hashlib
+import re
 from datetime import datetime
 
 import usecases.domain.cache_control
@@ -8,6 +9,16 @@ from osu_protocol.osu.types import osuMapStatus
 from repositories.beatmaps import BeatmapsRepository
 from repositories.osufiles.songs_folder import OsuFileRepository
 from usecases.adapters.ossapiasync import OssapiAsync
+
+# Pre-compiled regex patterns for beatmap filename parsing
+# Matches " 1.3x (226bpm)" or " 1.44x (251bpm) AR10.5 OD10.6" - speed mod and optional stat adjustments
+# Uses negative lookahead (?!1\.0x) to exclude normal 1.0x speed
+SPEED_MOD_SUFFIX_PATTERN = re.compile(
+    r"\s+(?!1\.0x)[\d.]+x\s*\([^)]*\)(?:\s+(?:AR|OD|HP|CS)[\d.]+)*"
+)
+FILENAME_PARSE_PATTERN = re.compile(
+    r"(.+?)\s+-\s+(.+?)\s+\[(.+?)\]\.osu"
+)  # Matches "Artist - Title [Difficulty].osu"
 
 
 @usecases.domain.cache_control.cache_beatmaps
@@ -45,9 +56,17 @@ async def from_api_md5(
 
     try:
         api_beatmap = await api_client.beatmap(checksum=beatmap_md5)
-    except ValueError:
         print(
-            f"[DEBUG] ValueError fetching beatmap from API for checksum: {beatmap_md5}"
+            f"[DEBUG] from_api_md5: API beatmap call succeeded, result: {'found' if api_beatmap else 'None'}"
+        )
+    except ValueError as e:
+        print(
+            f"[DEBUG] ValueError fetching beatmap from API for checksum: {beatmap_md5}, error: {e}"
+        )
+        return None
+    except Exception as e:
+        print(
+            f"[DEBUG] Exception fetching beatmap from API for checksum: {beatmap_md5}, error: {type(e).__name__}: {e}"
         )
         return None
 
@@ -59,18 +78,28 @@ async def from_api_md5(
 
     # get .osu file from songs folder
     if filename is None and api_beatmap.checksum is not None:
+        print(
+            f"[DEBUG] from_api_md5: Looking up osu_file by api_beatmap.checksum={api_beatmap.checksum}"
+        )
         osu_file = await osu_files_repo.from_md5(api_beatmap.checksum)
     elif filename is not None:
+        print(f"[DEBUG] from_api_md5: Looking up osu_file by filename={filename}")
         osu_file = await osu_files_repo.from_filename(filename)
     else:
+        print(f"[DEBUG] from_api_md5: No filename or api checksum provided")
         osu_file = None
 
     if osu_file is None:
+        print(
+            f"[DEBUG] from_api_md5: osu_file not found, trying beatmap_md5={beatmap_md5}"
+        )
         osu_file = await osu_files_repo.from_md5(beatmap_md5)
 
     if osu_file is None:
+        print(f"[DEBUG] from_api_md5: osu_file not found, returning None")
         return None
 
+    print(f"[DEBUG] from_api_md5: osu_file found, creating beatmap model")
     beatmap_set = api_beatmap.beatmapset()
 
     now = datetime.now()
@@ -156,22 +185,162 @@ async def from_api_id(
     return bmap
 
 
+def extract_base_filename_from_speed_modded(filename: str) -> str:
+    """
+    Extract base filename from speed-modded version by removing speed mod suffixes.
+
+    Examples:
+        "Difficulty [Dear Rue 1.3x (226bpm)].osu" -> "Difficulty [Dear Rue].osu"
+        "Difficulty [Name X# (YYbpm)].osu" -> "Difficulty [Name].osu"
+    """
+    return SPEED_MOD_SUFFIX_PATTERN.sub("", filename.rstrip(".osu")) + ".osu"
+
+
+def is_speed_modded_filename(filename: str) -> bool:
+    """
+    Check if a filename is from a speed-modded version.
+
+    Returns True if filename contains speed mod suffix like " 1.3x (226bpm)".
+    """
+    return SPEED_MOD_SUFFIX_PATTERN.search(filename) is not None
+
+
+async def find_ranked_by_filename(
+    beatmap_md5: str, filename: str, profile_name: str
+) -> Beatmap | None:
+    """
+    Find a ranked/submitted beatmap by searching for the original difficulty name
+    extracted from a speed-modded filename.
+
+    This is used when a speed-modded version has beatmap_set_id=-1 and the local
+    .osu file doesn't have valid beatmap metadata.
+    """
+    beatmaps_repo = BeatmapsRepository()
+
+    print(f"[DEBUG] find_ranked_by_filename: Original filename={filename}")
+    base_filename = extract_base_filename_from_speed_modded(filename)
+    print(f"[DEBUG] find_ranked_by_filename: Base filename={base_filename}")
+
+    # Extract artist, title, and difficulty from the filename
+    match = FILENAME_PARSE_PATTERN.match(base_filename)
+
+    if not match:
+        print(
+            f"[DEBUG] find_ranked_by_filename: Could not parse filename: {base_filename}"
+        )
+        return None
+
+    artist, title, difficulty = match.groups()
+    print(
+        f"[DEBUG] find_ranked_by_filename: Parsed artist={artist}, title={title}, difficulty={difficulty}"
+    )
+
+    # Search the database using the repository method
+    beatmap = await beatmaps_repo.search_by_metadata(
+        artist=artist,
+        title=title,
+        difficulty=difficulty,
+        profile_name=profile_name,
+        excluded_statuses=[osuMapStatus.NOT_SUBMITTED, None],
+    )
+
+    if beatmap:
+        print(
+            f"[DEBUG] find_ranked_by_filename: Found ranked beatmap: id={beatmap.id}, status={beatmap.status}"
+        )
+    else:
+        print(f"[DEBUG] find_ranked_by_filename: No matching beatmap found")
+
+    return beatmap
+
+
+@usecases.domain.cache_control.cache_beatmaps
+async def from_local_file_by_filename(
+    api_client: OssapiAsync,
+    profile_name: str,
+    map_filename: str,
+) -> Beatmap | None:
+    """
+    Find and fetch a beatmap by looking up its local .osu file.
+    Used for speed-modded versions where API MD5 lookup fails.
+
+    Args:
+        api_client: OssAPI client for API calls
+        profile_name: User profile name for status caching
+        map_filename: Filename of the map to find (e.g. "Artist - Title [Diff].osu")
+
+    Returns:
+        Beatmap if found, None otherwise
+    """
+    osu_files_repo = OsuFileRepository()
+
+    print(f"[DEBUG] from_local_file_by_filename: Looking for '{map_filename}'")
+
+    # First, try the smarter search by filename pattern
+    ranked_beatmap = await find_ranked_by_filename(
+        beatmap_md5="",
+        filename=map_filename,
+        profile_name=profile_name,
+    )
+    if ranked_beatmap:
+        print(
+            f"[DEBUG] from_local_file_by_filename: Found ranked beatmap via filename search: id={ranked_beatmap.id}"
+        )
+        return ranked_beatmap
+
+    # Fallback: try to get beatmap_id from the local .osu file
+    try:
+        osu_file = await osu_files_repo.from_filename(map_filename)
+        if osu_file and osu_file.beatmap_id > 0:
+            print(
+                f"[DEBUG] from_local_file_by_filename: Found beatmap_id={osu_file.beatmap_id}, fetching from API"
+            )
+            beatmap = await from_api_id(
+                api_client=api_client,
+                beatmap_id=osu_file.beatmap_id,
+                profile_name=profile_name,
+            )
+            if beatmap:
+                print(
+                    f"[DEBUG] from_local_file_by_filename: Successfully resolved beatmap {beatmap.id}"
+                )
+            return beatmap
+    except Exception as e:
+        print(
+            f"[DEBUG] from_local_file_by_filename: Error resolving from local file: {e}"
+        )
+
+    return None
+
+
 @usecases.domain.cache_control.cache_beatmaps
 async def find_unsubmitted_map(
     profile_name: str, beatmap_md5: str, beatmap_set_id: int, map_filename: str
 ) -> Beatmap | None:
+    print(
+        f"[DEBUG] find_unsubmitted_map: beatmap_md5={beatmap_md5}, beatmap_set_id={beatmap_set_id}, map_filename={map_filename}"
+    )
     beatmaps_repo = BeatmapsRepository()
     osu_files_repo = OsuFileRepository()
 
     try:
         osu_file = await osu_files_repo.from_md5(beatmap_md5)
+        print(
+            f"[DEBUG] find_unsubmitted_map: osu_file found, beatmap_id={osu_file.beatmap_id if osu_file else 'None'}"
+        )
     except Exception as e:
         print(f"[DEBUG] Error fetching osu file for MD5 {beatmap_md5}: {e}")
         return None
 
     if osu_file is None:
+        print(
+            f"[DEBUG] find_unsubmitted_map: osu_file is None for beatmap_md5={beatmap_md5}"
+        )
         return
 
+    print(
+        f"[DEBUG] find_unsubmitted_map: osu_file.unsubmitted={osu_file.unsubmitted} (beatmap_id={osu_file.beatmap_id})"
+    )
     if osu_file.unsubmitted:
         now = datetime.now()
         unsubmitted_beatmap = Beatmap(
@@ -198,6 +367,30 @@ async def find_unsubmitted_map(
         return unsubmitted_beatmap
 
     return None
+
+
+async def delete_not_submitted_entry_for_md5(beatmap_md5: str) -> None:
+    """
+    Delete any NOT_SUBMITTED beatmap entry for a given MD5.
+    Used to clean up when a speed-modded version is resolved to a ranked beatmap.
+    """
+    beatmaps_repo = BeatmapsRepository()
+
+    print(
+        f"[DEBUG] delete_not_submitted_entry_for_md5: Checking for NOT_SUBMITTED entry with md5={beatmap_md5}"
+    )
+    not_submitted_beatmap = await beatmaps_repo.from_md5(beatmap_md5)
+
+    if not_submitted_beatmap and not_submitted_beatmap.id == 0:
+        print(
+            f"[DEBUG] delete_not_submitted_entry_for_md5: Found NOT_SUBMITTED entry, deleting it"
+        )
+        await beatmaps_repo.delete_beatmap(not_submitted_beatmap)
+        usecases.domain.cache_control.clear_beatmaps_cache()
+    else:
+        print(
+            f"[DEBUG] delete_not_submitted_entry_for_md5: No NOT_SUBMITTED entry found (id={not_submitted_beatmap.id if not_submitted_beatmap else 'None'})"
+        )
 
 
 @usecases.domain.cache_control.cache_beatmaps

@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, Header, Request, Response
 
 import services.cho
 import usecases.application.client.update
+import usecases.domain.profiles
 
 # from adapters import log, log_time
 from controllers.dependencies import client_state, profile
@@ -107,8 +108,15 @@ async def handle_ping(
 async def on_action_change(
     packet: ChangeAction, client_state: ClientState, profile: Profile
 ) -> None:
+    # Fetch fresh profile to ensure we're not using stale cached data after score submission
+    fresh_profile = await usecases.domain.profiles.get_profile(
+        client_state.profile_name
+    )
+    if fresh_profile is None:
+        fresh_profile = profile
+
     await services.cho.process_action_change(
-        packet=packet, client_state=client_state, profile=profile
+        packet=packet, client_state=client_state, profile=fresh_profile
     )
 
     return
@@ -119,7 +127,14 @@ async def on_action_change(
 async def on_logout(
     packet: LogOut, client_state: ClientState, profile: Profile
 ) -> None:
-    await services.cho.process_logout(client_state=client_state, profile=profile)
+    # Fetch fresh profile to ensure we're not using stale cached data after score submission
+    fresh_profile = await usecases.domain.profiles.get_profile(
+        client_state.profile_name
+    )
+    if fresh_profile is None:
+        fresh_profile = profile
+
+    await services.cho.process_logout(client_state=client_state, profile=fresh_profile)
 
     return
 

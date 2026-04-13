@@ -14,7 +14,7 @@ import sys
 from processes import (
     interface_process,
     los_process,
-    proxy_process,
+    # proxy_process,
     songs_folder_process,
     # TODO: mirror_process,
 )
@@ -26,7 +26,7 @@ def main():
         multiprocessing.Process(target=process, daemon=True, name=process.__name__)
         for process in [
             songs_folder_process,
-            proxy_process,
+            # proxy_process,
             los_process,
             interface_process,
         ]

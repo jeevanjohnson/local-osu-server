@@ -19,6 +19,7 @@ from fastapi.responses import RedirectResponse
 
 import services.osu
 import usecases.application.client.update
+import usecases.domain.profiles
 
 # from adapters import log_time
 from controllers.dependencies import (
@@ -125,9 +126,16 @@ async def get_leaderboard(
             OsuErrors.NON.value.encode(),
         )
 
+    # Fetch fresh profile to ensure we're not using stale cached data after score submission
+    fresh_profile = await usecases.domain.profiles.get_profile(
+        client_state.profile_name
+    )
+    if fresh_profile is None:
+        fresh_profile = profile
+
     leaderboard = await services.osu.process_leaderboard_request(
         client_state=client_state,
-        profile=profile,
+        profile=fresh_profile,
         leaderboard_type=LeaderboardType(leaderboard_type),
         map_md5=map_md5,
         map_filename=urllib.parse.unquote(map_filename),
