@@ -1,9 +1,9 @@
 import multiprocessing
 from datetime import datetime
 from typing import Callable
+import proxy.main
 
 from nicegui import app, ui
-
 
 class ApplicationService:
     def __init__(
@@ -19,8 +19,13 @@ class ApplicationService:
         self.shutdown = shutdown
         self.running = False
 
+        self.process = None
+
     def get_launch_process(self) -> multiprocessing.Process:
-        return multiprocessing.Process(target=self.launch)
+        if self.process is None:
+            self.process = multiprocessing.Process(target=self.launch)
+
+        return self.process
 
     def start(self) -> None:
         process = self.get_launch_process()
@@ -33,18 +38,16 @@ class ApplicationService:
             process.terminate()
             process.join(timeout=5)
 
+        self.process = None
         self.shutdown()
         self.running = False
-
-
-from proxy.main import run, shutdown
 
 SERVICES: list[ApplicationService] = [
     ApplicationService(
         name="Proxy",
         description="The proxy process which allows the osu! client to connect to the server.",
-        launch=run,
-        shutdown=shutdown,
+        launch=proxy.main.run,
+        shutdown=proxy.main.shutdown,
     )
     # ApplicationService(
     #     name="Server",
@@ -55,11 +58,6 @@ SERVICES: list[ApplicationService] = [
     #     name="Interface",
     #     description="The user interface for interacting with the application.",
     #     entrypoint=Path("./interface/main.py"),
-    # ),
-    # ApplicationService(
-    #     name="Proxy",
-    #     description="The proxy process which allows the osu! client to connect to the server.",
-    #     entrypoint=Path("./proxy/main.py"),
     # ),
     # ApplicationService(
     #     name="Watcher",
@@ -151,8 +149,7 @@ if __name__ in {
 }:
     build_ui()
     ui.run(
-        title="Application Control Panel",
-        port=5432,
+        title="LOS! Control Panel",
         dark=True,
         frameless=True,
         native=True,
