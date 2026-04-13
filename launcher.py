@@ -15,18 +15,24 @@ class ApplicationService:
     ) -> None:
         self.name = name
         self.description = description
-        self.launch = multiprocessing.Process(target=launch)
+        self.launch = launch
         self.shutdown = shutdown
         self.running = False
 
+    def get_launch_process(self) -> multiprocessing.Process:
+        return multiprocessing.Process(target=self.launch)
+
     def start(self) -> None:
-        self.launch.start()
+        process = self.get_launch_process()
+        process.start() 
         self.running = True
 
     def stop(self) -> None:
-        if self.launch.is_alive():
-            self.launch.terminate()
-            self.launch.join(timeout=5)
+        process = self.get_launch_process()
+        if process.is_alive():
+            process.terminate()
+            process.join(timeout=5)
+
         self.shutdown()
         self.running = False
 

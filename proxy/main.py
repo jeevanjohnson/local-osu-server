@@ -15,11 +15,11 @@ INTERNET_SETTINGS = OpenKey(
 
 
 def set_internet_setting(key: str, value: Any) -> None:
-    try:
-        current_value, value_type = QueryValueEx(INTERNET_SETTINGS, key)
-    except FileNotFoundError:
-        # Key doesn't exist, default to REG_SZ for strings
-        value_type = 1  # REG_SZ
+    # try:
+    # except FileNotFoundError:
+    #     # Key doesn't exist, default to REG_SZ for strings
+    #     value_type = 1  # REG_SZ
+    current_value, value_type = QueryValueEx(INTERNET_SETTINGS, key)
     SetValueEx(INTERNET_SETTINGS, key, 0, value_type, value)
 
 
@@ -56,12 +56,10 @@ def disable_windows_proxy() -> None:
     except Exception as e:
         print(f"✗ Failed to disable proxy: {e}")
 
-
 def run():
     enable_windows_proxy()
     process = subprocess.Popen(["mitmdump", "-s", "./proxy/mitm.py"])
     process.wait()
-
 
 def shutdown():
     try:
