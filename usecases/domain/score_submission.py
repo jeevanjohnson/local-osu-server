@@ -8,7 +8,7 @@ from osu_protocol.osu.score_submission import (
     parse_form_data,
 )
 from repositories.scores import ScoresRepository
-from usecases.adapters.osu_file import OsuFile
+from devnotes.adapters.osufile import OsuFile
 
 
 async def decrypt(

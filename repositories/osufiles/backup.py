@@ -2,7 +2,7 @@ from jays_tools import JsonDatabase
 
 from constants.paths import OSU_FILES
 from models.database.osufiles.backup import OsuFileBackup, OsuFileEntry
-from usecases.adapters.osu_file import OsuFile
+from devnotes.adapters.osufile import OsuFile
 
 
 class OsuFileBackupRepository:

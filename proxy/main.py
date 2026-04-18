@@ -3,7 +3,7 @@
 import ctypes
 import os
 import subprocess
-from typing import Any
+from typing import Any, Callable
 from winreg import HKEY_CURRENT_USER, KEY_ALL_ACCESS, OpenKey, QueryValueEx, SetValueEx
 
 INTERNET_SETTINGS = OpenKey(
@@ -12,7 +12,6 @@ INTERNET_SETTINGS = OpenKey(
     reserved=0,
     access=KEY_ALL_ACCESS,
 )
-
 
 def set_internet_setting(key: str, value: Any) -> None:
     # try:
@@ -26,7 +25,7 @@ def set_internet_setting(key: str, value: Any) -> None:
 def notify_internet_settings_changed() -> None:
     """Notify Windows that Internet settings have changed."""
     try:
-        internet_set_option = ctypes.windll.Wininet.InternetSetOptionW
+        internet_set_option: Callable = ctypes.windll.Wininet.InternetSetOptionW
         internet_set_option(0, 37, 0, 0)  # INTERNET_OPTION_REFRESH
         internet_set_option(0, 39, 0, 0)  # INTERNET_OPTION_SETTINGS_CHANGED
     except Exception as e:
@@ -56,14 +55,16 @@ def disable_windows_proxy() -> None:
     except Exception as e:
         print(f"✗ Failed to disable proxy: {e}")
 
-def run():
-    enable_windows_proxy()
-    process = subprocess.Popen(["mitmdump", "-s", "./proxy/mitm.py"])
-    process.wait()
+# Service functions that will be called by the launcher
 
-def shutdown():
+def stop():
     try:
         os.system("taskkill /F /IM mitmdump.exe")
     except Exception as e:
         print(f"error killing mitmdump: {e}")
     disable_windows_proxy()
+
+def start():
+    enable_windows_proxy()
+    process = subprocess.Popen(["mitmdump", "-s", "./proxy/mitm.py"])
+    process.wait()

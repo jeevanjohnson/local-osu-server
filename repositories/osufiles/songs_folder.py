@@ -3,7 +3,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from usecases.adapters.osu_file import OsuFile
+from devnotes.adapters.osufile import OsuFile
 from usecases.domain.cache_control import cache_beatmaps
 
 try:

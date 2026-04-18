@@ -4,7 +4,7 @@ from repositories.osufiles.backup import OsuFileBackupRepository
 from repositories.osufiles.songs_folder import OsuFileRepository
 
 # from adapters import log
-from usecases.adapters.osu_file import OsuFile
+from devnotes.adapters.osufile import OsuFile
 
 
 # @cached_for_30_minutes

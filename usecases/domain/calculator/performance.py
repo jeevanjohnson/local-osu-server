@@ -4,7 +4,7 @@ import usecases.domain.cache_control
 from models.domain.gameplay import Mods, osuGameMode, osuMods
 
 # from adapters import log, log_time
-from usecases.adapters.osu_file import OsuFile
+from devnotes.adapters.osufile import OsuFile
 
 # Mapping from osuGameMode to rosu GameMode
 ROSU_GAME_MODE_MAP: dict[osuGameMode, rosu.GameMode] = {

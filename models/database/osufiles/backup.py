@@ -3,7 +3,7 @@ import base64
 from jays_tools import MigratableModel
 from pydantic import ConfigDict, Field, field_serializer, field_validator
 
-from usecases.adapters.osu_file import OsuFile
+from devnotes.adapters.osufile import OsuFile
 
 
 class OsuFileEntryV1(MigratableModel):
@@ -14,8 +14,6 @@ class OsuFileEntryV1(MigratableModel):
 
     @field_serializer("file")
     def osu_file_to_json(self, value: OsuFile) -> str:
-        assert value.raw_file is not None, "OsuFile must have raw_file to be serialized"
-
         # Persist only map data; audio payloads make cache writes extremely large.
         compressed_osu_file = value.compress(include_audio=False)
 

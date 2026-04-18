@@ -1,8 +1,6 @@
 import multiprocessing
 from datetime import datetime
-from typing import Callable
-import proxy.main
-
+from typing import Callable, Any
 from nicegui import app, ui
 
 class ApplicationService:
@@ -10,20 +8,19 @@ class ApplicationService:
         self,
         name: str,
         description: str,
-        launch: Callable[[], None],
-        shutdown: Callable[[], None],
+        service_start: Callable[[], Any],
+        service_stop: Callable[[], Any]
     ) -> None:
         self.name = name
         self.description = description
-        self.launch = launch
-        self.shutdown = shutdown
+        self.service_start = service_start
+        self.service_stop = service_stop
         self.running = False
-
         self.process = None
 
     def get_launch_process(self) -> multiprocessing.Process:
         if self.process is None:
-            self.process = multiprocessing.Process(target=self.launch)
+            self.process = multiprocessing.Process(target=self.service_start)
 
         return self.process
 
@@ -39,16 +36,25 @@ class ApplicationService:
             process.join(timeout=5)
 
         self.process = None
-        self.shutdown()
+        self.service_stop()
         self.running = False
+
+import proxy.main as proxy
+import osu_watcher.main as osu_watcher
 
 SERVICES: list[ApplicationService] = [
     ApplicationService(
         name="Proxy",
         description="The proxy process which allows the osu! client to connect to the server.",
-        launch=proxy.main.run,
-        shutdown=proxy.main.shutdown,
-    )
+        service_start=proxy.start,
+        service_stop=proxy.stop,
+    ),
+    ApplicationService(
+        name="Osu! Watcher",
+        description="The osu! watcher process watches for live changes on osu! client actions.",
+        service_start=osu_watcher.start,
+        service_stop=osu_watcher.stop,
+    ),
     # ApplicationService(
     #     name="Server",
     #     description="The server which the osu! client connects to.",
@@ -58,11 +64,6 @@ SERVICES: list[ApplicationService] = [
     #     name="Interface",
     #     description="The user interface for interacting with the application.",
     #     entrypoint=Path("./interface/main.py"),
-    # ),
-    # ApplicationService(
-    #     name="Watcher",
-    #     description="The watcher process monitors the songs folder.",
-    #     entrypoint=Path("./watcher/main.py"),
     # ),
 ]
 
@@ -141,7 +142,6 @@ def build_ui() -> None:
 
     with ExitButton():
         ui.tooltip("Exit the application and stop all running services")
-
 
 if __name__ in {
     "__main__",

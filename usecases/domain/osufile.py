@@ -10,7 +10,7 @@ from repositories.osufiles.backup import OsuFileBackupRepository
 from repositories.osufiles.songs_folder import OsuFileRepository
 
 # from adapters import log
-from usecases.adapters.osu_file import OsuFile
+from devnotes.adapters.osufile import OsuFile
 
 FILENAME_REGEX = re.compile(
     r"(?P<artist>.*) - (?P<song_name>.*) ((?P<mapper>.*) \[)(?P<diff_name>.*)\]\.osu"
