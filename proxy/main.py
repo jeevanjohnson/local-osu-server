@@ -13,6 +13,7 @@ INTERNET_SETTINGS = OpenKey(
     access=KEY_ALL_ACCESS,
 )
 
+
 def set_internet_setting(key: str, value: Any) -> None:
     # try:
     # except FileNotFoundError:

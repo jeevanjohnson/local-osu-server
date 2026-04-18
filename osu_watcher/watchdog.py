@@ -1,10 +1,12 @@
-
-from watchdog.events import FileSystemEventHandler
 from pathlib import Path
 
-from osu_watcher.parser import parse_osu_file
-from osu_watcher.models import OsuFileLocation
+from watchdog.events import FileSystemEventHandler
+
 from jays_tools.json_database.database import JsonDatabase as _JsonDatabase
+
+from osu_watcher.models import OsuFileLocation
+from osu_watcher.parser import parse_osu_file
+
 
 class SongFolderHandler(FileSystemEventHandler):
     def __init__(self, json_db: _JsonDatabase[OsuFileLocation]) -> None:

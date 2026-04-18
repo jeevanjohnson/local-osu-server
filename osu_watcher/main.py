@@ -1,18 +1,18 @@
 
-
 import os
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 import psutil
-from osu_watcher.models import OsuFileLocation
 from jays_tools import JsonDatabase
 from jays_tools.json_database.database import JsonDatabase as _JsonDatabase
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from watchdog.observers import Observer
-from osu_watcher.parser import parse_osu_file
 
+from osu_watcher.models import OsuFileLocation
+from osu_watcher.parser import parse_osu_file
 from osu_watcher.watchdog import SongFolderHandler
+
 
 def retrive_songs_folder_from_osu_client() -> Path | None:
     try:

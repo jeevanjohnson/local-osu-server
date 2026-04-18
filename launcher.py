@@ -1,7 +1,12 @@
 import multiprocessing
 from datetime import datetime
-from typing import Callable, Any
+from typing import Any, Callable
+
 from nicegui import app, ui
+
+import osu_watcher.main as osu_watcher
+import proxy.main as proxy
+
 
 class ApplicationService:
     def __init__(
@@ -16,7 +21,7 @@ class ApplicationService:
         self.service_start = service_start
         self.service_stop = service_stop
         self.running = False
-        self.process = None
+        self.process: multiprocessing.Process | None = None
 
     def get_launch_process(self) -> multiprocessing.Process:
         if self.process is None:
@@ -26,7 +31,7 @@ class ApplicationService:
 
     def start(self) -> None:
         process = self.get_launch_process()
-        process.start() 
+        process.start()
         self.running = True
 
     def stop(self) -> None:
@@ -38,9 +43,6 @@ class ApplicationService:
         self.process = None
         self.service_stop()
         self.running = False
-
-import proxy.main as proxy
-import osu_watcher.main as osu_watcher
 
 SERVICES: list[ApplicationService] = [
     ApplicationService(

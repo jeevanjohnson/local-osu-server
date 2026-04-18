@@ -1,6 +1,7 @@
-from typing import TypedDict
-from pathlib import Path
 import hashlib
+from pathlib import Path
+from typing import TypedDict
+
 
 class ParseOsuFileResponse(TypedDict):
     md5: str

@@ -1,8 +1,8 @@
-
 from pathlib import Path
 
 from jays_tools import MigratableModel
 from pydantic import Field
+
 
 class OsuFileLocationV1(MigratableModel):
     by_md5: dict[str, Path] = Field(default_factory=dict)
