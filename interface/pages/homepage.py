@@ -1,7 +1,13 @@
 from nicegui import ui
-
+import core.usecases.application.authentication as auth_usecases
 
 def build() -> None:
+    
     @ui.page("/")
     def homepage() -> None:
-        ui.label("Welcome to the LOS! Interface.")
+        
+        if auth_usecases.is_logged_in():
+            ui.navigate.to("/dashboard")
+        else:
+            ui.navigate.to("/login")
+        

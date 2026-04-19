@@ -59,8 +59,8 @@ SERVICES: list[ApplicationService] = [
         service_stop=osu_watcher.stop,
     ),
     ApplicationService(
-        name="Interface",
-        description="The user interface for interacting with the application.",
+        name="LOS Interface",
+        description="The user interface for interacting with your LOS! profiles and more.",
         service_start=interface.start,
         service_stop=interface.stop,
     ),

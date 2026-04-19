@@ -1,5 +1,6 @@
 import subprocess
 import sys
+import time
 import webbrowser
 from pathlib import Path
 
@@ -23,7 +24,13 @@ def start() -> None:
 
     print(f"Currently running interface on {port} with PID {process.pid}")
 
-    webbrowser.open(f"http://localhost:{port}")
+    while True:
+        if not port_usecases.in_use():
+            print("Port is not in use, waiting for interface to start...")
+            time.sleep(1)
+        
+        webbrowser.open(f"http://localhost:{port}")
+        break
 
 
 def stop() -> None:
@@ -36,7 +43,6 @@ if __name__ in {"__main__", "__mp_main__"}:
     for page in pages.glob("*.py"):
         module_name = page.stem
         page = __import__(f"interface.pages.{module_name}", fromlist=[module_name])
-
         try:
             page.build()
         except AttributeError:
