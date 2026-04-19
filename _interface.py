@@ -56,7 +56,7 @@ async def login():
 
             with ui.interactive_image(
                 avatar_url, size=(256, 256)
-            ):  # .classes('relative'):
+            ):
                 ui.button(profile_name, on_click=on_profile_selection).classes(
                     "absolute bottom-0 left-0 m-2"
                 )

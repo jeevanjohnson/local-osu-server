@@ -86,7 +86,7 @@ URL = str
 
 
 class ProfileV1(MigratableModel):
-    profile_picture: Path | URL | None = Field(default=None)
+    avatar_url: URL = Field(default="https://a.ppy.sh/")
     friend_ids: list[int] = Field(default=[])
     country_code: osuCountryCode = Field(default=osuCountryCode.XX)
     performance: dict[osuGameMode, Performance] = Field(

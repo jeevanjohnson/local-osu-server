@@ -1,12 +1,20 @@
 from core.repositories.interface_state import InterfaceStateRepository
 from core.repositories.profiles import ProfilesRepository
-# from models.
+from core.models.profile import Profile
 
-def current_logged_in_profile() -> str | None:
+def current_logged_in_profile() -> tuple[str, Profile] | None:
     state_repo = InterfaceStateRepository()
     database = state_repo.get_state()
 
-    return database.current_profile
+    if database.current_profile is None:
+        return None
+
+    profiles_repo = ProfilesRepository()
+    profile = profiles_repo.get_profile(database.current_profile)
+    if profile is None:
+        return None
+
+    return (database.current_profile, profile)
 
 def is_logged_in() -> bool:
     return current_logged_in_profile() is not None

@@ -77,6 +77,8 @@ def template() -> None:
         warning="#ffff4d",
     )
 
+    ui.button.default_props('no-caps')
+
 if __name__ in {"__main__", "__mp_main__"}:
     pages = Path(__file__).parent / "pages"
     for page in pages.glob("*.py"):
