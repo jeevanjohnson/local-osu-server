@@ -13,7 +13,7 @@ import usecases.domain.score_submission
 import usecases.domain.scores
 from models.database.profiles import CurrentProfile as Profile
 from models.domain.errors import OsuErrors
-from osu_protocol.osu.charts import UNRANKED_CHARTS, SubmissionCharts
+from core.osu_protocol.osu.charts import UNRANKED_CHARTS, SubmissionCharts
 
 
 async def process_submission(

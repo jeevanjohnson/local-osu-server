@@ -6,7 +6,7 @@ from jays_tools import MigratableModel
 from pydantic import ConfigDict, Field
 
 from models.domain.gameplay import osuGameMode
-from osu_protocol.osu.types import osuMapStatus
+from core.osu_protocol.osu.types import osuMapStatus
 
 PROFILE_NAME = str
 

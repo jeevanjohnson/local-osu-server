@@ -21,18 +21,18 @@ from models.database.profiles import CurrentProfile as Profile
 from models.domain.errors import OsuErrors
 from models.domain.gameplay import Mods, osuGameMode
 from models.domain.scores import AcceptedScores
-from osu_protocol.osu.charts import SubmissionCharts
-from osu_protocol.osu.direct import (
+from core.osu_protocol.osu.charts import SubmissionCharts
+from core.osu_protocol.osu.direct import (
     DirectBeatmapSet,
     DirectSearchResult,
 )
-from osu_protocol.osu.leaderboard import (
+from core.osu_protocol.osu.leaderboard import (
     GraveyardLeaderboard,
     Leaderboard,
     NotSubmittedLeaderboard,
     UpdateBeatmapRequestLeaderboard,
 )
-from osu_protocol.osu.types import LeaderboardType
+from core.osu_protocol.osu.types import LeaderboardType
 
 
 async def process_seasonal_backgrounds_request(

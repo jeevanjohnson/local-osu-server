@@ -2,7 +2,7 @@ from jays_tools import JsonDatabase
 
 from constants.paths import CLIENT_UPDATES
 from models.database.client.update import ClientUpdate
-from osu_protocol.cho.server import Packet, Packets
+from core.osu_protocol.cho.server import Packet, Packets
 
 
 class ClientUpdateRepository:

@@ -3,7 +3,7 @@ from datetime import datetime, timedelta, timezone
 
 import numpy as np
 
-from osu_protocol.cho.server import osuAction
+from core.osu_protocol.cho.server import osuAction
 
 ALL_STATES = [
     osuAction.Idle,

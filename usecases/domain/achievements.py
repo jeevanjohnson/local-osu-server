@@ -1,4 +1,4 @@
-from osu_protocol.osu.charts import Achievements
+from core.osu_protocol.osu.charts import Achievements
 
 
 # TODO: implement achievements some day?

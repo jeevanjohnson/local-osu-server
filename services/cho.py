@@ -13,8 +13,8 @@ import usecases.domain.server
 from models.database.client.state import ClientState
 from models.database.profiles import CurrentProfile as Profile
 from models.domain.gameplay import Mods
-from osu_protocol.cho.client import ChangeAction, parse_login_data
-from osu_protocol.cho.server import Login, LoginAuthFailed, osuAction, osuGameMode
+from core.osu_protocol.cho.client import ChangeAction, parse_login_data
+from core.osu_protocol.cho.server import Login, LoginAuthFailed, osuAction, osuGameMode
 
 
 class LoginResponse(TypedDict):

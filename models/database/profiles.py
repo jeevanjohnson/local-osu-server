@@ -11,7 +11,7 @@ from pydantic import Field, field_validator
 from models.domain.accuracy import UnitAccuracy, to_unit_accuracy
 from models.domain.gameplay import osuGameMode
 from models.domain.scores import ScoringAlgorithm
-from osu_protocol.cho.server import osuCountryCode
+from core.osu_protocol.cho.server import osuCountryCode
 
 
 class SubmissionSettingsV1(MigratableModel):

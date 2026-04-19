@@ -5,3 +5,4 @@ __pycache__/
 config.py
 .vscode
 devnotes/
+.pytest_cache/

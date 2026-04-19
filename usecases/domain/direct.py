@@ -1,7 +1,7 @@
 import ossapi.models
 
 from models.domain.gameplay import osuGameMode
-from osu_protocol.osu.direct import (
+from core.osu_protocol.osu.direct import (
     DirectBeatmap,
     DirectBeatmapSet,
 )

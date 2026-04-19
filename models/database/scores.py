@@ -6,11 +6,11 @@ from pydantic import ConfigDict, Field, field_serializer, field_validator
 
 from models.domain.accuracy import UnitAccuracy
 from models.domain.gameplay import Mods
-from osu_protocol.cho.server import osuGameMode
+from core.osu_protocol.cho.server import osuGameMode
 
 if TYPE_CHECKING:
     from models.domain.scores import ScoringAlgorithm
-    from osu_protocol.osu.score_submission import ScoreData
+    from core.osu_protocol.osu.score_submission import ScoreData
 
 EpochTime = int
 

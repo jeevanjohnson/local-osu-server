@@ -12,10 +12,10 @@ from models.database.beatmaps import (
 from models.database.profiles import CurrentProfile as Profile
 from models.domain.gameplay import Mods, osuGameMode
 from models.domain.scores import AcceptedScores, AllScores
-from osu_protocol.osu.leaderboard import (
+from core.osu_protocol.osu.leaderboard import (
     LeaderboardWithScores,
 )
-from osu_protocol.osu.types import LeaderboardType
+from core.osu_protocol.osu.types import LeaderboardType
 from usecases.domain.scores import ScoringAlgorithm
 
 Position = int

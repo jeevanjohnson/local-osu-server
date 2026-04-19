@@ -20,7 +20,7 @@ import usecases.domain.server
 from models.database.client.state import ClientState
 from models.database.profiles import CurrentProfile as Profile
 from models.domain.gameplay import Mods
-from osu_protocol.osu.types import osuMapStatus
+from core.osu_protocol.osu.types import osuMapStatus
 
 CommandFunc = Callable[[ClientState, Profile, str], Coroutine[Any, Any, str]]
 

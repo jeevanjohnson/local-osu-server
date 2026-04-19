@@ -16,8 +16,8 @@ from models.database.profiles import (
 from models.database.scores import (
     CurrentScore as Score,
 )
-from osu_protocol.cho.server import osuGameMode
-from osu_protocol.osu.types import osuMapStatus
+from core.osu_protocol.cho.server import osuGameMode
+from core.osu_protocol.osu.types import osuMapStatus
 from repositories.beatmaps import BeatmapsRepository
 from repositories.profiles import ProfilesRepository
 from repositories.scores import ScoresRepository

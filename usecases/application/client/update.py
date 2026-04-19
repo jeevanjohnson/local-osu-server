@@ -4,7 +4,7 @@ import usecases.domain.cache_control
 from models.database.client.state import ClientState
 from models.database.profiles import CurrentProfile as Profile
 from models.domain.gameplay import Mods
-from osu_protocol.cho.server import (
+from core.osu_protocol.cho.server import (
     ClientRelog,
     LogOut,
     Message,

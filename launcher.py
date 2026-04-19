@@ -6,6 +6,7 @@ from nicegui import app, ui
 
 import osu_watcher.main as osu_watcher
 import proxy.main as proxy
+import interface.main as interface
 
 
 class ApplicationService:
@@ -57,15 +58,16 @@ SERVICES: list[ApplicationService] = [
         service_start=osu_watcher.start,
         service_stop=osu_watcher.stop,
     ),
+    ApplicationService(
+        name="Interface",
+        description="The user interface for interacting with the application.",
+        service_start=interface.start,
+        service_stop=interface.stop,
+    ),
     # ApplicationService(
     #     name="Server",
     #     description="The server which the osu! client connects to.",
     #     entrypoint=Path("./server/main.py"),
-    # ),
-    # ApplicationService(
-    #     name="Interface",
-    #     description="The user interface for interacting with the application.",
-    #     entrypoint=Path("./interface/main.py"),
     # ),
 ]
 

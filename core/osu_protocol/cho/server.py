@@ -9,7 +9,7 @@ from enum import IntEnum, IntFlag, unique
 
 import ossapi
 
-from osu_protocol.cho.types import (
+from core.osu_protocol.cho.types import (
     osuAccuracy,
     osuBaseType,
     osuByteArray,

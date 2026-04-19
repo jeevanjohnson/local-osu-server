@@ -4,7 +4,7 @@ from enum import Enum
 import usecases.domain.calculator.performance
 from constants.network import OSU_CLIENT_REQUEST_URL
 from models.domain.gameplay import Mods
-from osu_protocol.cho.server import osuGameMode
+from core.osu_protocol.cho.server import osuGameMode
 from repositories.osufiles.songs_folder import OsuFileRepository
 
 BEATMAP_SET_BASE_URL = f"https://osu.{OSU_CLIENT_REQUEST_URL}/beatmapsets/"

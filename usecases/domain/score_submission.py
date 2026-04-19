@@ -2,7 +2,7 @@ from starlette.datastructures import FormData, UploadFile
 
 import usecases.domain.calculator.performance
 from models.database.scores import CurrentScore as Score
-from osu_protocol.osu.score_submission import (
+from core.osu_protocol.osu.score_submission import (
     ScoreData,
     decrypt_score_aes_data,
     parse_form_data,

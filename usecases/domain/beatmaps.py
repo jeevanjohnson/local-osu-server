@@ -4,8 +4,8 @@ from datetime import datetime
 
 import usecases.domain.cache_control
 from models.database.beatmaps import CurrentBeatmap as Beatmap
-from osu_protocol.cho.server import osuGameMode
-from osu_protocol.osu.types import osuMapStatus
+from core.osu_protocol.cho.server import osuGameMode
+from core.osu_protocol.osu.types import osuMapStatus
 from repositories.beatmaps import BeatmapsRepository
 from repositories.osufiles.songs_folder import OsuFileRepository
 from usecases.adapters.ossapiasync import OssapiAsync

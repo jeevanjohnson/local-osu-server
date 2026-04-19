@@ -13,7 +13,7 @@ from models.domain.scores import (
     AllScores,
     ScoringAlgorithm,
 )
-from osu_protocol.domain.replay import extract_replay_frames_from_osr
+from core.osu_protocol.domain.replay import extract_replay_frames_from_osr
 from repositories.scores import ScoresRepository
 
 

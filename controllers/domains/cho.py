@@ -15,7 +15,7 @@ import usecases.domain.profiles
 from controllers.dependencies import client_state, profile
 from models.database.client.state import ClientState
 from models.database.profiles import CurrentProfile as Profile
-from osu_protocol.cho.client import (
+from core.osu_protocol.cho.client import (
     ChangeAction,
     ClientPackets,
     FriendAdd,
@@ -28,7 +28,7 @@ from osu_protocol.cho.client import (
     SendPublicMessage,
     UserStatsRequest,
 )
-from osu_protocol.cho.server import (
+from core.osu_protocol.cho.server import (
     SilentRelog,
 )
 

@@ -8,7 +8,7 @@ from ossapi import ScoreType
 
 import usecases.domain.calculator.bancho
 from models.domain.gameplay import Mods
-from osu_protocol.cho.server import (
+from core.osu_protocol.cho.server import (
     ALL_PRIVILEGES,
     Packets,
     PlayerPresence,
@@ -17,7 +17,7 @@ from osu_protocol.cho.server import (
     osuCountryCode,
     osuGameMode,
 )
-from osu_protocol.cho.server import LogOut as PlayerLogOut
+from core.osu_protocol.cho.server import LogOut as PlayerLogOut
 from usecases.adapters.ossapiasync import OssapiAsync
 
 

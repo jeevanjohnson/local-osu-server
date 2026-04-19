@@ -5,7 +5,7 @@ from models.database.beatmaps import CurrentBeatmap as Beatmap
 from models.database.scores import CurrentScore as ProfileScore
 from models.domain.gameplay import osuMods
 from models.domain.scores import AcceptedScores, AllScores, ScoringAlgorithm
-from osu_protocol.osu.types import osuMapStatus
+from core.osu_protocol.osu.types import osuMapStatus
 
 LEADERBOARD_SCORE_FMT = (
     "{id}|{name}|{score}|{max_combo}|"
