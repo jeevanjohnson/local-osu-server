@@ -28,7 +28,8 @@ def render_profiles(on_profile_select: Callable[[str], None], dialog: Dialog | N
                 ui.button(
                     profile_name,
                     on_click=lambda: on_profile_select(profile_name),
-                )
+                ).classes("w-full").style("word-break: break-word; white-space: normal; overflow-wrap: break-word;")
+    
     if dialog is not None:
         ui.button("Cancel", on_click=dialog.close)
 
