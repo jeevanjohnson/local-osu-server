@@ -7,7 +7,7 @@ from nicegui import app, ui
 import osu_watcher.main as osu_watcher
 import proxy.main as proxy
 import interface.main as interface
-
+import server.main as server
 
 class ApplicationService:
     def __init__(
@@ -64,11 +64,12 @@ SERVICES: list[ApplicationService] = [
         service_start=interface.start,
         service_stop=interface.stop,
     ),
-    # ApplicationService(
-    #     name="Server",
-    #     description="The server which the osu! client connects to.",
-    #     entrypoint=Path("./server/main.py"),
-    # ),
+    ApplicationService(
+        name="Server",
+        description="The server which the osu! client connects to.",
+        service_start=server.start,
+        service_stop=server.stop,
+    ),
 ]
 
 
@@ -135,7 +136,7 @@ def build_ui() -> None:
 
     ui.separator()
 
-    with ui.grid(columns=len(SERVICES)):
+    with ui.grid(columns=3):
         for service in SERVICES:
             with ui.column():
                 ui.label(service.name)
@@ -152,11 +153,18 @@ if __name__ in {
     "__mp_main__",  # multiprocessing compatibility
 }:
     build_ui()
-    ui.run(
-        title="LOS! Control Panel",
-        dark=True,
-        frameless=True,
-        native=True,
-        reload=False,
-        show=True,
-    )
+    try:
+        ui.run(
+            title="LOS! Control Panel",
+            dark=True,
+            frameless=True,
+            native=True,
+            reload=False,
+            show=True,
+        )
+    except Exception as e:
+        print(f"An error occurred: {e}")
+    finally:
+        for service in SERVICES:
+            if service.running:
+                service.stop()

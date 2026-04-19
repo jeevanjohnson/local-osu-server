@@ -137,6 +137,7 @@ def validate_osu_file_cache(songs_folder: Path, json_db: _JsonDatabase[OsuFileLo
 def stop():
     observer = Observer()
     observer.stop()
+    observer.join()
     print("Osu! Watcher stopped")
 
 def start():

@@ -7,14 +7,12 @@ import core.usecases.application.authentication as auth_usecases
 import core.usecases.domain.profiles as profiles_usecases
 from interface.components import BaseButton
 
-
 class InputStyle(ui.input):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.classes("w-96")
         self.style("background-color: #1c1c1c; color: #ffffff;")
         self.props("outlined")
-
 
 class ProfileSelectButton(BaseButton):
     def __init__(self, profile_name: str, on_select: Callable[[str], None]) -> None:
@@ -29,9 +27,8 @@ class ProfileSelectButton(BaseButton):
     def execute(self) -> None:
         self.on_select(self.profile_name)
 
-
-def render_profiles(
-    on_profile_select: Callable[[str], None], dialog: Dialog | None = None
+def render_profiles_in_dialog(
+    on_profile_select: Callable[[str], None]
 ) -> None:
     profiles = profiles_usecases.get_all()
 
@@ -40,9 +37,6 @@ def render_profiles(
             with ui.column():
                 ui.interactive_image(profile.avatar_url, size=(256, 256))
                 ProfileSelectButton(profile_name, on_profile_select)
-
-    if dialog is not None:
-        ui.button("Cancel", on_click=dialog.close)
 
 
 class CreateProfileButton(BaseButton):
@@ -90,33 +84,54 @@ class LoginButton(BaseButton):
     def open_dialog(self) -> None:
         with ui.dialog() as dialog, ui.card():
             ui.label("Please select a profile to log in with:")
-            render_profiles(self.login, dialog)
+            render_profiles_in_dialog(self.login)
+            ui.button("Cancel", on_click=dialog.close)
         self.dialog = dialog
         dialog.open()
-
 
 class DeleteProfileButton(BaseButton):
     def __init__(self) -> None:
         super().__init__("Delete Profile")
-        self.dialog: Dialog | None = None
+        self.first_dialog: Dialog | None = None
+        self.second_dialog: Dialog | None = None
         self.on_click(self.open_dialog)
+    
+    def confirm_delete(self, profile_name: str) -> None:
+        with ui.dialog() as dialog, ui.card():
+            ui.markdown(f"### Are you sure you want to delete the profile **{profile_name}**? This action cannot be undone!").classes(
+                "text-center"
+            )
+            with ui.column().classes(
+                "flex items-center justify-center w-full"
+            ):
+                with ui.row():
+                    ui.button("Cancel", on_click=dialog.close)
+                    ui.button(
+                        "Delete",
+                        on_click=lambda: self.delete_profile(profile_name),
+                        color="red"
+                    )
+                
+        self.second_dialog = dialog
+        dialog.open()
 
     def delete_profile(self, profile_name: str) -> None:
         if not profiles_usecases.profile_exists(profile_name):
             ui.notify("Profile does not exist")
             return
         profiles_usecases.delete_profile(profile_name)
-        if self.dialog is not None:
-            self.dialog.close()
+        if self.second_dialog is not None:
+            self.second_dialog.close()
         ui.notify(f"Profile {profile_name} deleted")
 
     def open_dialog(self) -> None:
         with ui.dialog() as dialog, ui.card():
             ui.label("Please select a profile to delete:")
-            render_profiles(self.delete_profile, dialog)
-        self.dialog = dialog
+            render_profiles_in_dialog(self.confirm_delete)
+            ui.button("Cancel", on_click=dialog.close)
+        
+        self.first_dialog = dialog
         dialog.open()
-
 
 def build(template: Callable[[], None]) -> None:
     @ui.page("/login")

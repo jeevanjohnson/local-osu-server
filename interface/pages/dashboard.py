@@ -68,9 +68,10 @@ class ChangeProfilePictureButton(BaseButton):
             return False
 
     def update_pfp_from_url(self, url: str, from_upload: bool = False) -> None:
-        if not from_upload and not self.is_valid_image_url(url):
-            ui.notify("Please enter a valid image URL")
-            return
+        if not from_upload:
+            if not self.is_valid_image_url(url):
+                ui.notify("Please enter a valid image URL")
+                return
 
         profiles_usecases.update_avatar_url(self.profile_name, url)
 
@@ -85,32 +86,36 @@ class ChangeProfilePictureButton(BaseButton):
 
     def execute(self) -> None:
         with ui.dialog() as dialog, ui.card():
-            msg = "### Either enter a direct link to an image, or a local file!"
-            ui.markdown(msg)
+            with ui.column().classes(
+                "flex items-center justify-center w-full"
+            ):
 
-            url_input = ui.input(
-                label="Image URL", placeholder="https://a.ppy.sh/"
-            )
+                msg = "### Either enter a direct link to an image, or a local file!"
+                ui.markdown(msg).classes("text-center")
 
-            ui.button(
-                "Use URL", on_click=lambda: self.update_pfp_from_url(url_input.value)
-            )
-
-            ui.separator()
-
-            @ui.refreshable
-            def render_upload_option() -> None:
-                ui.upload(
-                    label="Image Upload",
-                    max_files=1,
-                    auto_upload=True,
-                    on_upload=self.update_pfp_from_path,
-                    max_file_size=20 * 1024 * 1024,
+                url_input = ui.input(
+                    label="Image URL", placeholder="https://a.ppy.sh/"
                 )
 
-            self.render_upload_option = render_upload_option
-            self.render_upload_option()
-            ui.button("Cancel", on_click=dialog.close)
+                ui.button(
+                    "Use URL", on_click=lambda: self.update_pfp_from_url(url_input.value)
+                )
+
+                ui.separator()
+
+                @ui.refreshable
+                def render_upload_option() -> None:
+                    ui.upload(
+                        label="Image Upload",
+                        max_files=1,
+                        auto_upload=True,
+                        on_upload=self.update_pfp_from_path,
+                        max_file_size=20 * 1024 * 1024,
+                    )
+
+                self.render_upload_option = render_upload_option
+                self.render_upload_option()
+                ui.button("Cancel", on_click=dialog.close)
 
         self.dialog = dialog
         dialog.open()

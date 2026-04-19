@@ -10,7 +10,6 @@ import uvicorn
 from fastapi import FastAPI
 
 from constants.network import LOS_PORT
-from constants.paths import DATA
 from controllers.domains.assets import assets
 from controllers.domains.avatar import avatar
 from controllers.domains.beatmaps import beatmaps
@@ -18,28 +17,7 @@ from controllers.domains.cho import bancho
 from controllers.domains.osu import osu
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    # Startup
-    paths: list[Path] = [DATA]
-    for path in paths:
-        if not path.exists():
-            path.mkdir(parents=True, exist_ok=True)
-
-    yield
-    # Shutdown
-
-
-app = FastAPI(lifespan=lifespan)
-
-
-# @app.exception_handler(ClientResponseException)
-# async def client_response_exception_handler(
-#     _request: Request,
-#     exc: ClientResponseException,
-# ) -> Response:
-#     return Response(content=exc.content, status_code=exc.status_code)
-
+app = FastAPI()
 
 app.include_router(assets)
 app.include_router(beatmaps)
