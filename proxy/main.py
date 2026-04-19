@@ -67,5 +67,5 @@ def stop():
 
 def start():
     enable_windows_proxy()
-    process = subprocess.Popen(["mitmdump", "-s", "./proxy/mitm.py"])
+    process = subprocess.Popen(["mitmdump", "-s", "./proxy/mitm.py", "-q"])
     process.wait()

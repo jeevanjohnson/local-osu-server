@@ -8,33 +8,35 @@ sys.path.append(str(Path(__file__).parent.parent))
 
 from nicegui import ui
 
-import interface.usecases.domain.port as port_usecases
+import core.usecases.domain.port as port_usecases
 import interface.usecases.domain.process as process_usecases
+
 
 
 def start() -> None:
     process = subprocess.Popen(
         [sys.executable, "-m", "interface.main"],
-        creationflags=subprocess.CREATE_NEW_CONSOLE,
+        creationflags=subprocess.CREATE_NO_WINDOW,
     )
 
     process_usecases.set_process_id(process.pid)
 
-    port = port_usecases.get()
+    port = port_usecases.assign_port_to("interface")
 
     print(f"Currently running interface on {port} with PID {process.pid}")
 
     while True:
-        if not port_usecases.in_use():
-            print("Port is not in use, waiting for interface to start...")
-            time.sleep(1)
-        else:
+        if port_usecases.in_use(port):
             webbrowser.open(f"http://localhost:{port}")
             break
+        print(f"Waiting for interface to start on {port}")
+        time.sleep(1)
+
 
 def stop() -> None:
     process_usecases.shutdown()
-    port_usecases.clear()
+    port_usecases.clear_port_for("interface")
+
 
 def template() -> None:
     ui.add_head_html(""" 
@@ -86,10 +88,15 @@ if __name__ in {"__main__", "__mp_main__"}:
             print(f"Page module {module_name} does not have a build function.")
             sys.exit(1)
 
+    port = port_usecases.retrive_port_for("interface")
+    if port is None:
+        print("No port assigned for interface. Exiting.")
+        sys.exit(1)
+
     ui.run(
         title="LOS Interface",
         show=False,
         reload=True,
         dark=True,
-        port=port_usecases.get(),
+        port=port,
     )

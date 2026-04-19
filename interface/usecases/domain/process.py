@@ -1,7 +1,7 @@
-import os
-import signal
+import subprocess
 
 from core.repositories.interface_state import InterfaceStateRepository
+
 
 def shutdown() -> None:
     state_repo = InterfaceStateRepository()
@@ -11,12 +11,16 @@ def shutdown() -> None:
         print(f"Shutting down interface with PID {database.subprocess_pid}")
 
         try:
-            os.kill(database.subprocess_pid, signal.SIGTERM)
-        except ProcessLookupError:
-            pass
-        
+            subprocess.run(
+                ["taskkill", "/PID", str(database.subprocess_pid), "/F", "/T"]
+            )
+        except Exception as e:
+            print(f"Error killing process: {e}")
+
         database.subprocess_pid = None
         state_repo.update_state(database)
+    
+    print("Interface shutdown complete.")
 
 
 def set_process_id(pid: int) -> None:

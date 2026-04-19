@@ -169,7 +169,7 @@ def start():
     observer = Observer()
     observer.schedule(event_handler, str(SONGS_FOLDER), recursive=True)
 
-    print("Starting osu! watcher...")
+    print("Successfully started osu! watcher")
 
     try:
         observer.start()
