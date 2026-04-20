@@ -3,7 +3,7 @@ import tempfile
 from typing import Any, Callable
 
 import requests
-from catboxpy.catbox import CatboxClient
+import interface.usecases.adapters.catbox as catbox_adapter
 from nicegui import ui, events
 from nicegui.elements.dialog import Dialog
 from nicegui.events import UploadEventArguments
@@ -12,7 +12,6 @@ from core.osu_protocol.cho.enums import osuCountryCode
 import core.usecases.application.authentication as auth_usecases
 import core.usecases.domain.profiles as profiles_usecases
 from interface.components import BaseButton
-
 
 class LogoutButton(BaseButton):
     def __init__(self) -> None:
@@ -24,18 +23,18 @@ class LogoutButton(BaseButton):
         ui.notify("Logged out successfully")
         ui.navigate.to("/login")
 
-
 class ChangeProfilePictureButton(BaseButton):
     def __init__(self, profile_name: str, refresh_callback: Callable[[str], Any]) -> None:
         super().__init__("Change Profile Picture")
         self.dialog: Dialog | None = None
         self.profile_name = profile_name
         self.refresh_callback = refresh_callback
-        self.catbox_client = CatboxClient()
         self.render_upload_option: Any = None
         self.on_click(self.execute)
 
     async def update_pfp_from_path(self, path: UploadEventArguments) -> None:
+        ui.notify("Uploading file, please wait...")
+
         file = path.file
 
         if not file.content_type.startswith("image/"):
@@ -55,9 +54,15 @@ class ChangeProfilePictureButton(BaseButton):
             temp_path = temp_file.name
             await file.save(temp_path)
 
-        file_url = self.catbox_client.file_upload(temp_path)
+        try:
+            file_url = catbox_adapter.file_upload(temp_path)
+        except Exception as e:
+            ui.notify(f"Error uploading file: {str(e)}\nPlease use the URL upload option instead or try again later.")
+            return
+        finally:
+            os.remove(temp_path)
+
         self.update_pfp_from_url(file_url, from_upload=True)
-        os.remove(temp_path)
         ui.notify("File uploaded successfully!")
 
     def is_valid_image_url(self, url: str) -> bool:

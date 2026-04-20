@@ -3,8 +3,8 @@ from typing import Any, Iterable, TypedDict
 
 import ossapi.models
 
-from core.osu_protocol.cho.server import osuGameMode, osuMods
-from usecases.domain.calculator.linear_interpolation import linear_interpolation
+from core.osu_protocol.cho.server import osuMods
+from core.usecases.adapters.statistics import LinearInterpolation
 
 class GameMode(IntEnum):
     STANDARD = 0
@@ -12,15 +12,13 @@ class GameMode(IntEnum):
     CATCH = 2
     MANIA = 3
 
-LAZER_MODS = list[str]
-_NON_SCORING_ATTRIBUTE_PREFIXES = ("AR", "OD", "HP", "CS")
+class SplitModsResult(TypedDict):
+    stable_mods: osuMods
+    lazer_mods: list[str]
 
-ACRONYMS = list[str]
-
-RATE = float
-MULTIPLER = float
-
-STABLE_RATES = (0.75, 1.0, 1.5)
+class RateResult(TypedDict):
+    rate: float
+    score_multiplier: float
 
 def parse_difficulty_adjustment_settings(mod_settings: dict[str, Any]) -> list[str]:
     settings = []
@@ -44,131 +42,167 @@ def parse_difficulty_adjustment_settings(mod_settings: dict[str, Any]) -> list[s
 
     return settings
 
-
-class AttributeModifiers(TypedDict):
-    approach_rate: float | None
-    overall_difficulty: float | None
-    drain_rate: float | None
-    cs_change: float | None
-
-
-class Mods(ACRONYMS):
+class Mods(list[str]):
     """A list of mods, represented as short names, e.g. ['HD', 'HR', 'DT']."""
 
-    def __init__(self, iterable: Iterable[str] | None = None) -> None:
-        super().__init__(iterable or [])
-        self.post_init()
-
-    def difficulty_adjustments(self) -> AttributeModifiers:
-        if "DA" not in self:
-            return {
-                "approach_rate": None,
-                "overall_difficulty": None,
-                "drain_rate": None,
-                "cs_change": None,
-            }
-
-        modifiers: AttributeModifiers = {
-            "approach_rate": None,
-            "overall_difficulty": None,
-            "drain_rate": None,
-            "cs_change": None,
-        }
-
-        for mod in self:
-            if mod.startswith(_NON_SCORING_ATTRIBUTE_PREFIXES):
-                if mod.startswith("AR"):
-                    modifiers["approach_rate"] = float(mod[2:])
-                elif mod.startswith("OD"):
-                    modifiers["overall_difficulty"] = float(mod[2:])
-                elif mod.startswith("HP"):
-                    modifiers["drain_rate"] = float(mod[2:])
-                elif mod.startswith("CS"):
-                    modifiers["cs_change"] = float(mod[2:])
-
-        return modifiers
-
-    @property
-    def lazer_rate(self) -> bool:
-        return self.rate() not in STABLE_RATES
-
-    def rate(self) -> RATE:
-        for mod in self:
-            if mod.endswith("x"):
-                try:
-                    return float(mod[:-1])
-                except ValueError:
-                    print(f"Invalid rate change mod format: {mod}")
-            return 1.5
-
-        if "HT" in self or "DC" in self:
-            return 0.75
-
-        return 1.0
-
-    def post_init(self):
-        if "NC" in self and "DT" in self:
-            print("Both NC and DT mods found, removing DT since NC includes DT")
-            self.remove("DT")
-
-    @property
-    def stable(self) -> osuMods:
-        stable_mods, _ = self.to_stable_mods()
-        return stable_mods
+    def __init__(self, iterable: Iterable[str]) -> None:
+        super().__init__(iterable)
 
     def __int__(self) -> int:
-        stable_mods, _ = self.to_stable_mods()
+        stable_mods = self.to_stable_mods()
         return int(stable_mods)
 
-    def are_same(self, other: "Mods", ignore: ACRONYMS | None = None) -> bool:
-        if ignore is None:
-            ignore = []
+    def __eq__(self, other: "Mods") -> bool:
+        return sorted(self) == sorted(other)
 
-        self_mods = [mod for mod in self if mod not in ignore]
-        other_mods = [mod for mod in other if mod not in ignore]
+    def __repr__(self) -> str:
+        return str(self)
+
+    def __str__(self) -> str:
+        return ",".join(self)
+
+    @classmethod
+    def from_list(cls, mods_list: list[str]) -> "Mods":
+        mods_list = [mod.strip().upper() for mod in mods_list if mod.strip()]
+
+        if "NC" in mods_list and "DT" in mods_list:
+            mods_list.remove("DT")
+
+        custom_rate_mods = [mod for mod in mods_list if mod.endswith("X")]
+        if custom_rate_mods:
+            for constant_rate_mod in ["DT", "NC", "HT", "DC"]:
+                if constant_rate_mod in mods_list:
+                    mods_list.remove(constant_rate_mod)
+        
+        if "DA" in mods_list:
+            mods_list.remove("DA")
+
+        return cls(mods_list)
+
+    @classmethod
+    def from_stable_mods(cls, stable_mods: osuMods) -> "Mods":
+        mods_list = []
+        for mod in osuMods:
+            if stable_mods & mod:
+                mods_list.append(
+                    cls.normalize_stable_mod(mod)
+                )
+
+        return cls.from_list(mods_list)
+
+    @classmethod
+    def from_api_v2(cls, mods: list[ossapi.models.NonLegacyMod]) -> "Mods":
+        final_mods = []
+
+        for mod in mods:
+            if not mod.settings:
+                final_mods.append(mod.acronym)
+                continue
+                
+            mod_settings: dict[str, Any] = mod.settings
+
+            rate = mod_settings.get("speed_change")
+            if rate is not None:
+                if rate not in (1.5, 0.75, 1.0):
+                    final_mods.append(f"{rate}x")
+                else:
+                    final_mods.append(mod.acronym)
+            
+                continue
+
+            if mod.acronym == "DA":
+                final_mods.extend(
+                    parse_difficulty_adjustment_settings(mod_settings)
+                )
+        
+        return cls.from_list(final_mods)
+    
+    @classmethod
+    def from_stable_int(cls, stable_mods_int: int) -> "Mods":
+        stable_mods = osuMods(stable_mods_int)
+        return cls.from_stable_mods(stable_mods)
+
+    @staticmethod
+    def normalize_stable_mod(stable_mod: osuMods) -> str:
+        return {
+            osuMods.DOUBLETIME: "DT",
+            osuMods.NIGHTCORE: "NC",
+            osuMods.HARDROCK: "HR",
+            osuMods.HIDDEN: "HD",
+            osuMods.FLASHLIGHT: "FL",
+            osuMods.EASY: "EZ",
+            osuMods.NOFAIL: "NF",
+            osuMods.SUDDENDEATH: "SD",
+            osuMods.TOUCHSCREEN: "TD",
+            osuMods.RELAX: "RX",
+            osuMods.HALFTIME: "HT",
+            osuMods.AUTOPLAY: "AU",
+            osuMods.SPUNOUT: "SO",
+            osuMods.AUTOPILOT: "AP",
+            osuMods.PERFECT: "PF",
+            osuMods.KEY4: "4K",
+            osuMods.KEY5: "5K",
+            osuMods.KEY6: "6K",
+            osuMods.KEY7: "7K",
+            osuMods.KEY8: "8K",
+            osuMods.FADEIN: "FI",
+            osuMods.RANDOM: "RN",
+            osuMods.CINEMA: "CM",
+            osuMods.TARGET: "TP",
+            osuMods.KEY9: "9K",
+            osuMods.KEYCOOP: "COOP",
+            osuMods.KEY1: "1K",
+            osuMods.KEY3: "3K",
+            osuMods.KEY2: "2K",
+            osuMods.SCOREV2: "SV2",
+            osuMods.MIRROR: "MR",
+        }[stable_mod]
+
+    def rate(self) -> RateResult:
+        rate = None 
+
+        for mod in self:
+            if mod.endswith("X"):
+                rate = float(mod.removesuffix("X"))
+
+        if rate is None:
+            if "HT" in self or "DC" in self:
+                rate = 0.75
+            elif "DT" in self or "NC" in self:
+                rate = 1.5
+            else:
+                rate = 1.0
+        
+        score_multiplier = LinearInterpolation(
+            known_points=[
+                (0.75, 0.30),  # HT or DC multiples are 0.3x
+                (1.00, 1.00),  # Base multiplier at 1.0x rate
+                (1.50, 1.10),  # DT or NC multiples are 1.1x
+            ]
+        )
+
+        return RateResult(
+            rate=rate,
+            score_multiplier=score_multiplier.approximate(rate)
+        )
+
+    def custom_rate(self) -> bool:
+        return any(mod.endswith("X") for mod in self)
+
+    def same_as(self, other: "Mods", ignore: "Mods | None" = None) -> bool:
+        self_mods = list(self)
+        other_mods = list(other)
+
+        if ignore is not None:
+            for mod in ignore:
+                if mod in self_mods:
+                    self_mods.remove(mod)
+                if mod in other_mods:
+                    other_mods.remove(mod)
 
         return self_mods == other_mods
 
-    # Keep equality order-insensitive without mutating either operand.
-    def __eq__(self, other: object) -> bool:
-        if not isinstance(other, Mods):
-            return NotImplemented
-
-        return sorted(self) == sorted(other)
-
-    @classmethod
-    def from_stable_mods(
-        cls, stable_mods: osuMods | int, lazer_mods: LAZER_MODS | None = None
-    ) -> "Mods":
-        if isinstance(stable_mods, int):
-            stable_mods = osuMods(stable_mods)
-
-        mods = stable_mods.to_acronym_list()
-
-        if lazer_mods:
-            mods.extend(lazer_mods)
-
-        return cls(mods)
-
-    @classmethod
-    def from_score_submission(cls, mods: int) -> "Mods":
-        stable_mods = osuMods(mods)
-        return cls.from_stable_mods(stable_mods, None)
-
-    def approximate_score_multiplier_for(self, rate: RATE) -> MULTIPLER:
-        points = [
-            # (rate, multiplier)
-            (0.75, 0.30),  # HT or DC multiples are 0.3x
-            (1.00, 1.00),  # Base multiplier at 1.0x rate
-            (1.50, 1.10),  # DT or NC multiples are 1.1x
-        ]
-
-        return linear_interpolation(
-            input_value=rate,
-            points=points,
-        )
-
-    def to_stable_mods(self) -> tuple[osuMods, LAZER_MODS]:
+    def split_mods(self) -> SplitModsResult:
         stable_mods = osuMods.NOMOD
         lazer_mods = []
 
@@ -178,20 +212,45 @@ class Mods(ACRONYMS):
             except ValueError:
                 lazer_mods.append(mod)
 
-        return stable_mods, lazer_mods
+        return SplitModsResult(
+            stable_mods=stable_mods, 
+            lazer_mods=lazer_mods
+        )
 
-    def mod_multipler(self, game_mode: osuGameMode) -> float:
-        if game_mode == osuGameMode.STANDARD:
+    def to_osu_api_v2(self) -> list[str]:
+        result = []
+
+        for mod in self:
+            if mod.startswith("X"):
+                continue
+
+            if mod.startswith(("AR", "OD", "HP", "CS")):
+                continue
+
+            result.append(f"mods[]={mod}")
+
+        return result
+
+    def to_stable_mods(self) -> osuMods:
+        result = self.split_mods()
+        return result["stable_mods"]
+
+    def to_lazer_specific_mods(self) -> list[str]:
+        result = self.split_mods()
+        return result["lazer_mods"]
+
+    def mod_multipler(self, mode: GameMode) -> float:
+        if mode == GameMode.STANDARD:
             return self.mod_multiplier_standard()
-        elif game_mode == osuGameMode.TAIKO:
+        elif mode == GameMode.TAIKO:
             return self.mod_multiplier_taiko()
-        elif game_mode == osuGameMode.CATCH_THE_BEAT:
+        elif mode == GameMode.CATCH:
             return self.mod_multiplier_catch()
-        elif game_mode == osuGameMode.MANIA:
+        elif mode == GameMode.MANIA:
             return self.mod_multiplier_mania()
 
         print(
-            f"Mod multiplier for game mode {game_mode} not implemented, defaulting to 1.0"
+            f"Mod multiplier for game mode {mode} not implemented, defaulting to 1.0"
         )
         return 1.0
 
@@ -256,19 +315,19 @@ class Mods(ACRONYMS):
             "SV2": 1.0,  # Override: Score V2 always 1.0, doesn't affect multiplier
         }
 
-        rate_change = [m for m in self if m.endswith("x")]
-
         for mod in self:
-            if mod in mod_multipliers:
-                if mod in ["DT", "NC", "HT", "DC"] and rate_change:
-                    continue
-                else:
-                    multiplier *= mod_multipliers[mod]
-            elif mod.endswith("x"):
-                rate = float(mod[:-1])
-                multiplier *= self.approximate_score_multiplier_for(rate)
-            elif mod.startswith(_NON_SCORING_ATTRIBUTE_PREFIXES):
+            if mod.startswith(("AR", "OD", "HP", "CS")):
+                # TODO: compensate for these changes
                 continue
+
+            if mod not in mod_multipliers:
+                continue
+
+            multiplier *= mod_multipliers[mod]
+        
+        if self.custom_rate():
+            rate_result = self.rate()
+            multiplier *= rate_result["score_multiplier"]
 
         return multiplier
 
@@ -311,19 +370,19 @@ class Mods(ACRONYMS):
             "SV2": 1.0,  # Override: Score V2 always 1.0, doesn't affect multiplier
         }
 
-        rate_change = [m for m in self if m.endswith("x")]
-
         for mod in self:
-            if mod in mod_multipliers:
-                if mod in ["DT", "NC", "HT", "DC"] and rate_change:
-                    continue
-                else:
-                    multiplier *= mod_multipliers[mod]
-            elif mod.endswith("x"):
-                rate = float(mod[:-1])
-                multiplier *= self.approximate_score_multiplier_for(rate)
-            elif mod.startswith(_NON_SCORING_ATTRIBUTE_PREFIXES):
+            if mod.startswith(("AR", "OD", "HP", "CS")):
+                # TODO: compensate for these changes
                 continue
+
+            if mod not in mod_multipliers:
+                continue
+
+            multiplier *= mod_multipliers[mod]
+        
+        if self.custom_rate():
+            rate_result = self.rate()
+            multiplier *= rate_result["score_multiplier"]
 
         return multiplier
 
@@ -365,19 +424,19 @@ class Mods(ACRONYMS):
             "SV2": 1.0,  # Override: Score V2 always 1.0, doesn't affect multiplier
         }
 
-        rate_change = [m for m in self if m.endswith("x")]
-
         for mod in self:
-            if mod in mod_multipliers:
-                if mod in ["DT", "NC", "HT", "DC"] and rate_change:
-                    continue
-                else:
-                    multiplier *= mod_multipliers[mod]
-            elif mod.endswith("x"):
-                rate = float(mod[:-1])
-                multiplier *= self.approximate_score_multiplier_for(rate)
-            elif mod.startswith(_NON_SCORING_ATTRIBUTE_PREFIXES):
+            if mod.startswith(("AR", "OD", "HP", "CS")):
+                # TODO: compensate for these changes
                 continue
+
+            if mod not in mod_multipliers:
+                continue
+
+            multiplier *= mod_multipliers[mod]
+        
+        if self.custom_rate():
+            rate_result = self.rate()
+            multiplier *= rate_result["score_multiplier"]
 
         return multiplier
 
@@ -419,78 +478,30 @@ class Mods(ACRONYMS):
             "SY": 0.80,
             "DP": 1.00,
             "SV2": 1.0,  # Override: Score V2 always 1.0, doesn't affect multiplier
+            "1K": 0.90,
+            "2K": 0.90,
+            "3K": 0.90,
+            "4K": 0.90,
+            "5K": 0.90,
+            "6K": 0.90,
+            "7K": 0.90,
+            "8K": 0.90,
+            "9K": 0.90,
+            "10K": 0.90,
         }
 
-        rate_change = [m for m in self if m.endswith("x")]
-
         for mod in self:
-            if mod in mod_multipliers:
-                if mod in ["DT", "NC", "HT", "DC"] and rate_change:
-                    continue
-                else:
-                    multiplier *= mod_multipliers[mod]
-            elif mod.endswith("x"):
-                rate = float(mod[:-1])
-                multiplier *= self.approximate_score_multiplier_for(rate)
-            elif mod.startswith(_NON_SCORING_ATTRIBUTE_PREFIXES):
+            if mod.startswith(("AR", "OD", "HP", "CS")):
+                # TODO: compensate for these changes
                 continue
-            elif mod in ["1K", "2K", "3K", "4K", "5K", "6K", "7K", "8K", "9K", "10K"]:
-                multiplier *= 0.9
+
+            if mod not in mod_multipliers:
+                continue
+
+            multiplier *= mod_multipliers[mod]
+        
+        if self.custom_rate():
+            rate_result = self.rate()
+            multiplier *= rate_result["score_multiplier"]
 
         return multiplier
-
-    @classmethod
-    def from_api_v2(cls, mods: list[ossapi.models.NonLegacyMod]) -> "Mods":
-        score_mods = []
-        for mod in mods:
-            mod_settings: dict[str, Any] = mod.settings
-
-            if mod_settings:
-                score_mods.append(mod.acronym)
-
-                if mod_settings.get("speed_change"):
-                    speed_change = mod_settings["speed_change"]
-                    if speed_change != 1.5 and speed_change != 0.75:
-                        score_mods.append(f"{speed_change}x")
-
-                if mod.acronym == "DA":
-                    score_mods.extend(
-                        parse_difficulty_adjustment_settings(mod_settings)
-                    )
-                    # log.warning(
-                    #     f"Error processing mod settings for mod {mod.acronym}: {e}\nMod settings: {mod.settings}"
-                    # )
-            else:
-                score_mods.append(mod.acronym)
-
-        return cls(score_mods)
-
-    def __repr__(self) -> str:
-        return ",".join(self)
-
-    def __str__(self) -> str:
-        rep = self.__repr__()
-
-        if rep == "":
-            return "NM"
-
-        return rep
-
-    @classmethod
-    def from_stable_string(cls, stable_mods_str: str) -> "Mods":
-        # for every 2 chars in the string
-        stable_mods = osuMods.NOMOD
-        for i in range(0, len(stable_mods_str), 2):
-            mod_acronym = stable_mods_str[i : i + 2]
-            stable_mods |= osuMods.from_acronym(mod_acronym)
-
-        return cls.from_stable_mods(stable_mods)
-
-    @classmethod
-    def from_stable_int(cls, stable_mods_int: int) -> "Mods":
-        stable_mods = osuMods(stable_mods_int)
-        return cls.from_stable_mods(stable_mods)
-
-    def to_stable_mods_int(self) -> int:
-        stable_mods, _ = self.to_stable_mods()
-        return int(stable_mods)
