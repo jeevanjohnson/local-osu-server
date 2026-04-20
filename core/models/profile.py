@@ -4,9 +4,9 @@ from jays_tools.json_database import MigratableModel
 from pydantic import Field, field_validator
 
 from models.domain.accuracy import UnitAccuracy, to_unit_accuracy
-from models.domain.gameplay import osuGameMode
 from models.domain.scores import ScoringAlgorithm
 from core.osu_protocol.cho.server import osuCountryCode
+from core.models.domain.gameplay import GameMode
 
 
 class SubmissionSettingsV1(MigratableModel):
@@ -67,12 +67,12 @@ class PerformanceV1(MigratableModel):
 Performance = PerformanceV1
 
 
-def performace_factory() -> dict[osuGameMode, Performance]:
+def performace_factory() -> dict[GameMode, Performance]:
     return {
-        osuGameMode.STANDARD: Performance(),
-        osuGameMode.TAIKO: Performance(),
-        osuGameMode.CATCH_THE_BEAT: Performance(),
-        osuGameMode.MANIA: Performance(),
+        GameMode.STANDARD: Performance(),
+        GameMode.TAIKO: Performance(),
+        GameMode.CATCH: Performance(),
+        GameMode.MANIA: Performance(),
     }
 
 
@@ -89,7 +89,7 @@ class ProfileV1(MigratableModel):
     avatar_url: URL = Field(default="https://a.ppy.sh/")
     friend_ids: list[int] = Field(default=[])
     country_code: osuCountryCode = Field(default=osuCountryCode.XX)
-    performance: dict[osuGameMode, Performance] = Field(
+    performance: dict[GameMode, Performance] = Field(
         default_factory=performace_factory
     )
     notes: str | None = Field(default=None)

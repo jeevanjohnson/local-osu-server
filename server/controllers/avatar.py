@@ -4,6 +4,7 @@ from fastapi import Depends
 
 import core.usecases.application.avatar as avatar_usecases
 import server.dependencies as dependencies
+from core.usecases.application.player import Player
 
 avatar = APIRouter(
     prefix="/a",
@@ -11,9 +12,17 @@ avatar = APIRouter(
 
 @avatar.get("/{user_id}")
 async def get_avatar(
-    user_identifier: int | str = Depends(dependencies.user_identifier),
+    user_id: int,
+    player: Player | None = Depends(dependencies.player)
 ):
-    avatar_url = avatar_usecases.get(user_identifier)
+    
+    if user_id != 2:
+        avatar_url = f"https://a.ppy.sh/{user_id}"
+    elif player is None:
+        avatar_url = "https://a.ppy.sh/"
+    else:
+        profile = player.get_profile()
+        avatar_url = profile.avatar_url
 
     return RedirectResponse(
         url=avatar_url, 

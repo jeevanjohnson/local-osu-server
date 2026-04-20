@@ -1,4 +1,4 @@
-from core.models.port_state import PortState
+from core.models.application.states.port import PortState
 from jays_tools import JsonDatabase
 from core.constants import PORT_STATE
 

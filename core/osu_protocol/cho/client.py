@@ -8,7 +8,8 @@ import struct
 from dataclasses import dataclass, field, fields
 from enum import IntEnum, unique
 from pprint import pformat
-from typing import Callable, Type, TypedDict, TypeVar, get_type_hints
+from typing import Callable, Type, TypeVar, get_type_hints, TypedDict
+from dataclasses import dataclass
 
 # from adapters import log
 from core.osu_protocol.cho.types import (
@@ -20,8 +21,8 @@ from core.osu_protocol.cho.types import (
     osuUnsignedChar,
 )
 
-
-class LoginData(TypedDict):
+@dataclass
+class LoginData:
     username: str
     password_md5: bytes
     osu_version: str
@@ -58,19 +59,19 @@ def parse_login_data(raw_login_data: bytes) -> LoginData:
         disk_signature_md5,
     ) = client_hashes[:-1].split(":", maxsplit=4)
 
-    return {
-        "username": username,
-        "password_md5": password_md5.encode(),
-        "osu_version": osu_version,
-        "utc_offset": int(utc_offset),
-        "display_city": display_city == "1",
-        "pm_private": pm_private == "1",
-        "osu_path_md5": osu_path_md5,
-        "adapters_str": adapters_str,
-        "adapters_md5": adapters_md5,
-        "uninstall_md5": uninstall_md5,
-        "disk_signature_md5": disk_signature_md5,
-    }
+    return LoginData(
+        username=username,
+        password_md5=password_md5.encode(),
+        osu_version=osu_version,
+        utc_offset=int(utc_offset),
+        display_city=display_city == "1",
+        pm_private=pm_private == "1",
+        osu_path_md5=osu_path_md5,
+        adapters_str=adapters_str,
+        adapters_md5=adapters_md5,
+        uninstall_md5=uninstall_md5,
+        disk_signature_md5=disk_signature_md5,
+    )
 
 
 @unique
@@ -226,20 +227,20 @@ class PacketHeader(TypedDict):
 
 @dataclass
 class Packet:
-    _id: ClientPackets
+    id: ClientPackets
 
     raw_data: bytes
     offset: int  # = 0
 
     def __repr__(self) -> str:
-        return f"<Packet id={self._id} raw_data={self.raw_data} offset={self.offset}>"
+        return f"<Packet id={self.id} raw_data={self.raw_data} offset={self.offset}>"
 
     @property
     def remaining_data(self) -> bytes:
         return self.raw_data[self.offset :]
 
     def read(self) -> int:
-        base_fields = {"_id", "raw_data", "offset"}
+        base_fields = {"id", "raw_data", "offset"}
         type_hints = get_type_hints(type(self))
 
         for dataclass_field in fields(self):
@@ -378,7 +379,7 @@ class Packets(list[Packet]):
                 continue
 
             packet = READABLE_PACKETS[packet_id](
-                _id=packet_id,
+                id=packet_id,
                 offset=0,
                 raw_data=self.remaining_data[: packet_header["packet_length"]],
             )

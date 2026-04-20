@@ -20,14 +20,14 @@ class ProfilesRepository:
         profile = profile_json_database.get_database()
         return profile
 
-    def create_profile(self, profile_name: str, profile: Profile) -> None:
-        self.collection.create(profile_name, profile)
+    def create_profile(self, profile_name: str, profile: Profile) -> Profile:
+        return self.collection.create(profile_name, profile)
     
-    def create_new_profile(self, profile_name: str) -> None:
-        self.collection.create(profile_name, Profile())
+    def create_new_profile(self, profile_name: str) -> Profile:
+        return self.collection.create(profile_name, Profile())
 
-    def update_profile(self, profile_name: str, profile: Profile) -> None:
-        self.collection.update(profile_name, profile)
+    def update_profile(self, profile_name: str, profile: Profile) -> Profile:
+        return self.collection.update(profile_name, profile)
 
     def delete_profile(self, profile_name: str) -> None:
         self.collection.delete(profile_name)

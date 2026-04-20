@@ -9,6 +9,8 @@ import proxy.main as proxy
 import interface.main as interface
 import server.main as server
 
+# TODO: update management will be done here not in the server
+
 class ApplicationService:
     def __init__(
         self,

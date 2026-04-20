@@ -1,6 +1,6 @@
 import socket
 
-from core.repositories.port_state import PortStateRepository
+from core.repositories.states.port import PortStateRepository
 
 def in_use(port: int) -> bool:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:

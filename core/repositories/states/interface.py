@@ -1,6 +1,6 @@
 from jays_tools import JsonDatabase
 
-from core.models.interface_state import InterfaceState
+from core.models.application.states.interface import InterfaceState
 from core.constants import INTERFACE_STATE
 
 class InterfaceStateRepository:

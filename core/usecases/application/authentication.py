@@ -1,4 +1,4 @@
-from core.repositories.interface_state import InterfaceStateRepository
+from core.repositories.states.interface import InterfaceStateRepository
 from core.repositories.profiles import ProfilesRepository
 from core.models.profile import Profile
 

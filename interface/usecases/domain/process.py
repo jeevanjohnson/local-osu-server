@@ -1,6 +1,6 @@
 import subprocess
 
-from core.repositories.interface_state import InterfaceStateRepository
+from core.repositories.states.interface import InterfaceStateRepository
 
 
 def shutdown() -> None:
