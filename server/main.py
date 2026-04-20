@@ -8,7 +8,7 @@ from server.controllers.beatmaps import beatmaps
 from server.controllers.cho import bancho
 # from controllers.domains.osu import osu
 
-def start() -> None:
+def start(dev_mode: bool) -> None:
     app = FastAPI()
 
     app.include_router(assets)
@@ -27,5 +27,5 @@ def start() -> None:
         port=port,
     )
 
-def stop() -> None:
+def stop(dev_mode: bool) -> None:
     port_usecases.clear_port_for("server")

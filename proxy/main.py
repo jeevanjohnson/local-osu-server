@@ -58,14 +58,14 @@ def disable_windows_proxy() -> None:
 
 # Service functions that will be called by the launcher
 
-def stop():
+def stop(dev_mode: bool):
     try:
         os.system("taskkill /F /IM mitmdump.exe")
     except Exception as e:
         print(f"error killing mitmdump: {e}")
     disable_windows_proxy()
 
-def start():
+def start(dev_mode: bool):
     enable_windows_proxy()
     process = subprocess.Popen(["mitmdump", "-s", "./proxy/mitm.py", "-q"])
     process.wait()

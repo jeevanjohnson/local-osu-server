@@ -11,13 +11,17 @@ from nicegui import ui
 import core.usecases.domain.port as port_usecases
 import interface.usecases.domain.process as process_usecases
 
-
-
-def start() -> None:
-    process = subprocess.Popen(
-        [sys.executable, "-m", "interface.main"],
-        creationflags=subprocess.CREATE_NO_WINDOW,
-    )
+def start(dev_mode: bool) -> None:
+    if dev_mode:
+        process = subprocess.Popen(
+            [sys.executable, "-m", "interface.main"],
+            creationflags=subprocess.CREATE_NEW_CONSOLE,
+        )
+    else:
+        process = subprocess.Popen(
+            [sys.executable, "-m", "interface.main"],
+            creationflags=subprocess.CREATE_NO_WINDOW,
+        )
 
     process_usecases.set_process_id(process.pid)
 
@@ -33,7 +37,7 @@ def start() -> None:
         time.sleep(1)
 
 
-def stop() -> None:
+def stop(dev_mode: bool) -> None:
     process_usecases.shutdown()
     port_usecases.clear_port_for("interface")
 

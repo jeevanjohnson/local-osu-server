@@ -1,13 +1,24 @@
 import multiprocessing
 from datetime import datetime
-from typing import Any, Callable
+from typing import Any, Callable, TypedDict
 
 from nicegui import app, ui
+from jays_tools import JsonDatabase, MigratableModel
 
 import osu_watcher.main as osu_watcher
 import proxy.main as proxy
 import interface.main as interface
 import server.main as server
+
+from core.constants import LAUNCHER_STATE
+
+class LauncherState(MigratableModel):
+    dev_mode: bool = False
+
+STATE_DB = JsonDatabase(
+    path=LAUNCHER_STATE,
+    database_model=LauncherState,
+)
 
 # TODO: update management will be done here not in the server
 
@@ -16,8 +27,8 @@ class ApplicationService:
         self,
         name: str,
         description: str,
-        service_start: Callable[[], Any],
-        service_stop: Callable[[], Any]
+        service_start: Callable[[bool], Any],
+        service_stop: Callable[[bool], Any]
     ) -> None:
         self.name = name
         self.description = description
@@ -26,25 +37,28 @@ class ApplicationService:
         self.running = False
         self.process: multiprocessing.Process | None = None
 
-    def get_launch_process(self) -> multiprocessing.Process:
+    def get_launch_process(self, dev_mode: bool = False) -> multiprocessing.Process:
         if self.process is None:
-            self.process = multiprocessing.Process(target=self.service_start)
-
+            self.process = multiprocessing.Process(target=self.service_start, args=(dev_mode,))
+            
         return self.process
 
     def start(self) -> None:
-        process = self.get_launch_process()
+        launcher_state = STATE_DB.get_database()
+        process = self.get_launch_process(dev_mode=launcher_state.dev_mode)
         process.start()
         self.running = True
 
     def stop(self) -> None:
-        process = self.get_launch_process()
+        launcher_state = STATE_DB.get_database()
+        process = self.get_launch_process(dev_mode=launcher_state.dev_mode)
+
         if process.is_alive():
             process.terminate()
             process.join(timeout=5)
 
         self.process = None
-        self.service_stop()
+        self.service_stop(launcher_state.dev_mode)
         self.running = False
 
 SERVICES: list[ApplicationService] = [
@@ -116,6 +130,41 @@ class ExitButton(ui.button):
 
         app.shutdown()
 
+class DevModeToggle(ui.button):
+    def __init__(self, *args, **kwargs) -> None:
+        launcher_state = STATE_DB.get_database()
+
+        if launcher_state.dev_mode is True:
+            button_text = "Turn Dev Mode OFF"
+            color = "red"
+        else:
+            button_text = "Turn Dev Mode ON"
+            color = "blue"
+        
+        super().__init__(button_text, *args, **kwargs)
+        self.set_background_color(color)
+
+        self.on_click(self.toggle)
+
+    def toggle(self) -> None:
+        if any(service.running for service in SERVICES):
+            ui.notify("Please stop all running services before toggling developer mode.")
+            return
+
+        launcher_state = STATE_DB.get_database()
+        launcher_state.dev_mode = not launcher_state.dev_mode
+        STATE_DB.update_database(launcher_state)
+
+        if launcher_state.dev_mode is True:
+            self.text = "Turn Dev Mode OFF"
+            self.set_background_color("red")
+            notify_text = "Developer mode enabled. Services will run in developer mode on next start."
+        else:
+            self.text = "Turn Dev Mode ON"
+            self.set_background_color("blue")
+            notify_text = "Developer mode disabled. Services will run in normal mode on next start."
+        
+        ui.notify(notify_text)
 
 def build_ui() -> None:
     ui.markdown("# LOS! Control Panel")
@@ -147,8 +196,11 @@ def build_ui() -> None:
 
     ui.separator()
 
-    with ExitButton():
-        ui.tooltip("Exit the application and stop all running services")
+    with ui.row():
+        with ExitButton():
+            ui.tooltip("Exit the application and stop all running services")
+
+        DevModeToggle()
 
 if __name__ in {
     "__main__",

@@ -45,8 +45,8 @@ def parse_difficulty_adjustment_settings(mod_settings: dict[str, Any]) -> list[s
 class Mods(list[str]):
     """A list of mods, represented as short names, e.g. ['HD', 'HR', 'DT']."""
 
-    def __init__(self, iterable: Iterable[str]) -> None:
-        super().__init__(iterable)
+    def __init__(self, iterable: Iterable[str] | None = None) -> None:
+        super().__init__(iterable or [])
 
     def __int__(self) -> int:
         stable_mods = self.to_stable_mods()
