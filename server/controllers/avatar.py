@@ -2,9 +2,8 @@ from fastapi import APIRouter, status
 from fastapi.responses import RedirectResponse
 from fastapi import Depends
 
-import core.usecases.application.avatar as avatar_usecases
 import server.dependencies as dependencies
-from core.usecases.application.player import Player
+from server.usecases.domain.player import Player
 
 avatar = APIRouter(
     prefix="/a",

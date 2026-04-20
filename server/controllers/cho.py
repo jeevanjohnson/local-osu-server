@@ -22,7 +22,7 @@ from core.osu_protocol.cho.client import (
     SendPublicMessage,
     UserStatsRequest,
 )
-from core.usecases.application.player import Player
+from server.usecases.domain.player import Player
 
 bancho = APIRouter()
 

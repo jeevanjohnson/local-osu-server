@@ -1,12 +1,11 @@
 import core.usecases.application.authentication as auth_usecases
 from fastapi import Depends, Header, Request
-from core.models.profile import Profile
 import core.osu_protocol.cho.server as cho_server
 import core.osu_protocol.cho.client as cho_client
 from core.osu_protocol.cho.client import parse_login_data
 import core.services.cho as cho_services
 from typing import Literal
-from core.usecases.application.player import Player
+from server.usecases.domain.player import Player
 
 async def player() -> Player | None:
     result = auth_usecases.current_logged_in_profile()

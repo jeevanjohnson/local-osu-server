@@ -119,9 +119,14 @@ class DeleteProfileButton(BaseButton):
         if not profiles_usecases.profile_exists(profile_name):
             ui.notify("Profile does not exist")
             return
+        
         profiles_usecases.delete_profile(profile_name)
+        
         if self.second_dialog is not None:
             self.second_dialog.close()
+        if self.first_dialog is not None:
+            self.first_dialog.close()
+        
         ui.notify(f"Profile {profile_name} deleted")
 
     def open_dialog(self) -> None:
@@ -149,6 +154,7 @@ def build(template: Callable[[], None]) -> None:
                 LoginButton()
                 CreateProfileButton()
                 DeleteProfileButton()
+            
             ui.separator().classes("w-96")
             ui.button(
                 "Server Settings",

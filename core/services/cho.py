@@ -1,5 +1,5 @@
 import core.osu_protocol.cho.client as cho_client
-from core.usecases.application.player import Player
+from server.usecases.domain.player import Player
 import core.osu_protocol.cho.server as cho_server
 import core.osu_protocol.cho.enums as cho_enums
 from datetime import datetime
@@ -10,15 +10,16 @@ async def login(
 ) -> cho_server.Packets:
     profile = player.get_profile()
     client_state = player.get_client_state()
+    performance = profile.performance[client_state.game_mode]
 
     utc_offset = login_data.utc_offset
     friend_ids = profile.friend_ids
-    rank = profile.performance[client_state.game_mode].rank
-    ranked_score = profile.performance[client_state.game_mode].ranked_score
-    accuracy = profile.performance[client_state.game_mode].accuracy
-    play_count = profile.performance[client_state.game_mode].playcount
-    total_score = profile.performance[client_state.game_mode].total_score
-    performance_points = profile.performance[client_state.game_mode].performance_points
+    rank = performance.rank
+    ranked_score = performance.ranked_score
+    accuracy = performance.accuracy
+    play_count = performance.playcount
+    total_score = performance.total_score
+    performance_points = performance.performance_points
 
     packets = cho_server.Packets()
 

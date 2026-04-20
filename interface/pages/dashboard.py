@@ -4,10 +4,11 @@ from typing import Any, Callable
 
 import requests
 from catboxpy.catbox import CatboxClient
-from nicegui import ui
+from nicegui import ui, events
 from nicegui.elements.dialog import Dialog
 from nicegui.events import UploadEventArguments
 
+from core.osu_protocol.cho.enums import osuCountryCode
 import core.usecases.application.authentication as auth_usecases
 import core.usecases.domain.profiles as profiles_usecases
 from interface.components import BaseButton
@@ -73,7 +74,13 @@ class ChangeProfilePictureButton(BaseButton):
                 ui.notify("Please enter a valid image URL")
                 return
 
-        profiles_usecases.update_avatar_url(self.profile_name, url)
+        profile = profiles_usecases.get(self.profile_name)
+        if profile is None:
+            ui.notify("Profile not found")
+            return
+
+        profile.avatar_url = url
+        profiles_usecases.update_profile(self.profile_name, profile)
 
         if self.dialog is not None:
             self.dialog.close()
@@ -120,6 +127,73 @@ class ChangeProfilePictureButton(BaseButton):
         self.dialog = dialog
         dialog.open()
 
+class ChangeCountryFlag(ui.interactive_image):
+    def __init__(self, profile_name: str, country_code: osuCountryCode, dialog: Dialog, refresh_flag: Callable[[], None]) -> None:
+        flag_url = f"https://flagcdn.com/w80/{country_code.name.lower()}.png"
+
+        super().__init__(flag_url, on_mouse=self.change_flag)
+        self.profile_name = profile_name
+        self.country_code = country_code
+        self.dialog = dialog
+        self.refresh_flag = refresh_flag
+    
+    def change_flag(self) -> None:
+        profile = profiles_usecases.get(self.profile_name)
+        if profile is None:
+            ui.notify("Profile not found")
+            return
+        
+        profile.country_code = self.country_code
+        profiles_usecases.update_profile(self.profile_name, profile)
+
+        self.refresh_flag()
+        self.dialog.close()
+
+        ui.notify(f"Country changed to {self.country_code.name}")
+
+class CountryFlag(ui.interactive_image):
+    def __init__(self, profile_name: str) -> None:
+        super().__init__(f"https://flagcdn.com/w80/xx.png", on_mouse=self.open_dialog)
+        self.profile_name = profile_name
+        self.dialog: Dialog | None = None
+        self.refresh()
+    
+    def refresh(self) -> None:
+        profile = profiles_usecases.get(self.profile_name)
+        if profile is None:
+            ui.notify("Profile not found")
+            return
+        
+        country_code = profile.country_code.name.lower()
+        self.set_source(f"https://flagcdn.com/w80/{country_code}.png")
+
+    def change_flag(self, country_code: str) -> None:
+        profile = profiles_usecases.get(self.profile_name)
+        if profile is None:
+            ui.notify("Profile not found")
+            return
+        
+        profile.country_code = osuCountryCode[country_code.upper()]
+        profiles_usecases.update_profile(self.profile_name, profile)
+
+        self.refresh()
+
+    def open_dialog(self, event: events.MouseEventArguments) -> None:
+        with ui.dialog() as dialog, ui.card():
+            ui.markdown("### Select your country").classes("text-center")
+            with ui.grid(columns=5):
+                for code in osuCountryCode:
+                    if code == osuCountryCode.XX:
+                        continue
+                    
+                    ChangeCountryFlag(self.profile_name, code, dialog, self.refresh).style(
+                        "width: 80px; height: 60px; object-fit: cover; border-radius: 8px; cursor: pointer;"
+                    )
+            
+            ui.button("Cancel", on_click=dialog.close)
+        
+        self.dialog = dialog
+        dialog.open()
 
 def build(template: Callable[[], None]) -> None:
     @ui.refreshable
@@ -155,6 +229,8 @@ def build(template: Callable[[], None]) -> None:
         ):
             ui.markdown(f"# Welcome `{profile_name}` !!")
             render_profile_picture(profile_name)
+            CountryFlag(profile_name)
+    
             ui.separator().classes("w-96")
 
             with ui.row():

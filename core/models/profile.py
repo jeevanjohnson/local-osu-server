@@ -7,6 +7,7 @@ from models.domain.accuracy import UnitAccuracy, to_unit_accuracy
 from models.domain.scores import ScoringAlgorithm
 from core.osu_protocol.cho.server import osuCountryCode
 from core.models.domain.gameplay import GameMode
+import random
 
 
 class SubmissionSettingsV1(MigratableModel):
@@ -82,13 +83,20 @@ def seasonal_backgrounds_factory() -> list[str]:
     ]
 
 
+def random_country_code_factory() -> osuCountryCode:
+    return random.choice(
+        list(osuCountryCode)
+    )
+
 URL = str
 
 
 class ProfileV1(MigratableModel):
     avatar_url: URL = Field(default="https://a.ppy.sh/")
     friend_ids: list[int] = Field(default=[])
-    country_code: osuCountryCode = Field(default=osuCountryCode.XX)
+    country_code: osuCountryCode = Field(
+        default_factory=random_country_code_factory
+    )
     performance: dict[GameMode, Performance] = Field(
         default_factory=performace_factory
     )
