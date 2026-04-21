@@ -6,7 +6,7 @@ from pydantic import Field
 
 class OsuFileLocationV1(MigratableModel):
     by_md5: dict[str, Path] = Field(default_factory=dict)
-    by_id: dict[int, Path] = Field(default_factory=dict)
+    by_id: dict[int, list[Path]] = Field(default_factory=dict)
     by_set_id: dict[int, list[Path]] = Field(default_factory=dict)
     by_filename: dict[str, Path] = Field(default_factory=dict)
 

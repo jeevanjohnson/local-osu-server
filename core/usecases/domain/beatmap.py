@@ -1,5 +1,7 @@
 from datetime import datetime
 import time
+import re
+import functools
 
 from core.repositories.beatmaps import BeatmapRepository
 from core.repositories.osu_file_location import OsuFileLocationRepository
@@ -9,6 +11,35 @@ from core.models.domain.gameplay.game_mode import GameMode
 from core.models.domain.gameplay.rank_status import RankStatus
 from pathlib import Path
 import core.usecases.adapters.osufile as osufile_usecases
+
+FILENAME_REGEX = re.compile(
+    r"(?P<artist>.*) - (?P<song_name>.*) ((?P<mapper>.*) \[)(?P<diff_name>.*)\]\.osu"
+)
+DIFFICULTY_ADJUSTED_REGEX = re.compile(
+    r"(?P<rate>[0-9]{1,2}(?:\.[0-9]{1,2})?x) \((?P<bpm>[0-9]+bpm)\)"
+)
+ATTRIBUTE_EDIT_REGEX = re.compile(r"(.*) (HP|CS|AR|OD)([0-9]{1,2}(?:\.[0-9]{1,2})?)")
+
+@functools.cache
+def valid_difficulty_adjusted_filename(filename: str) -> bool:
+    """
+    Checks if the filename matches a difficulty-adjusted pattern.
+    Time Complexity: O(1) (regex search on a short string)
+    """
+    file_name_data = FILENAME_REGEX.search(filename)
+    if not file_name_data:
+        return False
+
+    difficulty_name = file_name_data["diff_name"]
+    if not difficulty_name:
+        return False
+
+    has_rate_adjust = bool(DIFFICULTY_ADJUSTED_REGEX.search(difficulty_name))
+    has_attribute_adjust = bool(ATTRIBUTE_EDIT_REGEX.search(difficulty_name))
+
+    # Accept either type of adjustment: rate-only (e.g. 0.89x (240bpm))
+    # or explicit stat edits (AR/CS/HP/OD).
+    return has_rate_adjust or has_attribute_adjust
 
 def get_path_by_md5(md5: str) -> Path | None:
     """Get the file path of a beatmap by its MD5 hash."""
@@ -35,15 +66,29 @@ def get_md5_by_filename(filename: str) -> str | None:
 
     return database.path_to_md5.get(path)
 
-def get_md5_by_id(beatmap_id: int) -> str | None:
+def get_md5_by_id(beatmap_id: int, original_map: bool = True) -> str | None:
     osu_file_location_repo = OsuFileLocationRepository()
     database = osu_file_location_repo.get()
 
-    path = database.by_id.get(beatmap_id)
-    if path is None:
+    paths = database.by_id.get(beatmap_id)
+    if paths is None:
         return None
     
-    return database.path_to_md5.get(path)
+    if not original_map:
+        raise NotImplementedError("Difficulty adjusted map lookup by ID is not implemented yet")
+
+    final_path: Path | None = None
+    for path in paths:
+        if valid_difficulty_adjusted_filename(path.name):
+            continue
+        
+        final_path = path
+        break
+    
+    if final_path is None:
+        return None
+    
+    return database.path_to_md5.get(final_path)
 
 # Retrieving ID
 def get_id_by_md5(md5: str) -> int | None:
@@ -113,8 +158,6 @@ async def get_by_md5_api(md5: str, osu_file_location: Path | None = None) -> Bea
         pass_count_timestamp=datetime.now(),
         play_count_timestamp=datetime.now()
     )
-
-
 
 # Building beatmap
 def add(md5: str, beatmap: Beatmap) -> Beatmap:

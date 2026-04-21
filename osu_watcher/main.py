@@ -9,7 +9,7 @@ from core.repositories.osu_file_location import OsuFileLocationRepository
 from watchdog.observers import Observer
 
 from core.constants import OSU_FILE_LOCATION
-from core.models.database.osu_file_location import OsuFileLocation
+from osu_watcher.repo import insert_beatmap_in_cache
 from osu_watcher.parser import parse_osu_file
 from osu_watcher.watchdog import SongFolderHandler
 
@@ -67,30 +67,7 @@ def initialize_osu_file_cache(songs_folder: Path) -> None:
         futures = {executor.submit(parse_osu_file, f): f for f in osu_files}
         for future in as_completed(futures):
             response = future.result()
-            md5 = response["md5"]
-            filename = response["filename"]
-            set_id = response["beatmap_set_id"]
-            id = response["beatmap_id"]
-            path = response["path"]
-
-            if id is not None:
-                database.by_id[id] = path
-            
-            database.by_md5[md5] = path
-            database.by_filename[filename] = path
-            if set_id is not None:
-                if set_id not in database.by_set_id:
-                    database.by_set_id[set_id] = []
-                database.by_set_id[set_id].append(path)
-
-            database.path_to_md5[path] = md5
-            if id is not None:
-                database.path_to_id[path] = id
-            if set_id is not None:
-                database.path_to_set_id[path] = set_id
-            database.path_to_filename[path] = filename
-
-            print(f"Added osu! file to cache: {path}")
+            database = insert_beatmap_in_cache(database, response)
 
     osu_file_location_repo.update(database)
 
@@ -111,30 +88,8 @@ def validate_osu_file_cache(songs_folder: Path) -> None:
         futures = {executor.submit(parse_osu_file, f): f for f in new_files}
         for future in as_completed(futures):
             response = future.result()
-            md5 = response["md5"]
-            filename = response["filename"]
-            set_id = response["beatmap_set_id"]
-            id = response["beatmap_id"]
-            path = response["path"]
-
-            if id is not None:
-                database.by_id[id] = path
-            database.by_md5[md5] = path
-            database.by_filename[filename] = path
-            if set_id is not None:
-                if set_id not in database.by_set_id:
-                    database.by_set_id[set_id] = []
-                database.by_set_id[set_id].append(path)
+            database = insert_beatmap_in_cache(database, response)
     
-            database.path_to_md5[path] = md5
-            if id is not None:
-                database.path_to_id[path] = id
-            if set_id is not None:
-                database.path_to_set_id[path] = set_id
-            database.path_to_filename[path] = filename
-
-            print(f"Added new osu! file to cache: {path}")
-
     osu_file_location_repo.update(database)
 
 def stop(dev_mode: bool):

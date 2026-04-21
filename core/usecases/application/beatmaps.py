@@ -1,5 +1,3 @@
-import functools
-import re
 from core.models.database.beatmaps import Beatmap
 import core.usecases.domain.beatmap as beatmap_usecases
 import core.usecases.adapters.osufile as osufile_usecases
@@ -7,35 +5,6 @@ from enum import Enum
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
-
-FILENAME_REGEX = re.compile(
-    r"(?P<artist>.*) - (?P<song_name>.*) ((?P<mapper>.*) \[)(?P<diff_name>.*)\]\.osu"
-)
-DIFFICULTY_ADJUSTED_REGEX = re.compile(
-    r"(?P<rate>[0-9]{1,2}(?:\.[0-9]{1,2})?x) \((?P<bpm>[0-9]+bpm)\)"
-)
-ATTRIBUTE_EDIT_REGEX = re.compile(r"(.*) (HP|CS|AR|OD)([0-9]{1,2}(?:\.[0-9]{1,2})?)")
-
-@functools.cache
-def valid_difficulty_adjusted_filename(filename: str) -> bool:
-    """
-    Checks if the filename matches a difficulty-adjusted pattern.
-    Time Complexity: O(1) (regex search on a short string)
-    """
-    file_name_data = FILENAME_REGEX.search(filename)
-    if not file_name_data:
-        return False
-
-    difficulty_name = file_name_data["diff_name"]
-    if not difficulty_name:
-        return False
-
-    has_rate_adjust = bool(DIFFICULTY_ADJUSTED_REGEX.search(difficulty_name))
-    has_attribute_adjust = bool(ATTRIBUTE_EDIT_REGEX.search(difficulty_name))
-
-    # Accept either type of adjustment: rate-only (e.g. 0.89x (240bpm))
-    # or explicit stat edits (AR/CS/HP/OD).
-    return has_rate_adjust or has_attribute_adjust
 
 async def get_difficulty_adjusted_beatmap(
     filename: str,
@@ -139,7 +108,7 @@ async def from_leaderboard_request(
 
     # if its a difficulty adjusted map, try to find the original map and add it as a difficulty adjusted copy
     t0 = time.time()
-    if valid_difficulty_adjusted_filename(filename) and osu_file is not None:
+    if beatmap_usecases.valid_difficulty_adjusted_filename(filename) and osu_file is not None:
         beatmap = await get_difficulty_adjusted_beatmap(filename, md5, osu_file)
         if beatmap:
             print(f"[LOOKUP] Difficulty adjusted found in {(time.time()-t0)*1000:.2f}ms")
@@ -184,7 +153,7 @@ async def from_leaderboard_request(
             status=BeatmapStatus.UNSUBMITTED
         )
     
-    if valid_difficulty_adjusted_filename(filename):
+    if beatmap_usecases.valid_difficulty_adjusted_filename(filename):
         print(f"[LOOKUP] Total: {(time.time()-start)*1000:.2f}ms - UNSUBMITTED (difficulty adjusted)")
         return BeatmapResult(
             beatmap=None,
