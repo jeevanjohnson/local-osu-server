@@ -70,11 +70,16 @@ def bancho_score_to_leaderboard_score(
         replay_available = replay_available,
     )
 
-def score_to_leaderboard_score(score: Score, position: int) -> LeaderboardScore:
+def score_to_leaderboard_score(score: Score, position: int, scoring_type: ScoringType) -> LeaderboardScore:
+    if scoring_type == ScoringType.SCOREV1:
+        total_score = score.statistics.total_score.v1
+    else:
+        total_score = score.statistics.total_score.v2
+
     return LeaderboardScore(
         score_id = score.id,
         username = score.profile_name,
-        score = score.statistics.score,
+        score = total_score,
         max_combo = score.statistics.combo,
         count50 = score.statistics.count_50,
         count100 = score.statistics.count_100,
@@ -93,6 +98,7 @@ def score_to_leaderboard_score(score: Score, position: int) -> LeaderboardScore:
 def only_one_or_less_score_on_leaderboard(
     beatmap: Beatmap, 
     beatmap_status: RankStatus, 
+    scoring_type: ScoringType,
     score: Score | None = None
 ) -> Leaderboard:
     leaderboard_header = LeaderboardHeader(
@@ -112,7 +118,9 @@ def only_one_or_less_score_on_leaderboard(
         )
 
     leaderboard_header.num_of_scores = 1
-    personal_best_leaderboard_score = score_to_leaderboard_score(score, position=1)
+    personal_best_leaderboard_score = score_to_leaderboard_score(
+        score, position=1, scoring_type=scoring_type
+    )
 
     return Leaderboard(
         header=leaderboard_header,
@@ -143,38 +151,19 @@ async def global_leaderboard(
             type=profile.settings.leaderboard.scores_sorted_by.to_api_v2(),
         )
     except ValueError:
-        return only_one_or_less_score_on_leaderboard(beatmap, beatmap_status, personal_best)
+        return only_one_or_less_score_on_leaderboard(
+            beatmap, beatmap_status, profile.settings.leaderboard.scores_sorted_by, personal_best
+        )
 
     if not api_scores:
-        return only_one_or_less_score_on_leaderboard(beatmap, beatmap_status, personal_best)
-    
-    if profile.settings.leaderboard.scores_sorted_by == ScoringType.SCOREV1:
-        training_data: list[ScoreDataPoint] = []
-        for api_score in api_scores.scores:
-            if not api_score.legacy_total_score:
-                continue
-
-            # Get the mod multiplier used for this score
-            mods = Mods.from_api_v2(api_score.mods)
-            mod_mult = mods.mod_multipler(client_state.game_mode)
-            
-            training_data.append(ScoreDataPoint(
-                count_300=api_score.statistics.great or 0,
-                count_100=api_score.statistics.ok or 0,
-                count_50=api_score.statistics.meh or 0,
-                count_miss=api_score.statistics.miss or 0,
-                combo=api_score.max_combo,
-                score=api_score.legacy_total_score,
-                mod_multiplier=mod_mult
-            ))
-        
-        score_estimator = ScoreEstimator(version=ScoringVersion.V1)
-        score_estimator.train(training_data)
-    else:
-        score_estimator = ScoreEstimator(version=ScoringVersion.V2)
+        return only_one_or_less_score_on_leaderboard(
+            beatmap, beatmap_status, profile.settings.leaderboard.scores_sorted_by, personal_best
+        )
     
     scores: list[BanchoScore | Score] = [
-        bancho_scores_usecases.from_api_to_bancho_score(score, client_state.game_mode) 
+        bancho_scores_usecases.from_api_to_bancho_score(
+            score, client_state.game_mode, profile.settings.leaderboard.scores_sorted_by
+        ) 
         for score in api_scores.scores
     ]
 
@@ -186,32 +175,12 @@ async def global_leaderboard(
             return score.pp
         
         if isinstance(score, BanchoScore):
-            mod_mult = score.mods.mod_multipler(score.game_mode)
-
-            if score.score_override is not None:
-                return score.score_override
-
-            if profile.settings.leaderboard.scores_sorted_by == ScoringType.SCOREV1:
-                return score_estimator.estimate(
-                    count_300=score.count300,
-                    count_100=score.count100,
-                    count_50=score.count50,
-                    count_miss=score.count_miss,
-                    combo=score.combo,
-                    mod_multiplier=mod_mult
-                )
-            else:
-                return score_estimator.estimate(
-                    count_300=score.count300,
-                    count_100=score.count100,
-                    count_50=score.count50,
-                    count_miss=score.count_miss,
-                    combo=score.combo,
-                    beatmap_max_combo=beatmap.max_combo,
-                    mod_multiplier=mod_mult
-                )
+            return score.total_score
         
-        return score.statistics.score
+        if profile.settings.leaderboard.scores_sorted_by == ScoringType.SCOREV1:
+            return score.statistics.total_score.v1
+        else:
+            return score.statistics.total_score.v2
     
     scores.sort(key=sort_key, reverse=True)
 
@@ -221,32 +190,18 @@ async def global_leaderboard(
 
     for index, score in enumerate(top_scores):
         if not isinstance(score, BanchoScore):
-            leaderboard_scores.append(score_to_leaderboard_score(score, position=index+1))
+            leaderboard_scores.append(
+                score_to_leaderboard_score(
+                    score, position=index+1, scoring_type=profile.settings.leaderboard.scores_sorted_by
+                )
+            )
             continue
         
         if profile.settings.leaderboard.scores_sorted_by == ScoringType.PP:
             total_score = score.pp
-        elif score.score_override is not None:
-            total_score = score.score_override
         else:
-            print(f"[LEADERBOARD DEBUG] Processing score for user {score.username}")
-            kwargs = {
-                "count_300": score.count300,
-                "count_100": score.count100,
-                "count_50": score.count50,
-                "count_miss": score.count_miss,
-                "combo": score.combo,
-                "mod_multiplier": score.mods.mod_multipler(score.game_mode)
-            }
-            
-            if profile.settings.leaderboard.scores_sorted_by == ScoringType.SCOREV1:
-                total_score = score_estimator.estimate(**kwargs)
-            else:
-                kwargs["beatmap_max_combo"] = beatmap.max_combo
-                total_score = score_estimator.estimate(**kwargs)
-            
-            print(f"[LEADERBOARD DEBUG] Estimated score for {score.username}: {total_score} (based on {kwargs})")
-
+            total_score = score.total_score
+        
         leaderboard_scores.append(
             bancho_score_to_leaderboard_score(
                 score, 
@@ -276,8 +231,16 @@ async def global_leaderboard(
         if personal_best in top_scores:
             personal_best_position = top_scores.index(personal_best) + 1
         else:
+            
+            if profile.settings.leaderboard.scores_sorted_by == ScoringType.PP:
+                personal_best_sorting_value = personal_best.pp
+            elif profile.settings.leaderboard.scores_sorted_by == ScoringType.SCOREV1:
+                personal_best_sorting_value = personal_best.statistics.total_score.v1
+            else:
+                personal_best_sorting_value = personal_best.statistics.total_score.v2
+
             personal_best_position = score_position_calculator_usecases.get_leaderboard_position(
-                sorting_value=personal_best.statistics.score,
+                sorting_value=personal_best_sorting_value,
                 leaderboard_scores=[
                     (idx + 1, score.score) for idx, score in enumerate(leaderboard_scores)
                 ],
@@ -287,7 +250,11 @@ async def global_leaderboard(
         return Leaderboard(
             header=leaderboard_header,
             scores=leaderboard_scores,
-            personal_best=score_to_leaderboard_score(personal_best, position=personal_best_position)
+            personal_best=score_to_leaderboard_score(
+                personal_best, 
+                position=personal_best_position, 
+                scoring_type=profile.settings.leaderboard.scores_sorted_by
+            )
         )
 
     return Leaderboard(

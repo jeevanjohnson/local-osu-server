@@ -6,6 +6,12 @@ from core.models.domain.gameplay.game_mode import GameMode
 from core.models.domain.gameplay.mods import Mods
 from pydantic import Field
 
+class TotalScoreV1(MigratableModel):
+    v1: int
+    v2: int
+
+TotalScore = TotalScoreV1
+
 class BeatmapReferenceV1(MigratableModel):
     md5: str
     max_combo: int
@@ -13,7 +19,7 @@ class BeatmapReferenceV1(MigratableModel):
 BeatmapReference = BeatmapReferenceV1
 
 class StatisticsV1(MigratableModel):
-    score: int
+    total_score: TotalScore
     count_300: int
     count_100: int
     count_50: int

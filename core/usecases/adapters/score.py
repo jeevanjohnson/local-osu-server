@@ -71,26 +71,22 @@ class ScoreEstimator:
             for p in training_data
         ])
         
-        # Target values: scores
+        # Target values: scores transformed to log space
         values = np.array([float(p.score) for p in training_data])
+        log_values = np.log(np.maximum(values, 1.0))  # Avoid log(0), minimum 1
         
         # Log training bounds
         print(f"[V1 TRAIN] Training with {len(training_data)} V1 scores")
         print(f"[V1 TRAIN] Mod multiplier bounds: {points[:, 5].min():.4f} - {points[:, 5].max():.4f}")
+        print(f"[V1 TRAIN] Score range: {values.min():.0f} - {values.max():.0f}")
         
-        # Create RBF interpolator with multiquadric kernel
-        # epsilon=None lets scipy auto-choose the optimal smoothing parameter
-        try:
-            self.rbf_interpolator = RBFInterpolator(
-                points, 
-                values, 
-                kernel='multiquadric',
-                epsilon=None,
-                smoothing=0.0  # No smoothing for exact interpolation at known points
-            )
-        except Exception:
-            # Fallback if RBF fails
-            return
+        self.rbf_interpolator = RBFInterpolator(
+            points, 
+            log_values,  # Train on log-transformed scores
+            kernel='multiquadric',
+            epsilon=1.0,  # Shape parameter for multiquadric kernel
+            smoothing=1e-3  # Regularize to prevent singular matrix
+        )
         
         # Store raw data for reference
         self.known_points = [
@@ -98,7 +94,7 @@ class ScoreEstimator:
             for p in training_data
         ]
     
-    def estimate_v1(self, count_300: int, count_100: int, count_50: int, count_miss: int, combo: int, mod_multiplier: float = 1.0) -> int:
+    def estimate_v1(self, count_300: int, count_100: int, count_50: int, count_miss: int, combo: int, mod_multiplier: float) -> int:
         """
         Estimate Score V1 (legacy) using multidimensional RBF interpolation.
         
@@ -122,23 +118,11 @@ class ScoreEstimator:
         
         query = np.array([float(count_300), float(count_100), float(count_50), float(count_miss), float(combo), mod_multiplier])
         
-        # Clamp query to training bounds if we have data
-        if self.known_points:
-            training_array = np.array([(p[0], p[1], p[2], p[3], p[4], p[5]) for p in self.known_points])
-            mins = training_array.min(axis=0)
-            maxs = training_array.max(axis=0)
-            
-            clamped_query = np.clip(query, mins, maxs)
-            
-            # Log if we had to clamp
-            if not np.array_equal(query, clamped_query):
-                print(f"[V1 CLAMP] Original mod_mult: {query[5]:.4f}, bounds: {mins[5]:.4f}-{maxs[5]:.4f}, clamped to: {clamped_query[5]:.4f}")
-            
-            query = clamped_query
-        
-        # Query 6D RBF surface with (possibly clamped) values
-        estimated_score = self.rbf_interpolator([query])
-        result = max(0, int(estimated_score[0]))
+        # Query 6D RBF surface (outputs log-space score)
+        log_score = self.rbf_interpolator([query])[0]
+        # Transform back to linear space (guarantees positive)
+        estimated_score = np.exp(log_score)
+        result = max(1, int(estimated_score))
         
         return result
 
@@ -150,7 +134,7 @@ class ScoreEstimator:
         count_miss: int,
         combo: int,
         beatmap_max_combo: int,
-        mod_multiplier: float = 1.0
+        mod_multiplier: float
     ) -> int:
         """
         Calculate Score V2 (ScoreV2/Lazer) using the official formula.
@@ -201,11 +185,11 @@ class ScoreEstimator:
         self,
         combo: int,
         mod_multiplier: float,
-        count_300: Optional[int] = None,
-        count_100: Optional[int] = None,
-        count_50: Optional[int] = None,
-        count_miss: Optional[int] = None,
-        beatmap_max_combo: Optional[int] = None
+        count_300: int,
+        count_100: int,
+        count_50: int,
+        count_miss: int,
+        beatmap_max_combo: int | None = None
     ) -> int:
         """
         Estimate score using the configured scoring version.
@@ -220,25 +204,24 @@ class ScoreEstimator:
             Estimated score based on configured scoring version
         """
         if self.version == ScoringVersion.V1:
-            assert count_300 is not None
-            assert count_100 is not None
-            assert count_50 is not None
-            assert count_miss is not None
-            
-            return self.estimate_v1(count_300, count_100, count_50, count_miss, combo, mod_multiplier)
+            return self.estimate_v1(
+                count_300=count_300,
+                count_100=count_100,
+                count_50=count_50,
+                count_miss=count_miss,
+                combo=combo,
+                mod_multiplier=mod_multiplier
+            )
         elif self.version == ScoringVersion.V2:
-            if any(x is None for x in [count_300, count_100, count_50, count_miss, beatmap_max_combo]):
-                raise ValueError(
-                    "V2 estimation requires all: count_300, count_100, count_50, count_miss, "
-                    "beatmap_max_combo"
-                )
-            # Type narrowing with assertions
-            assert count_300 is not None and count_100 is not None
-            assert count_50 is not None and count_miss is not None
-            assert beatmap_max_combo is not None
+            assert beatmap_max_combo is not None, "beatmap_max_combo is required for Score V2 estimation"
             return self.estimate_v2(
-                count_300, count_100, count_50, count_miss,
-                combo, beatmap_max_combo, mod_multiplier
+                count_300=count_300,
+                count_100=count_100,
+                count_50=count_50,
+                count_miss=count_miss,
+                combo=combo,
+                beatmap_max_combo=beatmap_max_combo,
+                mod_multiplier=mod_multiplier
             )
         else:
             return 0

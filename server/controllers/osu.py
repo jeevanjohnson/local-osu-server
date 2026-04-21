@@ -14,6 +14,7 @@ from core.usecases.application.beatmaps import BeatmapStatus
 import core.usecases.application.leaderboards as leaderboards_usecases
 from core.osu_protocol.osu.types import LeaderboardType
 from core.usecases.domain.osu_api import InvalidOsuApiCredentialsError
+import time
 
 osu = APIRouter(
     prefix="/osu",
@@ -113,6 +114,7 @@ async def get_leaderboard(
     player.update_client_state(client_state)
     client_state = player.update_client_stats()
 
+    t0 = time.time()
     try:
         beatmap_result = await beatmap_usecases.from_leaderboard_request(
             filename=map_filename,
@@ -121,6 +123,8 @@ async def get_leaderboard(
     except InvalidOsuApiCredentialsError:
         client_state_usecases.restart_client()
         return Response(b"error: no")
+    t1 = time.time()
+    print(f"[TIMING] beatmap lookup for '{map_filename}': {(t1-t0)*1000:.2f}ms")
 
     beatmap = beatmap_result.beatmap
     beatmap_status = beatmap_result.status

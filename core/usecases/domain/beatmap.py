@@ -13,7 +13,6 @@ def get_path_by_md5(md5: str) -> Path | None:
     """Get the file path of a beatmap by its MD5 hash."""
     osu_file_location_repo = OsuFileLocationRepository()
     database = osu_file_location_repo.get()
-
     return database.by_md5.get(md5)
 
 # Retriving MD5
@@ -64,7 +63,7 @@ def get_by_md5_database(md5: str) -> Beatmap | None:
     beatmap_repo = BeatmapRepository()
     return beatmap_repo.get(md5)
 
-async def get_by_md5_api(md5: str) -> Beatmap | None:
+async def get_by_md5_api(md5: str, osu_file_location: Path | None = None) -> Beatmap | None:
     api_client = osu_api_usecases.get_api_client()
 
     try:
@@ -74,7 +73,8 @@ async def get_by_md5_api(md5: str) -> Beatmap | None:
 
     beatmap_set = api_beatmap.beatmapset()
 
-    path = get_path_by_md5(md5)
+    # Use provided path if available, otherwise look it up
+    path = osu_file_location or get_path_by_md5(md5)
     if path is None:
         return None
     

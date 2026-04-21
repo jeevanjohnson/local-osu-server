@@ -434,8 +434,7 @@ class Mods(list[str]):
 
         if self.custom_rate():
             rate_result = self.rate()
-            rate_mult = rate_result["score_multiplier"]
-            multiplier *= rate_mult
+            multiplier *= rate_result["score_multiplier"]
         
         return multiplier
 

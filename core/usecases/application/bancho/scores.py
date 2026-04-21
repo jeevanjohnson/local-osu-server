@@ -1,6 +1,7 @@
 from core.models.domain.gameplay.mods import Mods
 from core.models.domain.gameplay.game_mode import GameMode
 from ossapi.models import Score
+from core.models.domain.gameplay.scoring import ScoringType
 from dataclasses import dataclass
 
 @dataclass
@@ -20,10 +21,9 @@ class BanchoScore:
     pp: int
     game_mode: GameMode
     lazer: bool
+    total_score: int
 
-    score_override: int | None = None
-
-def from_api_to_bancho_score(score: Score, mode: GameMode) -> BanchoScore:
+def from_api_to_bancho_score(score: Score, mode: GameMode, scoring_type: ScoringType) -> BanchoScore:
     mods = Mods.from_api_v2(score.mods)
 
     lazer = not score.legacy_score_id
@@ -34,11 +34,11 @@ def from_api_to_bancho_score(score: Score, mode: GameMode) -> BanchoScore:
         pp = int(score.pp)
     else:
         pp = 0
-    
-    if not lazer:
-        score_override = score.legacy_total_score
-    else:        
-        score_override = None
+
+    if scoring_type == ScoringType.SCOREV1:
+        total_score = score.classic_total_score
+    else:
+        total_score = score.total_score
 
     return BanchoScore(
         score_id=score.id or 0,
@@ -56,5 +56,5 @@ def from_api_to_bancho_score(score: Score, mode: GameMode) -> BanchoScore:
         pp=pp,
         game_mode=mode,
         lazer=lazer,
-        score_override=score_override,
+        total_score=total_score
     )

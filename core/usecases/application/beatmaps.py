@@ -6,6 +6,7 @@ import core.usecases.adapters.osufile as osufile_usecases
 from enum import Enum
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from pathlib import Path
 
 FILENAME_REGEX = re.compile(
     r"(?P<artist>.*) - (?P<song_name>.*) ((?P<mapper>.*) \[)(?P<diff_name>.*)\]\.osu"
@@ -39,6 +40,7 @@ def valid_difficulty_adjusted_filename(filename: str) -> bool:
 async def get_difficulty_adjusted_beatmap(
     filename: str,
     md5: str,
+    osu_file_location: Path,
 ) -> Beatmap | None:
     original_beatmap_id = beatmap_usecases.get_id_by_filename(filename)
     if original_beatmap_id is None:
@@ -53,16 +55,11 @@ async def get_difficulty_adjusted_beatmap(
         original_beatmap = await beatmap_usecases.get_by_md5_api(original_md5)
         if original_beatmap is None:
             return None
-    
-    difficulty_adjusted_map_path = beatmap_usecases.get_path_by_md5(md5)
-    if difficulty_adjusted_map_path is None:
-        return None
 
-    version = osufile_usecases.get_version(difficulty_adjusted_map_path)
-    attributes = osufile_usecases.get_difficulty_attributes(difficulty_adjusted_map_path)
-    object_count = osufile_usecases.get_object_count(difficulty_adjusted_map_path)
-    drain_time_seconds = osufile_usecases.get_drain_time_seconds(difficulty_adjusted_map_path)
-
+    version = osufile_usecases.get_version(osu_file_location)
+    attributes = osufile_usecases.get_difficulty_attributes(osu_file_location)
+    object_count = osufile_usecases.get_object_count(osu_file_location)
+    drain_time_seconds = osufile_usecases.get_drain_time_seconds(osu_file_location)
     
     beatmap = beatmap_usecases.add(
         md5,
@@ -109,17 +106,40 @@ async def from_leaderboard_request(
     md5: str,
 ) -> BeatmapResult:
     """Fetch beatmap based on leaderboard request data."""
-
+    import time
+    start = time.time()
+    
     # check if its in db
+    t0 = time.time()
     beatmap = beatmap_usecases.get_by_md5_database(md5)
     if beatmap:
+        print(f"[LOOKUP] DB hit in {(time.time()-t0)*1000:.2f}ms")
         return BeatmapResult(
             beatmap=beatmap, 
             status=BeatmapStatus.VALID
         )
+    print(f"[LOOKUP] DB check: {(time.time()-t0)*1000:.2f}ms (miss)")
+
+    t0 = time.time()
+    osu_file = beatmap_usecases.get_path_by_md5(md5)
+    print(f"[LOOKUP] File path lookup: {(time.time()-t0)*1000:.2f}ms")
+
+    # if its a difficulty adjusted map, try to find the original map and add it as a difficulty adjusted copy
+    t0 = time.time()
+    if valid_difficulty_adjusted_filename(filename) and osu_file is not None:
+        beatmap = await get_difficulty_adjusted_beatmap(filename, md5, osu_file)
+        if beatmap:
+            print(f"[LOOKUP] Difficulty adjusted found in {(time.time()-t0)*1000:.2f}ms")
+            return BeatmapResult(
+                beatmap=beatmap,
+                status=BeatmapStatus.VALID
+            )
+    print(f"[LOOKUP] Difficulty adjusted check: {(time.time()-t0)*1000:.2f}ms")
 
     # check if its in api
-    beatmap = await beatmap_usecases.get_by_md5_api(md5)
+    t0 = time.time()
+    beatmap = await beatmap_usecases.get_by_md5_api(md5, osu_file_location=osu_file)
+    print(f"[LOOKUP] API check: {(time.time()-t0)*1000:.2f}ms")
 
     if beatmap:
         beatmap_usecases.add(md5, beatmap)
@@ -127,40 +147,39 @@ async def from_leaderboard_request(
             beatmap=beatmap,
             status=BeatmapStatus.VALID
         )
-    
-    # if its a difficulty adjusted map, try to find the original map and add it as a difficulty adjusted copy
-    if valid_difficulty_adjusted_filename(filename):
-        beatmap = await get_difficulty_adjusted_beatmap(filename, md5)
-        if beatmap:
-            return BeatmapResult(
-                beatmap=beatmap,
-                status=BeatmapStatus.VALID
-            )
 
     # check if its unsubmitted
+    t0 = time.time()
     osu_file = beatmap_usecases.get_path_by_md5(md5)
+    print(f"[LOOKUP] File lookup: {(time.time()-t0)*1000:.2f}ms")
     if osu_file is None:
+        print(f"[LOOKUP] Total: {(time.time()-start)*1000:.2f}ms - UNSUBMITTED")
         return BeatmapResult(
             beatmap=None,
             status=BeatmapStatus.UNSUBMITTED
         )
 
+    t0 = time.time()
     beatmap_id = osufile_usecases.get_beatmap_id(osu_file)
     beatmap_set_id = osufile_usecases.get_beatmap_set_id(osu_file)
+    print(f"[LOOKUP] Parse .osu file: {(time.time()-t0)*1000:.2f}ms")
 
     if beatmap_id == 0 or beatmap_set_id == 0:
+        print(f"[LOOKUP] Total: {(time.time()-start)*1000:.2f}ms - UNSUBMITTED (no id)")
         return BeatmapResult(
             beatmap=None,
             status=BeatmapStatus.UNSUBMITTED
         )
     
     if valid_difficulty_adjusted_filename(filename):
+        print(f"[LOOKUP] Total: {(time.time()-start)*1000:.2f}ms - UNSUBMITTED (difficulty adjusted)")
         return BeatmapResult(
             beatmap=None,
             status=BeatmapStatus.UNSUBMITTED
         )
     else:
         # a valid beatmap and set id exists, so map is probably outdated and needs to be updated 
+        print(f"[LOOKUP] Total: {(time.time()-start)*1000:.2f}ms - NEEDS_UPDATE")
         return BeatmapResult(
             beatmap=None,
             status=BeatmapStatus.NEEDS_UPDATE
