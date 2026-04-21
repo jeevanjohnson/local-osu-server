@@ -1,13 +1,14 @@
 from base64 import b64decode
 from datetime import UTC, datetime
+from core.osu_protocol.domain.enums import (
+    osuMods,
+    osuGameMode
+)
 
 from fastapi.datastructures import FormData
 from py3rijndael import Pkcs7Padding, RijndaelCbc
-from pydantic import BaseModel, ConfigDict
+from dataclasses import dataclass
 from starlette.datastructures import UploadFile as StarletteUploadFile
-
-from models.domain.gameplay import Mods, osuGameMode
-
 
 def parse_form_data(form_data: FormData) -> tuple[bytes, StarletteUploadFile] | None:
     try:
@@ -27,9 +28,8 @@ def parse_form_data(form_data: FormData) -> tuple[bytes, StarletteUploadFile] | 
         return None
 
 
-class ScoreData(BaseModel):
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-
+@dataclass
+class ScoreData:
     beatmap_md5: str
     username: str
     online_checksum: str
@@ -43,21 +43,12 @@ class ScoreData(BaseModel):
     max_combo: int
     perfect: bool
     grade: str
-    mods: Mods
+    mods: osuMods
     passed: bool
     game_mode: osuGameMode
     play_time: datetime
     # Ignore client flags & version since we don't have a use for them
     # Although not parsing could cause issues?
-
-    # @field_serializer("mods")
-    # def serialize_mods(self, value: Mods) -> list[str]:
-    #     return list(value)
-
-    # @field_validator("mods", mode="before")
-    # @classmethod
-    # def deserialize_mods(cls, value: list[str]) -> Mods:
-    #     return Mods(value)
 
 
 def decrypt_score_aes_data(
@@ -95,7 +86,7 @@ def decrypt_score_aes_data(
         max_combo=int(score_data[10]),
         perfect=score_data[11] == "True",
         grade=score_data[12].upper(),
-        mods=Mods.from_score_submission(int(score_data[13])),
+        mods=osuMods(int(score_data[13])),
         passed=score_data[14] == "True",
         game_mode=osuGameMode(int(score_data[15])),
         # Score submission timestamp is UTC; keep it timezone-aware so epoch conversion is stable.

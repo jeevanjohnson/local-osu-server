@@ -16,7 +16,7 @@ import core.usecases.application.leaderboards as leaderboards_usecases
 from core.osu_protocol.osu.types import LeaderboardType
 from core.usecases.domain.osu_api import InvalidOsuApiCredentialsError
 import time
-from fastapi import Request
+from fastapi import Request, Form, File
 from fastapi.responses import RedirectResponse
 
 osu = APIRouter(
@@ -202,3 +202,27 @@ async def get_map_file(
         url=f"https://osu.ppy.sh{url_path}",
         status_code=status.HTTP_301_MOVED_PERMANENTLY
     )
+
+@osu.post("/web/osu-submit-modular-selector.php")
+# log
+async def osuSubmitModularSelector(
+    request: Request,
+    token: str = Header(...),
+    exited_out: bool = Form(..., alias="x"),
+    fail_time: int = Form(..., alias="ft"),
+    visual_settings_b64: bytes = Form(..., alias="fs"),
+    updated_beatmap_hash: str = Form(..., alias="bmk"),
+    storyboard_md5: str | None = Form(None, alias="sbk"),
+    iv_b64: bytes = Form(..., alias="iv"),
+    unique_ids: str = Form(..., alias="c1"),
+    score_time: int = Form(..., alias="st"),
+    pw_md5: str = Form(..., alias="pass"),
+    osu_version: str = Form(..., alias="osuver"),
+    client_hash_b64: bytes = Form(..., alias="s"),
+    fl_cheat_screenshot: bytes | None = File(None, alias="i"),
+    player: Player | None = Depends(dependencies.player)
+):
+    if player is None:
+        client_state_usecases.restart_client()
+        return Response(b"error: no")
+

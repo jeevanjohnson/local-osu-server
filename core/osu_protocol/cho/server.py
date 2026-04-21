@@ -6,13 +6,15 @@ Purpose/Domain/Concept:
 
 import base64
 
+from core.osu_protocol.domain.enums import (
+    osuCountryCode,
+    osuGameMode,
+    osuMods,
+)
 from core.osu_protocol.cho.enums import (
     ALL_PRIVILEGES,
     LoginFailureReason,
     osuAction,
-    osuCountryCode,
-    osuGameMode,
-    osuMods,
     ServerPackets,
 )
 from core.osu_protocol.cho.types import (
@@ -30,6 +32,7 @@ from core.osu_protocol.cho.types import (
     osuUnsignedChar,
     osuUTCOffset,
 )
+from typing import Iterable
 
 
 def bytes_to_string(b: bytes) -> str:
@@ -86,8 +89,8 @@ class Packets(list[Packet]):
 
         return bytes(raw_data)
 
-    def __iadd__(self, other: "Packet | Packets") -> "Packets":
-        if isinstance(other, Packets):
+    def __iadd__(self, other: "Packet | Iterable[Packet]") -> "Packets":
+        if isinstance(other, Iterable):
             self.extend(other)
         else:
             self.append(other)
