@@ -275,6 +275,9 @@ async def general_leaderboard(
         return only_one_or_less_score_on_leaderboard(
             beatmap, beatmap_status, profile.settings.leaderboard.scores_sorted_by, personal_best
         )
+
+    if "SV2" in client_state.mods and profile.settings.leaderboard.show_only_lazer_scores_on_leaderboard_with_score_v2_enabled:
+        api_scores.scores = [score for score in api_scores.scores if not score.legacy_score_id]
     
     scores: list[BanchoScore | Score] = [
         bancho_scores_usecases.from_api_to_bancho_score(
@@ -317,3 +320,5 @@ async def from_client_request(
         )
     elif leaderboard_type == LeaderboardType.COUNTRY:
         ...
+    else:
+        raise ValueError(f"Unknown leaderboard type: {leaderboard_type}")

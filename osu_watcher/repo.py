@@ -16,14 +16,18 @@ def insert_beatmap_in_cache(
     if id is not None:
         if id not in database.by_id:
             database.by_id[id] = []
-        database.by_id[id].append(path)
+
+        if path not in database.by_id[id]:
+            database.by_id[id].append(path)
     
     database.by_md5[md5] = path
     database.by_filename[filename] = path
     if set_id is not None:
         if set_id not in database.by_set_id:
             database.by_set_id[set_id] = []
-        database.by_set_id[set_id].append(path)
+        
+        if path not in database.by_set_id[set_id]:
+            database.by_set_id[set_id].append(path)
 
     database.path_to_md5[path] = md5
     if id is not None:

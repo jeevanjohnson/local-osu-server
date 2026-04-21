@@ -200,6 +200,32 @@ class CountryFlag(ui.interactive_image):
         self.dialog = dialog
         dialog.open()
 
+class ProfileNotes(ui.textarea):
+    def __init__(self, profile_name: str) -> None:
+        super().__init__(label="Notes", placeholder="Add some notes to your profile...")
+        self.profile_name = profile_name
+        self.classes("w-96")
+        self.refresh()
+
+        self.on_value_change(self.on_change)
+
+    def refresh(self) -> None:
+        profile = profiles_usecases.get(self.profile_name)
+        if profile is None:
+            ui.notify("Profile not found")
+            return
+        
+        self.value = profile.notes
+
+    def on_change(self) -> None:
+        profile = profiles_usecases.get(self.profile_name)
+        if profile is None:
+            ui.notify("Profile not found")
+            return
+        
+        profile.notes = self.value
+        profiles_usecases.update_profile(self.profile_name, profile)
+
 def build(template: Callable[[], None]) -> None:
     @ui.refreshable
     def render_profile_picture(profile_name: str) -> None:
@@ -242,6 +268,8 @@ def build(template: Callable[[], None]) -> None:
                 ChangeProfilePictureButton(
                     profile_name, render_profile_picture.refresh
                 )
+            
+            ProfileNotes(profile_name)
 
             ui.separator().classes("w-96")
 

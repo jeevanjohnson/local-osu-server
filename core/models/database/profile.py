@@ -92,7 +92,7 @@ class ProfileV1(MigratableModel):
     performance: dict[GameMode, Performance] = Field(
         default_factory=performace_factory
     )
-    notes: str | None = Field(default=None)
+    notes: str = Field(default="")
     settings: ProfileSettings = Field(default_factory=ProfileSettings)
     seasonal_backgrounds: list[str] = Field(
         default_factory=seasonal_backgrounds_factory
