@@ -40,26 +40,37 @@ def valid_difficulty_adjusted_filename(filename: str) -> bool:
 async def get_difficulty_adjusted_beatmap(
     filename: str,
     md5: str,
-    osu_file_location: Path,
+    difficulty_adjusted_osu_file_location: Path,
 ) -> Beatmap | None:
+    print(f"[DIFFICULTY_ADJUSTED] Processing: {filename} (md5: {md5})")
+    
     original_beatmap_id = beatmap_usecases.get_id_by_filename(filename)
     if original_beatmap_id is None:
+        print(f"[DIFFICULTY_ADJUSTED] FAILED: Could not find original beatmap ID for filename: {filename}")
         return None
+    print(f"[DIFFICULTY_ADJUSTED] Found original beatmap ID: {original_beatmap_id}")
 
     original_md5 = beatmap_usecases.get_md5_by_id(original_beatmap_id)
     if original_md5 is None:
+        print(f"[DIFFICULTY_ADJUSTED] FAILED: Could not find MD5 for beatmap ID: {original_beatmap_id}")
         return None
+    print(f"[DIFFICULTY_ADJUSTED] Found original MD5: {original_md5}")
 
     original_beatmap = beatmap_usecases.get_by_md5_database(original_md5)
     if original_beatmap is None:
+        print(f"[DIFFICULTY_ADJUSTED] Not in DB, fetching from API: {original_md5}")
         original_beatmap = await beatmap_usecases.get_by_md5_api(original_md5)
         if original_beatmap is None:
+            print(f"[DIFFICULTY_ADJUSTED] FAILED: Could not fetch original beatmap from API: {original_md5}")
             return None
+    print(f"[DIFFICULTY_ADJUSTED] Successfully loaded original beatmap: {original_beatmap.artist} - {original_beatmap.title}")
 
-    version = osufile_usecases.get_version(osu_file_location)
-    attributes = osufile_usecases.get_difficulty_attributes(osu_file_location)
-    object_count = osufile_usecases.get_object_count(osu_file_location)
-    drain_time_seconds = osufile_usecases.get_drain_time_seconds(osu_file_location)
+    version = osufile_usecases.get_version(difficulty_adjusted_osu_file_location)
+    attributes = osufile_usecases.get_difficulty_attributes(difficulty_adjusted_osu_file_location)
+    object_count = osufile_usecases.get_object_count(difficulty_adjusted_osu_file_location)
+    drain_time_seconds = osufile_usecases.get_drain_time_seconds(difficulty_adjusted_osu_file_location)
+    
+    print(f"[DIFFICULTY_ADJUSTED] Extracted attributes - AR: {attributes['ar']}, CS: {attributes['cs']}, HP: {attributes['hp']}, OD: {attributes['od']}")
     
     beatmap = beatmap_usecases.add(
         md5,
@@ -88,6 +99,8 @@ async def get_difficulty_adjusted_beatmap(
             play_count_timestamp=original_beatmap.play_count_timestamp
         )
     )
+    
+    print(f"[DIFFICULTY_ADJUSTED] Successfully created difficulty adjusted beatmap: {beatmap.artist} - {beatmap.title} [{beatmap.version}]")
 
     return beatmap
 

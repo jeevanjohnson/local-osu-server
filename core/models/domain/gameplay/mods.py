@@ -273,6 +273,9 @@ class Mods(list[str]):
 
         if stable_mods & osuMods.NIGHTCORE:
             stable_mods |= osuMods.DOUBLETIME
+        
+        if stable_mods & osuMods.PERFECT:
+            stable_mods |= osuMods.SUDDENDEATH
 
         return SplitModsResult(
             stable_mods=stable_mods, 
@@ -312,7 +315,7 @@ class Mods(list[str]):
 
         return ",".join(copy)
 
-    def to_osu_api_v2(self) -> list[str]:
+    def _to_osu_api_v2(self) -> list[str]:
         result = []
 
         for mod in self:
@@ -325,6 +328,15 @@ class Mods(list[str]):
             result.append(f"mods[]={mod}")
 
         return result
+    
+    def to_osu_api_v2(self) -> int:
+        stable_mods = self.to_stable_mods()
+        
+        stable_mods &= ~osuMods.SCOREV2
+        stable_mods &= ~osuMods.RELAX
+        stable_mods &= ~osuMods.AUTOPILOT
+
+        return int(stable_mods)
 
     def to_stable_mods(self, remove_rate_mods: bool = False) -> osuMods:
         result = self.split_mods()

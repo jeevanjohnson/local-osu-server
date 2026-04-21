@@ -1,4 +1,5 @@
 from datetime import datetime
+import time
 
 from core.repositories.beatmaps import BeatmapRepository
 from core.repositories.osu_file_location import OsuFileLocationRepository
@@ -11,9 +12,16 @@ import core.usecases.adapters.osufile as osufile_usecases
 
 def get_path_by_md5(md5: str) -> Path | None:
     """Get the file path of a beatmap by its MD5 hash."""
+    t0 = time.time()
     osu_file_location_repo = OsuFileLocationRepository()
+    t1 = time.time()
     database = osu_file_location_repo.get()
-    return database.by_md5.get(md5)
+    t2 = time.time()
+    result = database.by_md5.get(md5)
+    t3 = time.time()
+    
+    print(f"[PERF] get_path_by_md5: repo init {(t1-t0)*1000:.2f}ms, get() {(t2-t1)*1000:.2f}ms, lookup {(t3-t2)*1000:.2f}ms, total {(t3-t0)*1000:.2f}ms")
+    return result
 
 # Retriving MD5
 def get_md5_by_filename(filename: str) -> str | None:
@@ -105,6 +113,8 @@ async def get_by_md5_api(md5: str, osu_file_location: Path | None = None) -> Bea
         pass_count_timestamp=datetime.now(),
         play_count_timestamp=datetime.now()
     )
+
+
 
 # Building beatmap
 def add(md5: str, beatmap: Beatmap) -> Beatmap:

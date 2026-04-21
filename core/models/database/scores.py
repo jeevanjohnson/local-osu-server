@@ -16,6 +16,9 @@ class BeatmapReferenceV1(MigratableModel):
     md5: str
     max_combo: int
 
+    difficulty_adjusted: bool
+    original_md5: str
+
 BeatmapReference = BeatmapReferenceV1
 
 class StatisticsV1(MigratableModel):

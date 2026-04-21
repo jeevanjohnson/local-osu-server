@@ -128,47 +128,17 @@ def only_one_or_less_score_on_leaderboard(
         personal_best=personal_best_leaderboard_score,
     )
 
-async def global_leaderboard(
+async def build_leaderboard_from_scores(
+    scores: list[BanchoScore | Score],
     beatmap: Beatmap,
     beatmap_status: RankStatus,
     player: Player,
-) -> Leaderboard:
-    """Generate a global leaderboard response based on the client request."""
-    personal_best = scores_usecases.get_personal_best_for(player.name, beatmap.md5)
-
-    api_client = osu_api_usecases.get_api_client()
-
-    client_state = player.get_client_state()
-    profile = player.get_profile()
-
-    try:
-        legacy_only = profile.settings.leaderboard.show_lazer_scores_on_leaderboard == False
-
-        api_scores = await api_client.beatmap_scores(
-            beatmap_id=beatmap.osu_id,
-            mode=client_state.game_mode.to_api_v2(),
-            legacy_only=legacy_only,
-            type=profile.settings.leaderboard.scores_sorted_by.to_api_v2(),
-        )
-    except ValueError:
-        return only_one_or_less_score_on_leaderboard(
-            beatmap, beatmap_status, profile.settings.leaderboard.scores_sorted_by, personal_best
-        )
-
-    if not api_scores:
-        return only_one_or_less_score_on_leaderboard(
-            beatmap, beatmap_status, profile.settings.leaderboard.scores_sorted_by, personal_best
-        )
-    
-    scores: list[BanchoScore | Score] = [
-        bancho_scores_usecases.from_api_to_bancho_score(
-            score, client_state.game_mode, profile.settings.leaderboard.scores_sorted_by
-        ) 
-        for score in api_scores.scores
-    ]
-
-    if personal_best:
+    personal_best: Score | None,
+):
+    if personal_best and personal_best not in scores:
         scores.append(personal_best)
+
+    profile = player.get_profile()
 
     def sort_key(score: BanchoScore | Score) -> int:
         if profile.settings.leaderboard.scores_sorted_by == ScoringType.PP:
@@ -263,6 +233,64 @@ async def global_leaderboard(
         personal_best=None
     )
 
+async def general_leaderboard(
+    beatmap: Beatmap,
+    beatmap_status: RankStatus,
+    player: Player,
+    selected_mods: Mods | None = None,
+) -> Leaderboard:
+    """Generate a global leaderboard response based on the client request."""
+    profile = player.get_profile()
+
+    personal_best = scores_usecases.get_personal_best_for(
+        player.name, beatmap.md5, profile.settings.leaderboard.scores_sorted_by, selected_mods
+    )
+
+    api_client = osu_api_usecases.get_api_client()
+
+    client_state = player.get_client_state()
+    profile = player.get_profile()
+
+    try:
+        legacy_only = profile.settings.leaderboard.show_lazer_scores_on_leaderboard == False
+
+        if selected_mods is not None:
+            mods = selected_mods.to_osu_api_v2()
+        else:
+            mods = None
+
+        api_scores = await api_client.beatmap_scores(
+            beatmap_id=beatmap.osu_id,
+            mode=client_state.game_mode.to_api_v2(),
+            legacy_only=legacy_only,
+            type=profile.settings.leaderboard.scores_sorted_by.to_api_v2(),
+            mods=mods,
+        )
+    except ValueError:
+        return only_one_or_less_score_on_leaderboard(
+            beatmap, beatmap_status, profile.settings.leaderboard.scores_sorted_by, personal_best
+        )
+
+    if not api_scores:
+        return only_one_or_less_score_on_leaderboard(
+            beatmap, beatmap_status, profile.settings.leaderboard.scores_sorted_by, personal_best
+        )
+    
+    scores: list[BanchoScore | Score] = [
+        bancho_scores_usecases.from_api_to_bancho_score(
+            score, client_state.game_mode, profile.settings.leaderboard.scores_sorted_by
+        ) 
+        for score in api_scores.scores
+    ]
+
+    return await build_leaderboard_from_scores(
+        scores=scores,
+        beatmap=beatmap,
+        beatmap_status=beatmap_status,
+        player=player,
+        personal_best=personal_best,
+    )
+
 async def from_client_request(
     beatmap: Beatmap,
     beatmap_status: RankStatus,
@@ -271,10 +299,21 @@ async def from_client_request(
 ) -> Leaderboard:
     """Generate a leaderboard response based on the client request."""
     if leaderboard_type == LeaderboardType.TOP:
-        return await global_leaderboard(beatmap, beatmap_status, player)
+        return await general_leaderboard(
+            beatmap, 
+            beatmap_status, 
+            player
+        )
     elif leaderboard_type == LeaderboardType.FRIENDS:
         ...
     elif leaderboard_type == LeaderboardType.MODS:
-        ...
+        client_state = player.get_client_state()
+
+        return await general_leaderboard(
+            beatmap, 
+            beatmap_status, 
+            player, 
+            selected_mods=client_state.mods
+        )
     elif leaderboard_type == LeaderboardType.COUNTRY:
         ...
