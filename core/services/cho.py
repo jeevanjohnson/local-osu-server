@@ -1,5 +1,5 @@
 import core.osu_protocol.cho.client as cho_client
-from server.usecases.domain.player import Player
+from core.usecases.domain.player import Player
 import core.osu_protocol.cho.server as cho_server
 import core.osu_protocol.cho.enums as cho_enums
 from datetime import datetime
@@ -61,7 +61,7 @@ async def login(
         action=client_state.status,
         info_text="",
         beatmap_md5="",
-        mods=client_state.mods.to_stable_mods_int(),
+        mods=client_state.mods.to_stable_mods(),
         game_mode=client_state.game_mode,
         beatmap_id=0,
         ranked_score=ranked_score,

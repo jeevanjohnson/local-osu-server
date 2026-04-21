@@ -7,7 +7,8 @@ from core.osu_protocol.cho.enums import osuAction
 import core.osu_protocol.cho.server as cho_server
 import core.osu_protocol.cho.client as cho_client
 import server.dependencies as dependencies
-from core.models.domain.gameplay import GameMode, Mods
+from core.models.domain.gameplay.mods import Mods
+from core.models.domain.gameplay.game_mode import GameMode
 
 from core.osu_protocol.cho.client import (
     ChangeAction,
@@ -22,7 +23,7 @@ from core.osu_protocol.cho.client import (
     SendPublicMessage,
     UserStatsRequest,
 )
-from server.usecases.domain.player import Player
+from core.usecases.domain.player import Player
 
 bancho = APIRouter()
 
@@ -101,25 +102,8 @@ async def on_action_change(
     client_state.beatmap.md5 = packet.beatmap_md5.value
     client_state.beatmap.id = packet.beatmap_id.value
 
-    performance = player.get_performance(client_state.game_mode)
-
-    client_state.outgoing_packets += cho_server.PlayerStats(
-        user_id=2,
-        action=client_state.status,
-        info_text=client_state.status_message,
-        beatmap_md5=client_state.beatmap.md5,
-        mods=client_state.mods.to_stable_mods_int(),
-        game_mode=client_state.game_mode,
-        beatmap_id=client_state.beatmap.id,
-        ranked_score=performance.ranked_score,
-        accuracy=performance.accuracy,
-        play_count=performance.playcount,
-        total_score=performance.total_score,
-        rank=performance.rank,
-        performance_points=performance.performance_points
-    )
-
     player.update_client_state(client_state)
+    player.update_client_stats()
 
     return
 

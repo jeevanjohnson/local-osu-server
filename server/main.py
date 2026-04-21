@@ -6,7 +6,7 @@ from server.controllers.assets import assets
 from server.controllers.avatar import avatar
 from server.controllers.beatmaps import beatmaps
 from server.controllers.cho import bancho
-# from controllers.domains.osu import osu
+from server.controllers.osu import osu
 
 def start(dev_mode: bool) -> None:
     app = FastAPI()
@@ -14,7 +14,7 @@ def start(dev_mode: bool) -> None:
     app.include_router(assets)
     app.include_router(beatmaps)
     app.include_router(avatar)
-    # app.include_router(osu)
+    app.include_router(osu)
 
     for subdomain in ["/c4", "/c5", "/c6", "/ce", "/c"]:
         app.include_router(bancho, prefix=subdomain)

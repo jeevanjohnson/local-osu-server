@@ -10,12 +10,12 @@ from models.database.scores import CurrentScore as ProfileScore
 
 
 class ScoringAlgorithm(IntEnum):
-    LAZER = 0
+    SCORE = 0
     PP = 1
 
     def to_api_v2(self) -> ossapi.enums.RankingType:
         return {
-            ScoringAlgorithm.LAZER: ossapi.enums.RankingType.SCORE,
+            ScoringAlgorithm.SCORE: ossapi.enums.RankingType.SCORE,
             ScoringAlgorithm.PP: ossapi.enums.RankingType.PERFORMANCE,
         }[self]
 

@@ -1,5 +1,5 @@
 from core.repositories.server_settings import ServerSettingsRepository
-from core.models.server_settings import ServerSettings
+from core.models.database.server_settings import ServerSettings
 
 def get_server_settings() -> ServerSettings:
     repo = ServerSettingsRepository()

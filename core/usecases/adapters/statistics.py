@@ -1,5 +1,8 @@
 class LinearInterpolation:
-    def __init__(self, known_points: list[tuple[float, float]]) -> None:
+    def __init__(
+            self, 
+            known_points: list[tuple[float, float]] | list[tuple[int, int]]
+        ) -> None:
         # assumes x is the input and y is the output
         # (x, y) = (input, output)
 

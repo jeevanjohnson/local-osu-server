@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from ossapi import OssapiAsync as BaseOssapiAsync
-from core.models.domain.gameplay import Mods
+from core.models.domain.gameplay.mods import Mods
 
 import core.usecases.domain.client_state as client_state_usecases
 

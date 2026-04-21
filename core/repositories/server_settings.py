@@ -1,5 +1,5 @@
 from jays_tools import JsonDatabase
-from core.models.server_settings import ServerSettings
+from core.models.database.server_settings import ServerSettings
 from core.constants import SERVER_SETTINGS
 
 class ServerSettingsRepository:

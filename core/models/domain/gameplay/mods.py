@@ -1,16 +1,17 @@
-from enum import IntEnum
+
 from typing import Any, Iterable, TypedDict
 
 import ossapi.models
 
 from core.osu_protocol.cho.server import osuMods
+from core.models.domain.gameplay.game_mode import GameMode
 from core.usecases.adapters.statistics import LinearInterpolation
 
-class GameMode(IntEnum):
-    STANDARD = 0
-    TAIKO = 1
-    CATCH = 2
-    MANIA = 3
+class AttributeAdjustmentResult(TypedDict):
+    hp: float | None
+    cs: float | None
+    od: float | None
+    ar: float | None
 
 class SplitModsResult(TypedDict):
     stable_mods: osuMods
@@ -52,14 +53,11 @@ class Mods(list[str]):
         stable_mods = self.to_stable_mods()
         return int(stable_mods)
 
+    def __ne__(self, other: "Mods") -> bool:
+        return not self.__eq__(other)
+
     def __eq__(self, other: "Mods") -> bool:
         return sorted(self) == sorted(other)
-
-    def __repr__(self) -> str:
-        return str(self)
-
-    def __str__(self) -> str:
-        return ",".join(self)
 
     @classmethod
     def from_list(cls, mods_list: list[str]) -> "Mods":
@@ -114,7 +112,18 @@ class Mods(list[str]):
                 final_mods.extend(
                     parse_difficulty_adjustment_settings(mod_settings)
                 )
+                final_mods.append("DA")
+                continue
+                
+            if mod.acronym in ("WU", "WD"):
+                initial_rate = mod_settings["initial_rate"]
+                final_rate = mod_settings["final_rate"]
+                final_mods.append(f"{mod.acronym}({initial_rate}->{final_rate})")
+                continue
         
+            print(f"UNHANDLED Mods: {mod.acronym}, settings: {mod_settings}")
+            final_mods.append(mod.acronym)
+
         return cls.from_list(final_mods)
     
     @classmethod
@@ -164,6 +173,19 @@ class Mods(list[str]):
         for mod in self:
             if mod.endswith("X"):
                 rate = float(mod.removesuffix("X"))
+                break
+
+        if rate is None:
+            for mod in self:
+                if mod.startswith(("WU", "WD")):
+                    try:
+                        rate_part = mod[2:].strip("()")
+                        initial_rate_str, final_rate_str = rate_part.split("->")
+                        initial_rate = float(initial_rate_str)
+                        final_rate = float(final_rate_str)
+                        rate = (initial_rate + final_rate) / 2
+                    except Exception:
+                        pass
 
         if rate is None:
             if "HT" in self or "DC" in self:
@@ -180,14 +202,16 @@ class Mods(list[str]):
                 (1.50, 1.10),  # DT or NC multiples are 1.1x
             ]
         )
+        
+        score_mult = score_multiplier.approximate(rate)
 
         return RateResult(
             rate=rate,
-            score_multiplier=score_multiplier.approximate(rate)
+            score_multiplier=score_mult
         )
 
     def custom_rate(self) -> bool:
-        return any(mod.endswith("X") for mod in self)
+        return any(mod.endswith("X") or mod.startswith(("WU", "WD")) for mod in self)
 
     def same_as(self, other: "Mods", ignore: "Mods | None" = None) -> bool:
         self_mods = list(self)
@@ -201,6 +225,41 @@ class Mods(list[str]):
                     other_mods.remove(mod)
 
         return self_mods == other_mods
+    
+    def attribute_adjustments(self) -> AttributeAdjustmentResult:
+        hp = None
+        cs = None
+        od = None
+        ar = None
+
+        for mod in self:
+            if mod.startswith("HP"):
+                try:
+                    hp = float(mod.removeprefix("HP"))
+                except ValueError:
+                    pass
+            elif mod.startswith("CS"):
+                try:
+                    cs = float(mod.removeprefix("CS"))
+                except ValueError:
+                    pass
+            elif mod.startswith("OD"):
+                try:
+                    od = float(mod.removeprefix("OD"))
+                except ValueError:
+                    pass
+            elif mod.startswith("AR"):
+                try:
+                    ar = float(mod.removeprefix("AR"))
+                except ValueError:
+                    pass
+
+        return AttributeAdjustmentResult(
+            hp=hp,
+            cs=cs,
+            od=od,
+            ar=ar
+        )
 
     def split_mods(self) -> SplitModsResult:
         stable_mods = osuMods.NOMOD
@@ -212,16 +271,52 @@ class Mods(list[str]):
             except ValueError:
                 lazer_mods.append(mod)
 
+        if stable_mods & osuMods.NIGHTCORE:
+            stable_mods |= osuMods.DOUBLETIME
+
         return SplitModsResult(
             stable_mods=stable_mods, 
             lazer_mods=lazer_mods
         )
 
+    def to_str(self, include_rate: bool = False, remove: list[str] | None = None) -> str:
+        if not self:
+            if remove and "NM" in remove:
+                return ""
+            return "NM"
+
+        copy = self.copy()
+
+        if include_rate:
+            if not any(mod.endswith("X") for mod in copy):
+                if "HT" in copy or "DC" in copy:
+                    copy.append(".75X")
+                elif "DT" in copy or "NC" in copy:
+                    copy.append("1.5X")
+                else:
+                    copy.append("1.0X")
+            
+            if "HT" in copy:
+                copy.remove("HT")
+            if "DC" in copy:
+                copy.remove("DC")
+            if "DT" in copy:
+                copy.remove("DT")
+            if "NC" in copy:
+                copy.remove("NC")
+
+        if remove:
+            for mod in remove:
+                if mod in copy:
+                    copy.remove(mod)
+
+        return ",".join(copy)
+
     def to_osu_api_v2(self) -> list[str]:
         result = []
 
         for mod in self:
-            if mod.startswith("X"):
+            if mod.endswith("X"):
                 continue
 
             if mod.startswith(("AR", "OD", "HP", "CS")):
@@ -231,13 +326,31 @@ class Mods(list[str]):
 
         return result
 
-    def to_stable_mods(self) -> osuMods:
+    def to_stable_mods(self, remove_rate_mods: bool = False) -> osuMods:
         result = self.split_mods()
-        return result["stable_mods"]
+        stable_mods = result["stable_mods"]
+        if remove_rate_mods:
+            stable_mods &= ~osuMods.DOUBLETIME
+            stable_mods &= ~osuMods.NIGHTCORE
+            stable_mods &= ~osuMods.HALFTIME
+        
+        return stable_mods
 
-    def to_lazer_specific_mods(self) -> list[str]:
+    def to_lazer_specific_mods(self, ignore: list[str] | None = None, include_rate: bool = False) -> list[str]:
         result = self.split_mods()
-        return result["lazer_mods"]
+        lazer_mods = result["lazer_mods"]
+
+        if ignore:
+            lazer_mods = [mod for mod in lazer_mods if mod not in ignore]
+
+        if include_rate:
+            rate_result = self.rate()
+            rate_mod = f"{rate_result['rate']}X"
+            if rate_mod not in lazer_mods:
+                lazer_mods.append(rate_mod)
+
+        return lazer_mods
+
 
     def mod_multipler(self, mode: GameMode) -> float:
         if mode == GameMode.STANDARD:
@@ -296,8 +409,6 @@ class Mods(list[str]):
             "SI": 1.00,
             "GR": 1.00,
             "DF": 1.00,
-            "WU": 0.50,
-            "WD": 0.50,
             "TC": 1.00,
             "BR": 1.00,
             "AD": 1.00,
@@ -316,19 +427,16 @@ class Mods(list[str]):
         }
 
         for mod in self:
-            if mod.startswith(("AR", "OD", "HP", "CS")):
-                # TODO: compensate for these changes
-                continue
-
             if mod not in mod_multipliers:
                 continue
 
             multiplier *= mod_multipliers[mod]
-        
+
         if self.custom_rate():
             rate_result = self.rate()
-            multiplier *= rate_result["score_multiplier"]
-
+            rate_mult = rate_result["score_multiplier"]
+            multiplier *= rate_mult
+        
         return multiplier
 
     def mod_multiplier_taiko(self) -> float:
@@ -360,21 +468,16 @@ class Mods(list[str]):
             "SI": 1.00,
             "GR": 1.00,
             "DF": 1.00,
-            "WU": 0.50,
-            "WD": 0.50,
             "MU": 1.00,
             "MG": 0.50,
             "AS": 0.50,
             "SY": 0.80,
             "DP": 1.00,
             "SV2": 1.0,  # Override: Score V2 always 1.0, doesn't affect multiplier
+            "DA": 0.50,
         }
 
         for mod in self:
-            if mod.startswith(("AR", "OD", "HP", "CS")):
-                # TODO: compensate for these changes
-                continue
-
             if mod not in mod_multipliers:
                 continue
 
@@ -414,8 +517,6 @@ class Mods(list[str]):
             "SI": 1.00,
             "GR": 1.00,
             "DF": 1.00,
-            "WU": 0.50,
-            "WD": 0.50,
             "NS": 1.00,
             "FF": 1.00,
             "MU": 1.00,
@@ -425,10 +526,6 @@ class Mods(list[str]):
         }
 
         for mod in self:
-            if mod.startswith(("AR", "OD", "HP", "CS")):
-                # TODO: compensate for these changes
-                continue
-
             if mod not in mod_multipliers:
                 continue
 
@@ -470,8 +567,6 @@ class Mods(list[str]):
             "SI": 1.00,
             "GR": 1.00,
             "DF": 1.00,
-            "WU": 0.50,
-            "WD": 0.50,
             "TC": 1.00,
             "BR": 1.00,
             "MU": 1.00,
@@ -491,10 +586,6 @@ class Mods(list[str]):
         }
 
         for mod in self:
-            if mod.startswith(("AR", "OD", "HP", "CS")):
-                # TODO: compensate for these changes
-                continue
-
             if mod not in mod_multipliers:
                 continue
 

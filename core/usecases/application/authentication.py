@@ -1,6 +1,6 @@
 from core.repositories.states.interface import InterfaceStateRepository
 from core.repositories.profiles import ProfilesRepository
-from core.models.profile import Profile
+from core.models.database.profile import Profile
 
 def current_logged_in_profile() -> tuple[str, Profile] | None:
     state_repo = InterfaceStateRepository()

@@ -36,7 +36,7 @@ class LeaderboardScore:
     enabled_mods: osuMods
     user_id: int
     position: int
-    time_set: EpochTime
+    time_set_epoch: int
     replay_available: bool
 
     def serialize(self) -> str:
@@ -55,141 +55,144 @@ class LeaderboardScore:
             mods=self.enabled_mods,
             userid=self.user_id,
             rank=self.position,
-            time=self.time_set,
+            time=self.time_set_epoch,
             has_replay=int(self.replay_available),
         )
 
     def __repr__(self) -> str:
         return self.serialize()
 
-    @classmethod
-    def from_score(
-        cls,
-        score: Score | ProfileScore,
-        position: int,
-        ingame_score: int,
-        from_difficulty_adjusted: bool = False,
-        truncate_username: bool = False,
-    ) -> "LeaderboardScore":
-        stable_mods, lazer_mods = score.enabled_mods.to_stable_mods()
-        has_lazer_rate_change = any(m.endswith("x") for m in lazer_mods)
+    def name_override(self, new_name: str) -> None:
+        self.username = new_name
 
-        if isinstance(score, LazerScore):
-            title = f"[LAZER] {score.username}"
+    # @classmethod
+    # def from_score(
+    #     cls,
+    #     score: Score | ProfileScore,
+    #     position: int,
+    #     ingame_score: int,
+    #     from_difficulty_adjusted: bool = False,
+    #     truncate_username: bool = False,
+    # ) -> "LeaderboardScore":
+    #     stable_mods, lazer_mods = score.enabled_mods.to_stable_mods()
+    #     has_lazer_rate_change = any(m.endswith("x") for m in lazer_mods)
 
-            total_lazer_mods = len(lazer_mods)
+    #     if isinstance(score, LazerScore):
+    #         title = f"[LAZER] {score.username}"
 
-            if lazer_mods:
-                title += " ("
+    #         total_lazer_mods = len(lazer_mods)
 
-                for i, lazer_mod in enumerate(lazer_mods):
-                    if lazer_mod == "DA":
-                        continue
+    #         if lazer_mods:
+    #             title += " ("
 
-                    if lazer_mod.endswith("x"):  # Rate change
-                        # remove any rate changing mod
-                        # so more space can be given to lazer-exclusive mods in the title
-                        stable_mods = (
-                            stable_mods
-                            & ~osuMods.DOUBLETIME
-                            & ~osuMods.HALFTIME
-                            & ~osuMods.NIGHTCORE
-                        )
+    #             for i, lazer_mod in enumerate(lazer_mods):
+    #                 if lazer_mod == "DA":
+    #                     continue
 
-                        if float(lazer_mod[:-1]) < 1.0:
-                            lazer_mod = lazer_mod.replace("0.", ".", count=1)
+    #                 if lazer_mod.endswith("x"):  # Rate change
+    #                     # remove any rate changing mod
+    #                     # so more space can be given to lazer-exclusive mods in the title
+    #                     stable_mods = (
+    #                         stable_mods
+    #                         & ~osuMods.DOUBLETIME
+    #                         & ~osuMods.HALFTIME
+    #                         & ~osuMods.NIGHTCORE
+    #                     )
 
-                    if i == total_lazer_mods - 1:
-                        title += lazer_mod
-                    else:
-                        title += lazer_mod + ","
+    #                     if float(lazer_mod[:-1]) < 1.0:
+    #                         lazer_mod = lazer_mod.replace("0.", ".", count=1)
 
-                title += ")"
-        else:
-            title = score.username
+    #                 if i == total_lazer_mods - 1:
+    #                     title += lazer_mod
+    #                 else:
+    #                     title += lazer_mod + ","
 
-        if "NC" in score.enabled_mods:
-            # Client needs this in order to actual speed up the
-            # replay properly
-            stable_mods |= osuMods.DOUBLETIME
+    #             title += ")"
+    #     else:
+    #         title = score.username
 
-            if isinstance(score, LazerScore):
-                stable_mods |= osuMods.NIGHTCORE
+    #     if "NC" in score.enabled_mods:
+    #         # Client needs this in order to actual speed up the
+    #         # replay properly
+    #         stable_mods |= osuMods.DOUBLETIME
 
-        if from_difficulty_adjusted and not isinstance(score, ProfileScore):
-            # https://capitalizemytitle.com/small-text-converter/
-            title = f"[ᵒᵍ ᵈⁱᶠᶠ] {title}"
+    #         if isinstance(score, LazerScore):
+    #             stable_mods |= osuMods.NIGHTCORE
 
-            stable_mods = (
-                stable_mods
-                & ~osuMods.DOUBLETIME
-                & ~osuMods.HALFTIME
-                & ~osuMods.NIGHTCORE
-            )
+    #     if from_difficulty_adjusted and not isinstance(score, ProfileScore):
+    #         # https://capitalizemytitle.com/small-text-converter/
+    #         title = f"[ᵒᵍ ᵈⁱᶠᶠ] {title}"
 
-            if isinstance(score, StableScore):
-                if "DT" in score.enabled_mods or "NC" in score.enabled_mods:
-                    title += " (1.5x)"
-                elif "HT" in score.enabled_mods or "DC" in score.enabled_mods:
-                    title += " (.75x)"
-                else:
-                    title += " (1x)"
-            elif isinstance(score, LazerScore):
-                if not has_lazer_rate_change:
-                    if "DT" in score.enabled_mods or "NC" in score.enabled_mods:
-                        title += " (1.5x)"
-                    elif "HT" in score.enabled_mods or "DC" in score.enabled_mods:
-                        title += " (.75x)"
-                    else:
-                        title += " (1x)"
+    #         stable_mods = (
+    #             stable_mods
+    #             & ~osuMods.DOUBLETIME
+    #             & ~osuMods.HALFTIME
+    #             & ~osuMods.NIGHTCORE
+    #         )
 
-        if truncate_username and len(title) > 15 + 3:  # 15 chars + 3 for "..."
-            title = title[:15] + "..."  # Truncate username to 20 characters
+    #         if isinstance(score, StableScore):
+    #             if "DT" in score.enabled_mods or "NC" in score.enabled_mods:
+    #                 title += " (1.5x)"
+    #             elif "HT" in score.enabled_mods or "DC" in score.enabled_mods:
+    #                 title += " (.75x)"
+    #             else:
+    #                 title += " (1x)"
+    #         elif isinstance(score, LazerScore):
+    #             if not has_lazer_rate_change:
+    #                 if "DT" in score.enabled_mods or "NC" in score.enabled_mods:
+    #                     title += " (1.5x)"
+    #                 elif "HT" in score.enabled_mods or "DC" in score.enabled_mods:
+    #                     title += " (.75x)"
+    #                 else:
+    #                     title += " (1x)"
 
-        if isinstance(score, ProfileScore):
-            score_id = -score.id
-            max_combo = score.combo
-            user_id = 2
-            replay_available = score.replay_frames is not None
-        else:
-            user_id = score.user_id
-            score_id = score.score_id
-            max_combo = score.combo.actual
-            replay_available = score.replay_available
+    #     if truncate_username and len(title) > 15 + 3:  # 15 chars + 3 for "..."
+    #         title = title[:15] + "..."  # Truncate username to 20 characters
 
-        if not stable_mods & osuMods.SCOREV2:
-            if not isinstance(score, ProfileScore):
-                # This allows watching replays
-                # and playing w/ score v2 making the
-                # ranking up the map feel with the lb on more
-                # realistic to bancho/lazer
-                stable_mods |= osuMods.SCOREV2
-            else:
-                # TODO: profile setting?
-                # cause when you actually play the map the side leaderboards
-                # you just become number 1 cause client will calculate score
-                # by legacy algorithm instead of score v2, which is what the profile scores are stored with
-                # & the replay's acc will be off cause of slider acc
-                pass
+    #     if isinstance(score, ProfileScore):
+    #         score_id = -score.id
+    #         max_combo = score.combo
+    #         user_id = 2
+    #         replay_available = score.replay_frames is not None
+    #     else:
+    #         user_id = score.user_id
+    #         score_id = score.score_id
+    #         max_combo = score.combo.actual
+    #         replay_available = score.replay_available
 
-        return cls(
-            score_id=score_id,
-            username=title,
-            score=ingame_score,
-            max_combo=max_combo,
-            count50=score.count50,
-            count100=score.count100,
-            count300=score.count300,
-            count_miss=score.count_miss,
-            countkatu=0,
-            countgeki=0,
-            perfect=score.perfect,
-            enabled_mods=stable_mods,
-            user_id=user_id,
-            position=position,
-            time_set=score.time_set,
-            replay_available=replay_available,
-        )
+    #     if not stable_mods & osuMods.SCOREV2:
+    #         if not isinstance(score, ProfileScore):
+    #             # This allows watching replays
+    #             # and playing w/ score v2 making the
+    #             # ranking up the map feel with the lb on more
+    #             # realistic to bancho/lazer
+    #             stable_mods |= osuMods.SCOREV2
+    #         else:
+    #             # TODO: profile setting?
+    #             # cause when you actually play the map the side leaderboards
+    #             # you just become number 1 cause client will calculate score
+    #             # by legacy algorithm instead of score v2, which is what the profile scores are stored with
+    #             # & the replay's acc will be off cause of slider acc
+    #             pass
+
+    #     return cls(
+    #         score_id=score_id,
+    #         username=title,
+    #         score=ingame_score,
+    #         max_combo=max_combo,
+    #         count50=score.count50,
+    #         count100=score.count100,
+    #         count300=score.count300,
+    #         count_miss=score.count_miss,
+    #         countkatu=0,
+    #         countgeki=0,
+    #         perfect=score.perfect,
+    #         enabled_mods=stable_mods,
+    #         user_id=user_id,
+    #         position=position,
+    #         time_set=score.time_set,
+    #         replay_available=replay_available,
+    #     )
 
 
 STARTING_LB_FORMAT = (
@@ -242,18 +245,7 @@ class Leaderboard:
 
         self.personal_best = personal_best
 
-    def update_scores(self, new_scores: list[LeaderboardScore]):
-        self.scores = new_scores
-
     def serialize(self) -> bytes:
-        if isinstance(self.header.beatmap_status, bool):
-            error_message = (
-                f"Error: Beatmap status is a boolean value ({self.header.beatmap_status}). This is likely a bug.\n"
-                f"Beatmap ID: {self.header.beatmap_id}, Beatmap Set ID: {self.header.beatmap_set_id}\n"
-                f"Artist: {self.header.artist}, Title: {self.header.title}"
-            )
-            raise ValueError(error_message)
-
         if self.header.beatmap_status < 1:
             return f"{self.header.beatmap_status.value}|false".encode()
 
@@ -272,125 +264,124 @@ class Leaderboard:
 
         return bytes(buffer)
 
+# class LeaderboardWithScores(Leaderboard):
+#     # # log
+#     def __init__(
+#         self,
+#         beatmap: "Beatmap",
+#         scores: AllScores,
+#         personal_best: ProfileScore | None,
+#         scoring_algorithm: ScoringAlgorithm,
+#         difficulty_adjusted: bool,
+#         limit: int,
+#         accepted_scores: AcceptedScores,
+#         profile_name: str,
+#     ) -> None:
+#         self.beatmap = beatmap
+#         self.scores = scores
+#         self.personal_best = personal_best
+#         self.scoring_algorithm = scoring_algorithm
+#         self.difficulty_adjusted = difficulty_adjusted
+#         self.limit = limit
+#         self.accepted_scores = accepted_scores
+#         self.profile_name = profile_name
 
-class LeaderboardWithScores(Leaderboard):
-    # # log
-    def __init__(
-        self,
-        beatmap: "Beatmap",
-        scores: AllScores,
-        personal_best: ProfileScore | None,
-        scoring_algorithm: ScoringAlgorithm,
-        difficulty_adjusted: bool,
-        limit: int,
-        accepted_scores: AcceptedScores,
-        profile_name: str,
-    ) -> None:
-        self.beatmap = beatmap
-        self.scores = scores
-        self.personal_best = personal_best
-        self.scoring_algorithm = scoring_algorithm
-        self.difficulty_adjusted = difficulty_adjusted
-        self.limit = limit
-        self.accepted_scores = accepted_scores
-        self.profile_name = profile_name
+#         if self.personal_best is not None:
+#             if self.personal_best not in self.scores:
+#                 self.scores.append(self.personal_best)
 
-        if self.personal_best is not None:
-            if self.personal_best not in self.scores:
-                self.scores.append(self.personal_best)
+#         self.scores.sort(self.scoring_algorithm)
 
-        self.scores.sort(self.scoring_algorithm)
+#     @property
+#     def play_count(self) -> int:
+#         return self.beatmap.play_count
 
-    @property
-    def play_count(self) -> int:
-        return self.beatmap.play_count
+#     @property
+#     def pass_count(self) -> int:
+#         if self.beatmap.pass_count < 1:
+#             return 1
 
-    @property
-    def pass_count(self) -> int:
-        if self.beatmap.pass_count < 1:
-            return 1
+#         return self.beatmap.pass_count
 
-        return self.beatmap.pass_count
+#     def personal_best_position(self) -> int:
+#         if self.personal_best is None:
+#             return 0
 
-    def personal_best_position(self) -> int:
-        if self.personal_best is None:
-            return 0
+#         return self.scores.position_of_score(
+#             self.personal_best,
+#             self.scoring_algorithm,
+#             beatmap_pass_count=self.beatmap.pass_count,
+#             leaderboard_limit=self.limit,
+#         )
 
-        return self.scores.position_of_score(
-            self.personal_best,
-            self.scoring_algorithm,
-            beatmap_pass_count=self.beatmap.pass_count,
-            leaderboard_limit=self.limit,
-        )
+#     def serialize_personal_best(self) -> LeaderboardScore | None:
+#         if self.personal_best is None:
+#             return None
 
-    def serialize_personal_best(self) -> LeaderboardScore | None:
-        if self.personal_best is None:
-            return None
+#         if (
+#             self.scoring_algorithm == ScoringAlgorithm.PP
+#             and self.beatmap.can_display_pp
+#         ):
+#             ingame_score = self.personal_best.performance_points or 0
+#         else:
+#             ingame_score = self.personal_best.total_score
 
-        if (
-            self.scoring_algorithm == ScoringAlgorithm.PP
-            and self.beatmap.can_display_pp
-        ):
-            ingame_score = self.personal_best.performance_points or 0
-        else:
-            ingame_score = self.personal_best.total_score
+#         return LeaderboardScore.from_score(
+#             score=self.personal_best,
+#             position=self.personal_best_position(),
+#             ingame_score=ingame_score,
+#             from_difficulty_adjusted=self.difficulty_adjusted,
+#         )
 
-        return LeaderboardScore.from_score(
-            score=self.personal_best,
-            position=self.personal_best_position(),
-            ingame_score=ingame_score,
-            from_difficulty_adjusted=self.difficulty_adjusted,
-        )
+#     def serialize(self) -> bytes:
+#         leaderboard_header = LeaderboardHeader(
+#             beatmap_status=self.beatmap.status[self.profile_name],
+#             beatmap_id=self.beatmap.id,
+#             beatmap_set_id=self.beatmap.set_id,
+#             num_of_scores=self.beatmap.pass_count,
+#             artist=self.beatmap.artist,
+#             title=self.beatmap.title,
+#         )
 
-    def serialize(self) -> bytes:
-        leaderboard_header = LeaderboardHeader(
-            beatmap_status=self.beatmap.status[self.profile_name],
-            beatmap_id=self.beatmap.id,
-            beatmap_set_id=self.beatmap.set_id,
-            num_of_scores=self.beatmap.pass_count,
-            artist=self.beatmap.artist,
-            title=self.beatmap.title,
-        )
+#         leaderboard = Leaderboard(
+#             header=leaderboard_header,
+#             personal_best=self.serialize_personal_best(),
+#         )
 
-        leaderboard = Leaderboard(
-            header=leaderboard_header,
-            personal_best=self.serialize_personal_best(),
-        )
+#         leaderboard_scores = []
 
-        leaderboard_scores = []
+#         seen_self = False
+#         for index, score in enumerate(self.scores[: self.limit]):
+#             if (
+#                 self.scoring_algorithm == ScoringAlgorithm.PP
+#                 and self.beatmap.can_display_pp
+#             ):
+#                 ingame_score = score.performance_points or 0
+#             else:
+#                 ingame_score = score.total_score
 
-        seen_self = False
-        for index, score in enumerate(self.scores[: self.limit]):
-            if (
-                self.scoring_algorithm == ScoringAlgorithm.PP
-                and self.beatmap.can_display_pp
-            ):
-                ingame_score = score.performance_points or 0
-            else:
-                ingame_score = score.total_score
+#             if seen_self:
+#                 score.username += " " * (index + 1)
 
-            if seen_self:
-                score.username += " " * (index + 1)
+#             if score == self.personal_best:
+#                 seen_self = True
 
-            if score == self.personal_best:
-                seen_self = True
+#             leaderboard_score = LeaderboardScore.from_score(
+#                 score=score,
+#                 position=index + 1,
+#                 ingame_score=ingame_score,
+#                 from_difficulty_adjusted=self.difficulty_adjusted,
+#             )
+#             leaderboard_scores.append(leaderboard_score)
 
-            leaderboard_score = LeaderboardScore.from_score(
-                score=score,
-                position=index + 1,
-                ingame_score=ingame_score,
-                from_difficulty_adjusted=self.difficulty_adjusted,
-            )
-            leaderboard_scores.append(leaderboard_score)
+#         if not seen_self and leaderboard.personal_best:
+#             # if personal best not in top scores, calc its position
+#             # using interpolation
+#             leaderboard.personal_best.position = self.personal_best_position()
 
-        if not seen_self and leaderboard.personal_best:
-            # if personal best not in top scores, calc its position
-            # using interpolation
-            leaderboard.personal_best.position = self.personal_best_position()
+#         leaderboard.scores = leaderboard_scores
 
-        leaderboard.scores = leaderboard_scores
-
-        return leaderboard.serialize()
+#         return leaderboard.serialize()
 
 
 class GraveyardLeaderboard(Leaderboard):

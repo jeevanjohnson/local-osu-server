@@ -1,4 +1,4 @@
-from core.models.profile import Profile
+from core.models.database.profile import Profile
 from core.repositories.profiles import ProfilesRepository
 
 

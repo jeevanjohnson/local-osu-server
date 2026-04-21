@@ -1,8 +1,9 @@
 import core.usecases.domain.client_state as client_state_usecases
 import core.usecases.domain.profiles as profiles_usecases
 from core.models.application.states.client import ClientState
-from core.models.domain.gameplay import GameMode
-from core.models.profile import Performance, Profile
+from core.models.domain.gameplay.game_mode import GameMode
+from core.models.database.profile import Performance, Profile
+import core.osu_protocol.cho.server as cho_server
 
 
 class Player:
@@ -57,3 +58,26 @@ class Player:
         self.update_client_state(client_state)
 
         return outgoing_packets
+
+    def update_client_stats(self) -> ClientState:
+        """Update client state with current profile stats."""
+        client_state = self.get_client_state()
+        performance = self.get_performance(client_state.game_mode)
+
+        client_state.outgoing_packets += cho_server.PlayerStats(
+            user_id=2,
+            action=client_state.status,
+            info_text=client_state.status_message,
+            beatmap_md5=client_state.beatmap.md5,
+            mods=client_state.mods.to_stable_mods(),
+            game_mode=client_state.game_mode,
+            beatmap_id=client_state.beatmap.id,
+            ranked_score=performance.ranked_score,
+            accuracy=performance.accuracy,
+            play_count=performance.playcount,
+            total_score=performance.total_score,
+            rank=performance.rank,
+            performance_points=performance.performance_points
+        )
+
+        return self.update_client_state(client_state)

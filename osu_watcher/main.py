@@ -5,11 +5,11 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 import psutil
-from jays_tools import JsonDatabase
-from jays_tools.json_database.database import JsonDatabase as _JsonDatabase
+from core.repositories.osu_file_location import OsuFileLocationRepository
 from watchdog.observers import Observer
 
-from osu_watcher.models import OsuFileLocation
+from core.constants import OSU_FILE_LOCATION
+from core.models.database.osu_file_location import OsuFileLocation
 from osu_watcher.parser import parse_osu_file
 from osu_watcher.watchdog import SongFolderHandler
 
@@ -56,10 +56,13 @@ def retrive_songs_folder_from_osu_client() -> Path | None:
     else:
         return osu_path.parent / songs_folder
 
-def initialize_osu_file_cache(songs_folder: Path, json_db: _JsonDatabase[OsuFileLocation]) -> None:
+def initialize_osu_file_cache(songs_folder: Path) -> None:
+    osu_file_location_repo = OsuFileLocationRepository()
+
     osu_files = (osu_file for osu_file in songs_folder.glob("**/*.osu"))
 
-    database = json_db.get_database()
+    database = osu_file_location_repo.get()
+
     with ThreadPoolExecutor(max_workers=8) as executor:
         futures = {executor.submit(parse_osu_file, f): f for f in osu_files}
         for future in as_completed(futures):
@@ -89,12 +92,13 @@ def initialize_osu_file_cache(songs_folder: Path, json_db: _JsonDatabase[OsuFile
 
             print(f"Added osu! file to cache: {path}")
 
-    json_db.update_database(database)
+    osu_file_location_repo.update(database)
 
-def validate_osu_file_cache(songs_folder: Path, json_db: _JsonDatabase[OsuFileLocation]) -> None:
+def validate_osu_file_cache(songs_folder: Path) -> None:
     # check if songs folder was updated since last cache update, if not, skip validation
 
-    database = json_db.get_database()
+    osu_file_location_repo = OsuFileLocationRepository()
+    database = osu_file_location_repo.get()
 
     cached_files = set(database.path_to_filename.keys())
     current_files = set(f for f in songs_folder.glob("**/*.osu"))
@@ -103,7 +107,6 @@ def validate_osu_file_cache(songs_folder: Path, json_db: _JsonDatabase[OsuFileLo
     if not new_files:
         return
     
-    database = json_db.get_database()
     with ThreadPoolExecutor(max_workers=8) as executor:
         futures = {executor.submit(parse_osu_file, f): f for f in new_files}
         for future in as_completed(futures):
@@ -132,12 +135,11 @@ def validate_osu_file_cache(songs_folder: Path, json_db: _JsonDatabase[OsuFileLo
 
             print(f"Added new osu! file to cache: {path}")
 
-    json_db.update_database(database)
+    osu_file_location_repo.update(database)
 
 def stop(dev_mode: bool):
     observer = Observer()
     observer.stop()
-    observer.join()
     print("Osu! Watcher stopped")
 
 def start(dev_mode: bool):
@@ -151,22 +153,14 @@ def start(dev_mode: bool):
         print("Waiting for osu! client to start...")
         time.sleep(1)
     
-    osu_file_cache_path = Path("./.data/osu_files.json")
-    if not osu_file_cache_path.exists():
-        needs_initialization = True
-    else:
-        needs_initialization = False
-    
-    JSON_DB = JsonDatabase("./.data/osu_files.json", database_model=OsuFileLocation)
-    
-    if needs_initialization:
+    if not OSU_FILE_LOCATION.exists():
         print("Initializing osu! file cache...")
-        initialize_osu_file_cache(SONGS_FOLDER, JSON_DB)
+        initialize_osu_file_cache(SONGS_FOLDER)
     else:
         print("Validating osu! file cache...")
-        validate_osu_file_cache(SONGS_FOLDER, JSON_DB)
+        validate_osu_file_cache(SONGS_FOLDER)
     
-    event_handler = SongFolderHandler(JSON_DB)
+    event_handler = SongFolderHandler()
     observer = Observer()
     observer.schedule(event_handler, str(SONGS_FOLDER), recursive=True)
 

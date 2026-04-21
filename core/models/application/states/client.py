@@ -4,7 +4,8 @@ from jays_tools import MigratableModel
 import ossapi.enums
 from pydantic import Field, field_serializer, field_validator
 from datetime import datetime
-from core.models.domain.gameplay import GameMode, Mods
+from core.models.domain.gameplay.mods import Mods
+from core.models.domain.gameplay.game_mode import GameMode
 from core.osu_protocol.cho.enums import osuAction
 import core.osu_protocol.cho.server as cho_server
 
@@ -25,7 +26,6 @@ class BeatmapReferenceV1(MigratableModel):
     id: int = Field(default=0)
     set_id: int = Field(default=0)
     is_difficulty_adjusted: bool = Field(default=False)
-    watchable_replays: list[int] = Field(default_factory=list)
 
 BeatmapReference = BeatmapReferenceV1
 

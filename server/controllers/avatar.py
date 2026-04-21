@@ -3,7 +3,7 @@ from fastapi.responses import RedirectResponse
 from fastapi import Depends
 
 import server.dependencies as dependencies
-from server.usecases.domain.player import Player
+from core.usecases.domain.player import Player
 
 avatar = APIRouter(
     prefix="/a",

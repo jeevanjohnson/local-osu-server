@@ -4,9 +4,9 @@ from jays_tools.json_database import MigratableModel
 from pydantic import Field, field_validator
 
 from models.domain.accuracy import UnitAccuracy, to_unit_accuracy
-from models.domain.scores import ScoringAlgorithm
+from core.models.domain.gameplay.scoring import ScoringType
 from core.osu_protocol.cho.server import osuCountryCode
-from core.models.domain.gameplay import GameMode
+from core.models.domain.gameplay.game_mode import GameMode
 import random
 
 
@@ -19,23 +19,16 @@ class SubmissionSettingsV1(MigratableModel):
     force_score_v2: bool = Field(default=False)
     force_nf: bool = Field(default=False)
 
-
-class ScoringSettingsV1(MigratableModel):
-    """How to calculate and display scores"""
-
-    algorithm: ScoringAlgorithm = Field(default=ScoringAlgorithm.LAZER)
-    score_v2_shows_lazer_only_leaderboard: bool = Field(default=False)
-
-
 class LeaderboardSettingsV1(MigratableModel):
     """Leaderboard display rules"""
 
     score_limit: int = Field(default=50)
     show_lazer_scores_on_leaderboard: bool = Field(default=True)
+    show_only_lazer_scores_on_leaderboard_with_score_v2_enabled: bool = Field(default=False)
+    scores_sorted_by: ScoringType = Field(default=ScoringType.SCOREV1)
 
 
 SubmissionSettings = SubmissionSettingsV1
-ScoringSettings = ScoringSettingsV1
 LeaderboardSettings = LeaderboardSettingsV1
 
 
@@ -43,7 +36,6 @@ class ProfileSettingsV1(MigratableModel):
     """Master settings container"""
 
     submission: SubmissionSettingsV1 = Field(default_factory=SubmissionSettings)
-    scoring: ScoringSettingsV1 = Field(default_factory=ScoringSettings)
     leaderboard: LeaderboardSettingsV1 = Field(default_factory=LeaderboardSettings)
 
 
