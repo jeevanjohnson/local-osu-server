@@ -5,6 +5,7 @@ from enum import Enum
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
+import time
 
 async def get_difficulty_adjusted_beatmap(
     filename: str,
@@ -88,7 +89,7 @@ async def from_leaderboard_request(
     md5: str,
 ) -> BeatmapResult:
     """Fetch beatmap based on leaderboard request data."""
-    import time
+
     start = time.time()
     
     # check if its in db
@@ -131,11 +132,8 @@ async def from_leaderboard_request(
         )
 
     # check if its unsubmitted
-    t0 = time.time()
-    osu_file = beatmap_usecases.get_path_by_md5(md5)
-    print(f"[LOOKUP] File lookup: {(time.time()-t0)*1000:.2f}ms")
     if osu_file is None:
-        print(f"[LOOKUP] Total: {(time.time()-start)*1000:.2f}ms - UNSUBMITTED")
+        print(f"[LOOKUP] Total: {(time.time()-start)*1000:.2f}ms - UNSUBMITTED (no file)")
         return BeatmapResult(
             beatmap=None,
             status=BeatmapStatus.UNSUBMITTED
@@ -159,13 +157,13 @@ async def from_leaderboard_request(
             beatmap=None,
             status=BeatmapStatus.UNSUBMITTED
         )
-    else:
-        # a valid beatmap and set id exists, so map is probably outdated and needs to be updated 
-        print(f"[LOOKUP] Total: {(time.time()-start)*1000:.2f}ms - NEEDS_UPDATE")
-        return BeatmapResult(
-            beatmap=None,
-            status=BeatmapStatus.NEEDS_UPDATE
-        )
+
+    # a valid beatmap and set id exists, so map is probably outdated and needs to be updated 
+    print(f"[LOOKUP] Total: {(time.time()-start)*1000:.2f}ms - NEEDS_UPDATE")
+    return BeatmapResult(
+        beatmap=None,
+        status=BeatmapStatus.NEEDS_UPDATE
+    )
 
 async def get_pass_count(beatmap: Beatmap) -> int:
     # only update pass count if its been a day

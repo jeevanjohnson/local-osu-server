@@ -10,11 +10,14 @@ import core.usecases.domain.client_state as client_state_usecases
 from core.models.domain.gameplay.game_mode import GameMode
 from core.models.domain.gameplay.mods import Mods
 import core.usecases.application.beatmaps as beatmap_usecases
+import core.usecases.domain.beatmap as beatmap_domain
 from core.usecases.application.beatmaps import BeatmapStatus
 import core.usecases.application.leaderboards as leaderboards_usecases
 from core.osu_protocol.osu.types import LeaderboardType
 from core.usecases.domain.osu_api import InvalidOsuApiCredentialsError
 import time
+from fastapi import Request
+from fastapi.responses import RedirectResponse
 
 osu = APIRouter(
     prefix="/osu",
@@ -149,23 +152,23 @@ async def get_leaderboard(
     if beatmap is None:
         return Response(b"error: no")
     
-    if player.name in beatmap.status_override:
-        beatmap_status = beatmap.status_override[player.name]
-    else:
-        beatmap_status = beatmap.status
-    
-    if not beatmap_status.has_leaderboards():
-        leaderboard = GraveyardLeaderboard()
-        return Response(
-            leaderboard.serialize()
-        )
-
     client_state.beatmap.md5 = beatmap.md5
     client_state.beatmap.id = beatmap.osu_id
     client_state.beatmap.set_id = beatmap.osu_set_id
     client_state.beatmap.is_difficulty_adjusted = beatmap.difficulty_adjusted
 
     client_state = player.update_client_state(client_state)
+
+    if player.name in beatmap.status_override:
+        beatmap_status = beatmap.status_override[player.name]
+    else:
+        beatmap_status = beatmap.status
+
+    if not beatmap_status.has_leaderboards():
+        leaderboard = GraveyardLeaderboard()
+        return Response(
+            leaderboard.serialize()
+        )
 
     leaderboard_type = LeaderboardType(raw_leaderboard_type)
 
@@ -182,4 +185,20 @@ async def get_leaderboard(
 
     return Response(
         leaderboard.serialize()
+    )
+
+@osu.get("/web/maps/{map_filename}")
+async def get_map_file(
+    request: Request,
+    map_filename: str,
+    host: str = Header(...),
+):
+    url_path = request["raw_path"].decode().removeprefix("/osu")
+
+    if beatmap_domain.valid_difficulty_adjusted_filename(map_filename):
+        return Response(status_code=status.HTTP_404_NOT_FOUND)
+    
+    return RedirectResponse(
+        url=f"https://osu.ppy.sh{url_path}",
+        status_code=status.HTTP_301_MOVED_PERMANENTLY
     )
