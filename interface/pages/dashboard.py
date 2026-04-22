@@ -8,7 +8,7 @@ from nicegui import ui, events
 from nicegui.elements.dialog import Dialog
 from nicegui.events import UploadEventArguments
 
-from core.osu_protocol.cho.enums import osuCountryCode
+from core.osu_protocol.domain.enums import osuCountryCode
 import core.usecases.application.authentication as auth_usecases
 import core.usecases.domain.profiles as profiles_usecases
 from interface.components import BaseButton

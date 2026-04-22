@@ -1,6 +1,12 @@
 from jays_tools import JsonCollection, JsonDatabase
 from core.models.database.scores import MapScores, ScoreLookUp, Score
 from core.constants import SCORES, SCORES_LOOKUP
+from typing import TypedDict
+from core.models.domain.gameplay.game_mode import GameMode
+
+class AllMapScoresForProfileResult(TypedDict):
+    beatmap_md5: str
+    scores: list[Score]
 
 class ScoresRepository:
     def __init__(self) -> None:
@@ -43,6 +49,53 @@ class ScoresRepository:
                 return score
         
         return None
+
+    def generate_new_score_id(self) -> int:
+        score_lookup = self.database.get_database()
+        existing_ids = set(score_lookup.id_to_beatmap_md5.keys())
+
+        new_id = 1
+        while new_id in existing_ids:
+            new_id += 1
+        
+        return new_id
+
+    def get_all_map_scores_for_profile(self, profile_name: str, game_mode: GameMode) -> list[AllMapScoresForProfileResult]:
+        score_lookup = self.database.get_database()
+        print(f"[REPO_GET_SCORES] Available profile names in database: {list(score_lookup.profile_name_to_ids.keys())}")
+        print(f"[REPO_GET_SCORES] Looking for: '{profile_name}'")
+        
+        if profile_name not in score_lookup.profile_name_to_ids:
+            print(f"[REPO_GET_SCORES] ❌ Profile '{profile_name}' NOT found in database!")
+            return []
+
+        score_ids = score_lookup.profile_name_to_ids[profile_name]
+        print(f"[REPO_GET_SCORES] ✓ Found {len(score_ids)} score IDs for profile '{profile_name}'")
+        scores = [self.get_score(score_id) for score_id in score_ids]
+
+        beatmap_md5_to_scores: dict[str, list[Score]] = {}
+
+        for score in scores:
+            if score is None:
+                continue
+
+            if score.game_mode != game_mode:
+                continue
+            
+            beatmap_md5 = score.beatmap.original_md5
+
+            if beatmap_md5 not in beatmap_md5_to_scores:
+                beatmap_md5_to_scores[beatmap_md5] = []
+            
+            beatmap_md5_to_scores[beatmap_md5].append(score)
+        
+        return [
+            AllMapScoresForProfileResult(
+                beatmap_md5=beatmap_md5,
+                scores=scores
+            )
+            for beatmap_md5, scores in beatmap_md5_to_scores.items()
+        ]
 
     def get_all_scores_for(self, profile_name: str) -> list[Score]:
         score_lookup = self.database.get_database()

@@ -33,7 +33,10 @@ class BeatmapV1(MigratableModel):
     pass_count: int = Field(default=0)
     pass_count_timestamp: datetime = Field(default_factory=datetime.now)
     
+    last_updated: datetime = Field(default_factory=datetime.now)
+    
     status: RankStatus = Field(default=RankStatus.UNSUBMITTED)
+    status_timestamp: datetime = Field(default_factory=datetime.now)
     status_override: dict[str, RankStatus] = Field(default_factory=dict)
 
 Beatmap = BeatmapV1

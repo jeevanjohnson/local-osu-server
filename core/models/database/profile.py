@@ -1,21 +1,18 @@
-from pathlib import Path
-
 from jays_tools.json_database import MigratableModel
 from pydantic import Field, field_validator
 
-from models.domain.accuracy import UnitAccuracy, to_unit_accuracy
+from core.models.domain.gameplay.accuracy import Accuracy
 from core.models.domain.gameplay.scoring import ScoringType
 from core.osu_protocol.cho.server import osuCountryCode
 from core.models.domain.gameplay.game_mode import GameMode
 import random
 
-
 class SubmissionSettingsV1(MigratableModel):
     """What score submissions are allowed"""
 
-    relax_submission: bool = Field(default=True)
-    auto_pilot_submission: bool = Field(default=True)
-    score_v2_submission: bool = Field(default=True)
+    relax_submission: bool = Field(default=False)
+    auto_pilot_submission: bool = Field(default=False)
+    score_v2_submission: bool = Field(default=False)
     force_score_v2: bool = Field(default=False)
     force_nf: bool = Field(default=False)
 
@@ -27,10 +24,8 @@ class LeaderboardSettingsV1(MigratableModel):
     show_only_lazer_scores_on_leaderboard_with_score_v2_enabled: bool = Field(default=False)
     scores_sorted_by: ScoringType = Field(default=ScoringType.SCOREV1)
 
-
 SubmissionSettings = SubmissionSettingsV1
 LeaderboardSettings = LeaderboardSettingsV1
-
 
 class ProfileSettingsV1(MigratableModel):
     """Master settings container"""
@@ -38,27 +33,28 @@ class ProfileSettingsV1(MigratableModel):
     submission: SubmissionSettingsV1 = Field(default_factory=SubmissionSettings)
     leaderboard: LeaderboardSettingsV1 = Field(default_factory=LeaderboardSettings)
 
-
 ProfileSettings = ProfileSettingsV1
-
 
 class PerformanceV1(MigratableModel):
     rank: int = Field(default=0)
-    accuracy: UnitAccuracy = Field(default=0.0)
+    accuracy: Accuracy = Field(default=Accuracy(0))
     playcount: int = Field(default=0)
-    total_score: int = Field(default=0)
-    ranked_score: int = Field(default=0)
+    total_score_v1: int = Field(default=0)
+    total_score_v2: int = Field(default=0)
+    ranked_score_v1: int = Field(default=0)
+    ranked_score_v2: int = Field(default=0)
     performance_points: int = Field(default=0)
     max_combo: int = Field(default=0)
 
     @field_validator("accuracy", mode="before")
     @classmethod
-    def normalize_accuracy(cls, value: float | int) -> float:
-        return to_unit_accuracy(value)
-
+    def normalize_accuracy(cls, value: float | int) -> Accuracy:
+        return Accuracy(value)
+    
+    class Config:
+        arbitrary_types_allowed = True
 
 Performance = PerformanceV1
-
 
 def performace_factory() -> dict[GameMode, Performance]:
     return {

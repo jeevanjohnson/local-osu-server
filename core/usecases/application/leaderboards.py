@@ -3,16 +3,17 @@ from core.usecases.domain.player import Player
 from core.osu_protocol.osu.types import LeaderboardType
 from core.osu_protocol.osu.leaderboard import Leaderboard, LeaderboardHeader, LeaderboardScore
 import core.usecases.domain.scores as scores_usecases
+import asyncio
 import core.usecases.domain.osu_api as osu_api_usecases
+import core.usecases.application.score_ranking as score_ranking_usecases
 from core.models.domain.gameplay.rank_status import RankStatus
 from core.models.domain.gameplay.mods import Mods
 from core.models.database.scores import Score
 import core.usecases.application.bancho.scores as bancho_scores_usecases
 from core.usecases.application.bancho.scores import BanchoScore
 from core.models.domain.gameplay.scoring import ScoringType
-from core.usecases.adapters.score import ScoreEstimator, ScoreDataPoint, ScoringVersion
-import core.usecases.domain.calculator.position as score_position_calculator_usecases
 import core.usecases.application.beatmaps as beatmap_usecases
+import core.usecases.domain.beatmap as domain_beatmap_usecases
 
 def bancho_score_to_leaderboard_score(
     score: BanchoScore, 
@@ -134,6 +135,7 @@ async def build_leaderboard_from_scores(
     beatmap_status: RankStatus,
     player: Player,
     personal_best: Score | None,
+    personal_best_position: int | None = None,
 ):
     if personal_best and personal_best not in scores:
         scores.append(personal_best)
@@ -142,6 +144,9 @@ async def build_leaderboard_from_scores(
 
     def sort_key(score: BanchoScore | Score) -> int:
         if profile.settings.leaderboard.scores_sorted_by == ScoringType.PP:
+            if isinstance(score, Score):
+                return score.statistics.pp
+            
             return score.pp
         
         if isinstance(score, BanchoScore):
@@ -182,7 +187,7 @@ async def build_leaderboard_from_scores(
         )
 
     if beatmap.status.has_leaderboards():
-        total_scores = await beatmap_usecases.get_pass_count(beatmap)
+        total_scores = await domain_beatmap_usecases.get_pass_count(beatmap)
     else:
         total_scores = len(
             scores_usecases.get_map_scores_for(player.name, beatmap.md5)
@@ -198,24 +203,9 @@ async def build_leaderboard_from_scores(
     )
 
     if personal_best:
-        if personal_best in top_scores:
-            personal_best_position = top_scores.index(personal_best) + 1
-        else:
-            
-            if profile.settings.leaderboard.scores_sorted_by == ScoringType.PP:
-                personal_best_sorting_value = personal_best.pp
-            elif profile.settings.leaderboard.scores_sorted_by == ScoringType.SCOREV1:
-                personal_best_sorting_value = personal_best.statistics.total_score.v1
-            else:
-                personal_best_sorting_value = personal_best.statistics.total_score.v2
-
-            personal_best_position = score_position_calculator_usecases.get_leaderboard_position(
-                sorting_value=personal_best_sorting_value,
-                leaderboard_scores=[
-                    (idx + 1, score.score) for idx, score in enumerate(leaderboard_scores)
-                ],
-                total_scores=total_scores
-            )
+        if personal_best_position is None:
+            # This shouldn't happen - get_score_position() should always return a valid position
+            personal_best_position = 1
     
         return Leaderboard(
             header=leaderboard_header,
@@ -241,9 +231,14 @@ async def general_leaderboard(
 ) -> Leaderboard:
     """Generate a global leaderboard response based on the client request."""
     profile = player.get_profile()
+    client_state = player.get_client_state()
 
     personal_best = scores_usecases.get_personal_best_for(
-        player.name, beatmap.md5, profile.settings.leaderboard.scores_sorted_by, selected_mods
+        profile_name=player.name,
+        beatmap_md5=beatmap.md5,
+        scoring_type=profile.settings.leaderboard.scores_sorted_by,
+        game_mode=client_state.game_mode,
+        with_mods=selected_mods
     )
 
     api_client = osu_api_usecases.get_api_client()
@@ -259,13 +254,25 @@ async def general_leaderboard(
         else:
             mods = None
 
-        api_scores = await api_client.beatmap_scores(
+        # Fetch all scores and filtered scores in parallel
+        all_api_scores_task = api_client.beatmap_scores(
+            beatmap_id=beatmap.osu_id,
+            mode=client_state.game_mode.to_api_v2(),
+            legacy_only=legacy_only,
+            type=profile.settings.leaderboard.scores_sorted_by.to_api_v2(),
+            mods=None,  # No filter for position calculation
+        )
+
+        filtered_api_scores_task = api_client.beatmap_scores(
             beatmap_id=beatmap.osu_id,
             mode=client_state.game_mode.to_api_v2(),
             legacy_only=legacy_only,
             type=profile.settings.leaderboard.scores_sorted_by.to_api_v2(),
             mods=mods,
         )
+
+        all_api_scores, api_scores = await asyncio.gather(all_api_scores_task, filtered_api_scores_task)
+        
     except ValueError:
         return only_one_or_less_score_on_leaderboard(
             beatmap, beatmap_status, profile.settings.leaderboard.scores_sorted_by, personal_best
@@ -274,6 +281,16 @@ async def general_leaderboard(
     if not api_scores:
         return only_one_or_less_score_on_leaderboard(
             beatmap, beatmap_status, profile.settings.leaderboard.scores_sorted_by, personal_best
+        )
+
+    # Calculate personal best position based on ALL scores
+    personal_best_position = None
+    if personal_best and all_api_scores:
+        personal_best_position = await score_ranking_usecases.get_score_position(
+            score=personal_best,
+            beatmap=beatmap,
+            bancho_scores=all_api_scores.scores,
+            scoring_type=profile.settings.leaderboard.scores_sorted_by,
         )
 
     if "SV2" in client_state.mods and profile.settings.leaderboard.show_only_lazer_scores_on_leaderboard_with_score_v2_enabled:
@@ -292,6 +309,7 @@ async def general_leaderboard(
         beatmap_status=beatmap_status,
         player=player,
         personal_best=personal_best,
+        personal_best_position=personal_best_position,
     )
 
 async def from_client_request(
@@ -308,7 +326,7 @@ async def from_client_request(
             player
         )
     elif leaderboard_type == LeaderboardType.FRIENDS:
-        ...
+        raise NotImplementedError("Friends leaderboard not yet implemented")
     elif leaderboard_type == LeaderboardType.MODS:
         client_state = player.get_client_state()
 
@@ -319,6 +337,6 @@ async def from_client_request(
             selected_mods=client_state.mods
         )
     elif leaderboard_type == LeaderboardType.COUNTRY:
-        ...
+        raise NotImplementedError("Country leaderboard not yet implemented")
     else:
         raise ValueError(f"Unknown leaderboard type: {leaderboard_type}")

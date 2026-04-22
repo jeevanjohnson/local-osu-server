@@ -2,7 +2,7 @@ import core.usecases.domain.client_state as client_state_usecases
 import core.usecases.domain.profiles as profiles_usecases
 from core.models.application.states.client import ClientState
 from core.models.domain.gameplay.game_mode import GameMode
-from core.models.database.profile import Performance, Profile
+from core.models.database.profile import Performance, Profile, ProfileSettings
 import core.osu_protocol.cho.server as cho_server
 
 
@@ -20,6 +20,18 @@ class Player:
             raise ValueError(f"Profile '{self.name}' not found")
         return profile
 
+    def get_settings(self) -> ProfileSettings:
+        """Get player settings from profile."""
+        profile = self.get_profile()
+        return profile.settings
+
+    def update_settings(self, settings: ProfileSettings) -> ProfileSettings:
+        """Update player settings in profile."""
+        profile = self.get_profile()
+        profile.settings = settings
+        updated_profile = self.update_profile(profile)
+        return updated_profile.settings
+
     def get_performance(self, game_mode: GameMode) -> Performance:
         """Get performance stats for a specific game mode."""
         profile = self.get_profile()
@@ -27,11 +39,12 @@ class Player:
 
     def update_performance(
         self, game_mode: GameMode, performance: Performance
-    ) -> None:
+    ) -> Performance:
         """Update performance stats for a game mode."""
         profile = self.get_profile()
         profile.performance[game_mode] = performance
-        self.update_profile(profile)
+        updated_profile = self.update_profile(profile)
+        return updated_profile.performance[game_mode]
 
     def get_client_state(self) -> ClientState:
         """Fetch client state from repository."""
@@ -64,6 +77,13 @@ class Player:
         client_state = self.get_client_state()
         performance = self.get_performance(client_state.game_mode)
 
+        if "SV2" in client_state.mods:
+            total_score = performance.total_score_v2
+            ranked_score = performance.ranked_score_v2
+        else:
+            total_score = performance.total_score_v1
+            ranked_score = performance.ranked_score_v1
+
         client_state.outgoing_packets += cho_server.PlayerStats(
             user_id=2,
             action=client_state.status,
@@ -72,12 +92,18 @@ class Player:
             mods=client_state.mods.to_stable_mods(),
             game_mode=client_state.game_mode,
             beatmap_id=client_state.beatmap.id,
-            ranked_score=performance.ranked_score,
+            ranked_score=ranked_score,
             accuracy=performance.accuracy,
             play_count=performance.playcount,
-            total_score=performance.total_score,
+            total_score=total_score,
             rank=performance.rank,
             performance_points=performance.performance_points
         )
 
         return self.update_client_state(client_state)
+
+    def notify(self, message: str) -> None:
+        """Send a notification message to the client."""
+        client_state = self.get_client_state()
+        client_state.outgoing_packets += cho_server.Notification(message=message)
+        self.update_client_state(client_state)

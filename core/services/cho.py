@@ -15,11 +15,16 @@ async def login(
     utc_offset = login_data.utc_offset
     friend_ids = profile.friend_ids
     rank = performance.rank
-    ranked_score = performance.ranked_score
     accuracy = performance.accuracy
     play_count = performance.playcount
-    total_score = performance.total_score
     performance_points = performance.performance_points
+
+    if "SV2" in client_state.mods:
+        ranked_score = performance.ranked_score_v2
+        total_score = performance.total_score_v2
+    else:
+        ranked_score = performance.ranked_score_v1
+        total_score = performance.total_score_v1
 
     packets = cho_server.Packets()
 

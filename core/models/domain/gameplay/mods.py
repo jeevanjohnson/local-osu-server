@@ -341,6 +341,7 @@ class Mods(list[str]):
     def to_stable_mods(self, remove_rate_mods: bool = False) -> osuMods:
         result = self.split_mods()
         stable_mods = result["stable_mods"]
+        
         if remove_rate_mods:
             stable_mods &= ~osuMods.DOUBLETIME
             stable_mods &= ~osuMods.NIGHTCORE
@@ -364,22 +365,22 @@ class Mods(list[str]):
         return lazer_mods
 
 
-    def mod_multipler(self, mode: GameMode) -> float:
+    def multiplier(self, mode: GameMode) -> float:
         if mode == GameMode.STANDARD:
-            return self.mod_multiplier_standard()
+            return self.multiplier_standard()
         elif mode == GameMode.TAIKO:
-            return self.mod_multiplier_taiko()
+            return self.multiplier_taiko()
         elif mode == GameMode.CATCH:
-            return self.mod_multiplier_catch()
+            return self.multiplier_catch()
         elif mode == GameMode.MANIA:
-            return self.mod_multiplier_mania()
+            return self.multiplier_mania()
 
         print(
             f"Mod multiplier for game mode {mode} not implemented, defaulting to 1.0"
         )
         return 1.0
 
-    def mod_multiplier_standard(self) -> float:
+    def multiplier_standard(self) -> float:
         """Calculate mod multiplier for osu!Standard."""
         multiplier = 1.0
 
@@ -450,7 +451,7 @@ class Mods(list[str]):
         
         return multiplier
 
-    def mod_multiplier_taiko(self) -> float:
+    def multiplier_taiko(self) -> float:
         """Calculate mod multiplier for osu!Taiko."""
         multiplier = 1.0
 
@@ -500,7 +501,7 @@ class Mods(list[str]):
 
         return multiplier
 
-    def mod_multiplier_catch(self) -> float:
+    def multiplier_catch(self) -> float:
         """Calculate mod multiplier for osu!Catch."""
         multiplier = 1.0
 
@@ -548,7 +549,7 @@ class Mods(list[str]):
 
         return multiplier
 
-    def mod_multiplier_mania(self) -> float:
+    def multiplier_mania(self) -> float:
         """Calculate mod multiplier for osu!Mania."""
         multiplier = 1.0
 

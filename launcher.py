@@ -1,6 +1,6 @@
 import multiprocessing
 from datetime import datetime
-from typing import Any, Callable, TypedDict
+from typing import Any, Callable
 
 from nicegui import app, ui
 from jays_tools import JsonDatabase, MigratableModel
@@ -9,6 +9,7 @@ import osu_watcher.main as osu_watcher
 import proxy.main as proxy
 import interface.main as interface
 import server.main as server
+import osu_scraper.main as osu_scraper
 
 from core.constants import LAUNCHER_STATE
 
@@ -85,6 +86,12 @@ SERVICES: list[ApplicationService] = [
         description="The server which the osu! client connects to.",
         service_start=server.start,
         service_stop=server.stop,
+    ),
+    ApplicationService(
+        name="Osu! Scraper",
+        description="A scraper used to provide accurate ranking based of in-game pp. Please run once in a while to keep performance data up to date.",
+        service_start=osu_scraper.start,
+        service_stop=osu_scraper.stop,
     ),
 ]
 

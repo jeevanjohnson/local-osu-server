@@ -1,4 +1,5 @@
 from core.models.database.beatmaps import Beatmap
+from core.models.domain.gameplay.rank_status import RankStatus
 import core.usecases.domain.beatmap as beatmap_usecases
 import core.usecases.adapters.osufile as osufile_usecases
 from enum import Enum
@@ -66,7 +67,8 @@ async def get_difficulty_adjusted_beatmap(
             play_count=original_beatmap.play_count,
             pass_count=original_beatmap.pass_count,
             pass_count_timestamp=original_beatmap.pass_count_timestamp,
-            play_count_timestamp=original_beatmap.play_count_timestamp
+            play_count_timestamp=original_beatmap.play_count_timestamp,
+            last_updated=original_beatmap.last_updated,
         )
     )
     
@@ -125,7 +127,7 @@ async def from_leaderboard_request(
     print(f"[LOOKUP] API check: {(time.time()-t0)*1000:.2f}ms")
 
     if beatmap:
-        beatmap_usecases.add(md5, beatmap)
+        beatmap = beatmap_usecases.add(md5, beatmap)
         return BeatmapResult(
             beatmap=beatmap,
             status=BeatmapStatus.VALID
@@ -165,24 +167,43 @@ async def from_leaderboard_request(
         status=BeatmapStatus.NEEDS_UPDATE
     )
 
-async def get_pass_count(beatmap: Beatmap) -> int:
-    # only update pass count if its been a day
-    day = timedelta(days=1).total_seconds()
+async def get_by_md5(md5: str) -> Beatmap | None:
+    beatmap = beatmap_usecases.get_by_md5_database(md5)
+    if beatmap:
+        return beatmap
 
-    if datetime.now().timestamp() - beatmap.pass_count_timestamp.timestamp() < day:
-        return beatmap.pass_count
+    osu_file = beatmap_usecases.get_path_by_md5(md5)
+
+    if osu_file is not None and beatmap_usecases.valid_difficulty_adjusted_filename(osu_file.name):
+        beatmap = await get_difficulty_adjusted_beatmap(osu_file.name, md5, osu_file)
+        if beatmap:
+            return beatmap
+
+    beatmap = await beatmap_usecases.get_by_md5_api(md5, osu_file_location=osu_file)
+    if beatmap:
+        beatmap = beatmap_usecases.add(md5, beatmap)
+        return beatmap
+
+    return None
+
+async def get_current_status(beatmap: Beatmap) -> RankStatus:
+    # only update status if its been two hours
+    two_hours = timedelta(hours=2).total_seconds()
+
+    if datetime.now().timestamp() - beatmap.status_timestamp.timestamp() < two_hours:
+        return beatmap.status
 
     try:
         beatmap_info = await beatmap_usecases.get_by_md5_api(beatmap.md5)
     except ValueError:
-        return beatmap.pass_count
+        return beatmap.status
 
     if beatmap_info is None:
-        return beatmap.pass_count
+        return beatmap.status
 
-    beatmap.pass_count = beatmap_info.pass_count
-    beatmap.pass_count_timestamp = datetime.now()
+    beatmap.status = beatmap_info.status
+    beatmap.status_timestamp = datetime.now()
 
     updated_beatmap = beatmap_usecases.update(beatmap.md5, beatmap)
 
-    return updated_beatmap.pass_count
+    return updated_beatmap.status

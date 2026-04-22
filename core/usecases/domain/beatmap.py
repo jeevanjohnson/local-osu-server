@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 import time
 import re
 import functools
@@ -156,7 +156,8 @@ async def get_by_md5_api(md5: str, osu_file_location: Path | None = None) -> Bea
         play_count=api_beatmap.playcount,
         pass_count=api_beatmap.passcount,
         pass_count_timestamp=datetime.now(),
-        play_count_timestamp=datetime.now()
+        play_count_timestamp=datetime.now(),
+        last_updated=api_beatmap.last_updated,
     )
 
 # Building beatmap
@@ -171,3 +172,27 @@ def update(md5: str, beatmap: Beatmap) -> Beatmap:
 def delete(md5: str) -> None:
     beatmap_repo = BeatmapRepository()
     beatmap_repo.delete(md5)
+
+async def get_pass_count(beatmap: Beatmap) -> int:
+    # only update pass count if its been a day
+    day = timedelta(days=1).total_seconds()
+
+    if datetime.now().timestamp() - beatmap.pass_count_timestamp.timestamp() < day:
+        return beatmap.pass_count
+
+    try:
+        beatmap_info = await get_by_md5_api(beatmap.md5)
+    except ValueError:
+        return beatmap.pass_count
+
+    if beatmap_info is None:
+        return beatmap.pass_count
+
+    beatmap.pass_count = beatmap_info.pass_count
+    beatmap.pass_count_timestamp = datetime.now()
+
+    beatmap.last_updated = beatmap_info.last_updated
+
+    updated_beatmap = update(beatmap.md5, beatmap)
+
+    return updated_beatmap.pass_count
