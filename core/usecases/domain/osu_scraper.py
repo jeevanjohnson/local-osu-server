@@ -1,5 +1,5 @@
 from core.models.domain.gameplay.game_mode import GameMode
-from core.repositories.osu_scraper import OsuScraperRepository
+from core.repositories.osu_snapshots import OsuSnapshotRepository
 from core.models.database.osu_scraper import SnapShot
 from typing import TypedDict
 from datetime import datetime
@@ -12,10 +12,10 @@ class CreateNewSnapshotResponse(TypedDict):
     snapshot: SnapShot
     timestamp: datetime
 
-def get_recent_snapshot() -> GetRecentSnapshotResponse:
+async def get_recent_snapshot() -> GetRecentSnapshotResponse:
     print(f"[OSU_SCRAPER] Getting recent snapshot...")
-    osu_scraper_repo = OsuScraperRepository()
-    osu_scraper_state = osu_scraper_repo.get_state()
+    osu_scraper_repo = OsuSnapshotRepository()
+    osu_scraper_state = await osu_scraper_repo.get_latest_snapshot()
     
     print(f"[OSU_SCRAPER] Available snapshots: {len(osu_scraper_state.snapshots)}")
     

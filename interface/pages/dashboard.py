@@ -3,25 +3,30 @@ import tempfile
 from typing import Any, Callable
 
 import requests
-import interface.usecases.adapters.catbox as catbox_adapter
 from nicegui import ui, events
 from nicegui.elements.dialog import Dialog
 from nicegui.events import UploadEventArguments
 
 from core.osu_protocol.domain.enums import osuCountryCode
-import core.usecases.application.authentication as auth_usecases
+from core.usecases.domain.authentication import AuthenticationDomainUseCase
 import core.usecases.domain.profiles as profiles_usecases
 from interface.components import BaseButton
+from interface.usecases.profile import ProfileDomainUseCase
+
+AUTHENTICATION_DOMAIN_USECASE = AuthenticationDomainUseCase()
+PROFILE_DOMAIN_USECASE = ProfileDomainUseCase()
+
 
 class LogoutButton(BaseButton):
     def __init__(self) -> None:
         super().__init__("Logout")
         self.on_click(self.execute)
 
-    def execute(self) -> None:
-        auth_usecases.log_out()
+    async def execute(self) -> None:
+        await AUTHENTICATION_DOMAIN_USECASE.logout()
         ui.notify("Logged out successfully")
         ui.navigate.to("/login")
+
 
 class ChangeProfilePictureButton(BaseButton):
     def __init__(self, profile_name: str, refresh_callback: Callable[[str], Any]) -> None:
@@ -34,35 +39,12 @@ class ChangeProfilePictureButton(BaseButton):
 
     async def update_pfp_from_path(self, path: UploadEventArguments) -> None:
         ui.notify("Uploading file, please wait...")
-
-        file = path.file
-
-        if not file.content_type.startswith("image/"):
-            ui.notify("Please upload a valid image file")
-            return
-
-        suffix = file.content_type.removeprefix("image/")
-
-        if suffix not in ["png", "jpeg", "jpg", "gif"]:
-            msg = "Unsupported image format. Please upload a PNG, JPEG, JPG, or GIF file."
-            ui.notify(msg)
-            return
-
-        with tempfile.NamedTemporaryFile(
-            delete=False, suffix=f".{suffix}"
-        ) as temp_file:
-            temp_path = temp_file.name
-            await file.save(temp_path)
-
         try:
-            file_url = catbox_adapter.file_upload(temp_path)
+            PROFILE_PICTURE_DOMAIN_USECASE.update_pfp(path.file)
         except Exception as e:
-            ui.notify(f"Error uploading file: {str(e)}\nPlease use the URL upload option instead or try again later.")
+            ui.notify(f"Error uploading file: {e}")
             return
-        finally:
-            os.remove(temp_path)
 
-        self.update_pfp_from_url(file_url, from_upload=True)
         ui.notify("File uploaded successfully!")
 
     def is_valid_image_url(self, url: str) -> bool:
@@ -132,8 +114,15 @@ class ChangeProfilePictureButton(BaseButton):
         self.dialog = dialog
         dialog.open()
 
+
 class ChangeCountryFlag(ui.interactive_image):
-    def __init__(self, profile_name: str, country_code: osuCountryCode, dialog: Dialog, refresh_flag: Callable[[], None]) -> None:
+    def __init__(
+        self,
+        profile_name: str,
+        country_code: osuCountryCode,
+        dialog: Dialog,
+        refresh_flag: Callable[[], None]
+    ) -> None:
         flag_url = f"https://flagcdn.com/w80/{country_code.name.lower()}.png"
 
         super().__init__(flag_url, on_mouse=self.change_flag)
@@ -141,13 +130,13 @@ class ChangeCountryFlag(ui.interactive_image):
         self.country_code = country_code
         self.dialog = dialog
         self.refresh_flag = refresh_flag
-    
+
     def change_flag(self) -> None:
         profile = profiles_usecases.get(self.profile_name)
         if profile is None:
             ui.notify("Profile not found")
             return
-        
+
         profile.country_code = self.country_code
         profiles_usecases.update_profile(self.profile_name, profile)
 
@@ -156,19 +145,20 @@ class ChangeCountryFlag(ui.interactive_image):
 
         ui.notify(f"Country changed to {self.country_code.name}")
 
+
 class CountryFlag(ui.interactive_image):
     def __init__(self, profile_name: str) -> None:
         super().__init__(f"https://flagcdn.com/w80/xx.png", on_mouse=self.open_dialog)
         self.profile_name = profile_name
         self.dialog: Dialog | None = None
         self.refresh()
-    
+
     def refresh(self) -> None:
         profile = profiles_usecases.get(self.profile_name)
         if profile is None:
             ui.notify("Profile not found")
             return
-        
+
         country_code = profile.country_code.name.lower()
         self.set_source(f"https://flagcdn.com/w80/{country_code}.png")
 
@@ -177,7 +167,7 @@ class CountryFlag(ui.interactive_image):
         if profile is None:
             ui.notify("Profile not found")
             return
-        
+
         profile.country_code = osuCountryCode[country_code.upper()]
         profiles_usecases.update_profile(self.profile_name, profile)
 
@@ -190,15 +180,16 @@ class CountryFlag(ui.interactive_image):
                 for code in osuCountryCode:
                     if code == osuCountryCode.XX:
                         continue
-                    
+
                     ChangeCountryFlag(self.profile_name, code, dialog, self.refresh).style(
                         "width: 80px; height: 60px; object-fit: cover; border-radius: 8px; cursor: pointer;"
                     )
-            
+
             ui.button("Cancel", on_click=dialog.close)
-        
+
         self.dialog = dialog
         dialog.open()
+
 
 class ProfileNotes(ui.textarea):
     def __init__(self, profile_name: str) -> None:
@@ -214,7 +205,7 @@ class ProfileNotes(ui.textarea):
         if profile is None:
             ui.notify("Profile not found")
             return
-        
+
         self.value = profile.notes
 
     def on_change(self) -> None:
@@ -222,9 +213,10 @@ class ProfileNotes(ui.textarea):
         if profile is None:
             ui.notify("Profile not found")
             return
-        
+
         profile.notes = self.value
         profiles_usecases.update_profile(self.profile_name, profile)
+
 
 def build(template: Callable[[], None]) -> None:
     @ui.refreshable
@@ -240,36 +232,35 @@ def build(template: Callable[[], None]) -> None:
         )
 
     @ui.page("/dashboard")
-    def dashboard() -> None:
-        if not auth_usecases.is_logged_in():
+    async def dashboard() -> None:
+        if not await AUTHENTICATION_DOMAIN_USECASE.is_logged_in():
             ui.navigate.to("/login")
             return
 
-        result = auth_usecases.current_logged_in_profile()
-        if result is None:
+        profile = await AUTHENTICATION_DOMAIN_USECASE.logged_in_as()
+        if profile is None:
             ui.notify("No profile found, please log in again.")
-            auth_usecases.log_out()
+            await AUTHENTICATION_DOMAIN_USECASE.logout()
             ui.navigate.to("/login")
             return
 
-        profile_name, profile = result
         template()
 
         with ui.column().classes(
             "flex items-center justify-center w-full min-h-screen gap-6"
         ):
-            ui.markdown(f"# Welcome `{profile_name}` !!")
-            render_profile_picture(profile_name)
-            CountryFlag(profile_name)
-    
+            ui.markdown(f"# Welcome `{profile.name}` !!")
+            render_profile_picture(profile.name)
+            CountryFlag(profile.name)
+
             ui.separator().classes("w-96")
 
             with ui.row():
                 ChangeProfilePictureButton(
-                    profile_name, render_profile_picture.refresh
+                    profile.name, render_profile_picture.refresh
                 )
-            
-            ProfileNotes(profile_name)
+
+            ProfileNotes(profile.name)
 
             ui.separator().classes("w-96")
 

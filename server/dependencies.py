@@ -1,4 +1,4 @@
-import core.usecases.application.authentication as auth_usecases
+import core.usecases.domain.authentication as auth_usecases
 from fastapi import Depends, Header, Request
 import core.osu_protocol.cho.server as cho_server
 import core.osu_protocol.cho.client as cho_client
@@ -7,6 +7,7 @@ import core.services.cho as cho_services
 from typing import Literal
 from core.usecases.domain.player import Player
 import core.usecases.domain.osu_api as osu_api_usecases
+
 
 async def player() -> Player | None:
     result = auth_usecases.current_logged_in_profile()
@@ -17,6 +18,7 @@ async def player() -> Player | None:
     profile_name, profile = result
 
     return Player(profile_name)
+
 
 async def login_response(
     request: Request,
@@ -39,6 +41,7 @@ async def login_response(
         player=player,
         login_data=parse_login_data(await request.body())
     )
+
 
 async def incoming_packets(
     request: Request,

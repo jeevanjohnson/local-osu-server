@@ -2,7 +2,7 @@ import core.usecases.domain.client_state as client_state_usecases
 import core.usecases.domain.profiles as profiles_usecases
 from core.models.application.states.client import ClientState
 from core.models.domain.gameplay.game_mode import GameMode
-from core.models.database.profile import Performance, Profile, ProfileSettings
+from core.models.adapters.database.profile import Performance, Profile, ProfileSettings
 import core.osu_protocol.cho.server as cho_server
 
 

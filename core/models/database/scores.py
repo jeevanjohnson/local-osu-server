@@ -4,14 +4,17 @@ from jays_tools import MigratableModel
 from pydantic import field_serializer, field_validator
 from core.models.domain.gameplay.game_mode import GameMode
 from core.models.domain.gameplay.mods import Mods
-from core.models.domain.gameplay.accuracy import Accuracy
+from core.models.domain.normalizers import Accuracy
 from pydantic import Field
+
 
 class TotalScoreV1(MigratableModel):
     v1: int = Field(default=0)
     v2: int = Field(default=0)
 
+
 TotalScore = TotalScoreV1
+
 
 class BeatmapReferenceV1(MigratableModel):
     md5: str = Field(default="")
@@ -20,7 +23,9 @@ class BeatmapReferenceV1(MigratableModel):
     difficulty_adjusted: bool = Field(default=False)
     original_md5: str = Field(default="")
 
+
 BeatmapReference = BeatmapReferenceV1
+
 
 class StatisticsV1(MigratableModel):
     total_score: TotalScore = Field(default_factory=TotalScore)
@@ -42,7 +47,9 @@ class StatisticsV1(MigratableModel):
             / (total_hits * 300)
         )
 
+
 Statistics = StatisticsV1
+
 
 class ScoreV1(MigratableModel):
     id: int = Field(default=0)
@@ -73,17 +80,22 @@ class ScoreV1(MigratableModel):
         return base64.b64decode(value.encode("ascii"))
 
     class Config:
-        arbitrary_types_allowed=True
+        arbitrary_types_allowed = True
+
 
 Score = ScoreV1
+
 
 class MapScoresV1(MigratableModel):
     all: list[Score] = Field(default_factory=list)
 
+
 MapScores = MapScoresV1
+
 
 class ScoreLookUpV1(MigratableModel):
     id_to_beatmap_md5: dict[int, str] = Field(default_factory=dict)
     profile_name_to_ids: dict[str, list[int]] = Field(default_factory=dict)
+
 
 ScoreLookUp = ScoreLookUpV1

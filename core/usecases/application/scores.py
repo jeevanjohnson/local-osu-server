@@ -1,5 +1,5 @@
 
-from core.models.domain.gameplay.accuracy import Accuracy
+from core.models.domain.normalizers import Accuracy
 from core.osu_protocol.osu.score_submission import ScoreData
 from core.models.database.beatmaps import Beatmap
 from core.models.database.scores import Score
@@ -10,7 +10,7 @@ from core.models.domain.gameplay.game_mode import GameMode
 import core.usecases.domain.calculator.pp as performance_calculator
 import core.usecases.domain.calculator.rank as rank_calculator
 import core.usecases.domain.beatmap as beatmaps_usecases
-from core.models.database.profile import Profile
+from core.models.adapters.database.profile import Profile
 import core.usecases.domain.profiles as profiles_usecases
 
 def recalculate_profile(

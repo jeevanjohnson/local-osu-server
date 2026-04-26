@@ -1,16 +1,18 @@
-from jays_tools import JsonDatabase
-from core.models.database.server_settings import ServerSettings
-from core.constants import SERVER_SETTINGS
+from core.repositories.database import SQLDatabaseInstance
+from core.models.adapters.database.server_settings import ServerSettings
+from jays_tools.sql_database import EqualTo
+
 
 class ServerSettingsRepository:
     def __init__(self) -> None:
-        self.database = JsonDatabase(
-            path=SERVER_SETTINGS, 
-            database_model=ServerSettings
-        )
-    
-    def get_settings(self) -> ServerSettings:
-        return self.database.get_database()
+        self.database = SQLDatabaseInstance()
 
-    def update_settings(self, settings: ServerSettings) -> ServerSettings:
-        return self.database.update_database(settings)
+    async def get_settings(self) -> ServerSettings:
+        settings = await self.database.find(ServerSettings)
+        if not settings:
+            return await self.database.insert(ServerSettings())
+
+        return settings[0]
+
+    async def update_settings(self, settings: ServerSettings) -> ServerSettings:
+        return await self.database.update(settings)

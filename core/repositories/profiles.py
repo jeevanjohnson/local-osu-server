@@ -1,33 +1,44 @@
-from core.models.database.profile import Profile
-from jays_tools import JsonCollection
-from core.constants import PROFILES
+from core.models.adapters.database.profile import Profile
+from core.repositories.database import SQLDatabaseInstance
+from jays_tools.architecture import Repository
+from jays_tools.sql_database import EqualTo
 
-class ProfilesRepository:
+
+class ProfilesRepository(Repository):
     def __init__(self) -> None:
-        self.collection = JsonCollection(
-            path=PROFILES, 
-            model=Profile
+        self.database = SQLDatabaseInstance()
+
+    async def get_profiles(self) -> list[Profile]:
+        return await self.database.find(Profile)
+
+    async def get_profile(self, profile_name: str) -> Profile | None:
+        profile_search_result = await self.database.find(
+            Profile,
+            where=EqualTo("name", profile_name)
         )
-    
-    def get_profiles(self) -> dict[str, Profile]:
-        return self.collection.get_all()
+        if not profile_search_result:
+            return None
 
-    def profile_exists(self, profile_name: str) -> bool:
-        return self.collection.exists(profile_name)
+        return profile_search_result[0]
 
-    def get_profile(self, profile_name: str) -> Profile | None:
-        profile_json_database = self.collection.get(profile_name)
-        profile = profile_json_database.get_database()
-        return profile
+    async def create_new_profile(self, profile_name: str) -> Profile:
+        return await self.database.insert(
+            Profile(name=profile_name)
+        )
 
-    def create_profile(self, profile_name: str, profile: Profile) -> Profile:
-        return self.collection.create(profile_name, profile)
-    
-    def create_new_profile(self, profile_name: str) -> Profile:
-        return self.collection.create(profile_name, Profile())
+    async def profile_exists(self, profile_name: str) -> bool:
+        profile_search_result = await self.database.find(
+            Profile,
+            where=EqualTo("name", profile_name)
+        )
 
-    def update_profile(self, profile_name: str, profile: Profile) -> Profile:
-        return self.collection.update(profile_name, profile)
+        if not profile_search_result:
+            return False
 
-    def delete_profile(self, profile_name: str) -> None:
-        self.collection.delete(profile_name)
+        return True
+
+    async def update_profile(self, profile: Profile) -> Profile:
+        return await self.database.update(profile)
+
+    async def delete_profile(self, profile: Profile) -> None:
+        await self.database.delete(profile)

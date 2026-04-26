@@ -11,9 +11,7 @@ from pathlib import Path
 
 sys.path.append(str(Path(__file__).parent.parent))
 
-import core.usecases.domain.port as port_usecases
-
-OSU_CLIENT_REQUEST_URL = "akatsuki.gg"
+from constants import OsuClient, Ports
 
 """ Architectural Notes: """
 # Status codes 301 & 302 are not used since using them would cause the request to turn into a GET request.
@@ -27,19 +25,12 @@ SUCCESS_MESSAGE_SENT = False
 class Proxy:
     # Intercepts all http requests being made on the machine.
     async def request(self, flow: http.HTTPFlow) -> None:
-        global SUCCESS_MESSAGE_SENT
-        if not SUCCESS_MESSAGE_SENT:
-            print("Proxy server is running and intercepting requests!")
-            SUCCESS_MESSAGE_SENT = True
-
-        if flow.request.pretty_host.endswith(OSU_CLIENT_REQUEST_URL):
+        if flow.request.pretty_host.endswith(OsuClient.REQUEST_URL):
             subdomain = flow.request.pretty_host.split(".")[0]
-
-            port = port_usecases.retrive_port_for("server")
             
             new_location = flow.request.url.replace(
-                f"https://{subdomain}.{OSU_CLIENT_REQUEST_URL}",
-                f"http://localhost:{port}/{subdomain}",
+                f"https://{subdomain}.{OsuClient.REQUEST_URL}",
+                f"http://localhost:{Ports.SERVER}/{subdomain}",
             )
 
             flow.response = Response.make(

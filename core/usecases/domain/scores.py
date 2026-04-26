@@ -1,4 +1,4 @@
-from core.models.database.profile import ProfileSettings
+from core.models.adapters.database.profile import ProfileSettings
 from core.models.domain.gameplay.scoring import ScoringType
 from core.models.database.beatmaps import Beatmap
 from core.repositories.scores import ScoresRepository, AllMapScoresForProfileResult
