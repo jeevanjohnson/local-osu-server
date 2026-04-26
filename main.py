@@ -11,26 +11,70 @@ from interface.service import InterfaceService
 
 # TODO: update management done here
 
-SERVICES: list[Service] = [
+SERVER_SERVICES: list[Service] = [
     ProxyService(),
     OsuWatcherService(),
     InterfaceService()
 ]
 
-SCRIPTS: list[Service] = [
+SCRIPT_SERVICES: list[Service] = [
     OsuSnapShotService(),
 ]
 
-class ExitButton(ui.button):
-    def __init__(self, *args, **kwargs) -> None:
-        super().__init__("Shutdown", *args, **kwargs)
-        self.on_click(self.exit)
 
-        self.set_background_color("red")
+class FooterButtons:
+    def __init__(self, server_service_cards: list["ServiceCard"]) -> None:
+        self.server_service_cards = server_service_cards
 
-    def exit(self) -> None:
-        stop_services(SERVICES)
+        with ui.row():
+            self.exit_btn = ui.button(
+                "Shutdown Application",
+                on_click=self.shutdown_application
+            )
+            self.exit_btn.set_background_color("red")
+            with self.exit_btn:
+                ui.tooltip(
+                    "Shuts down all running services & closes application"
+                )
+
+            self.start_server_btn = ui.button(
+                "Start Server",
+                on_click=self.start_server
+            )
+            self.start_server_btn.set_background_color("green")
+            with self.start_server_btn:
+                ui.tooltip(
+                    "Starts all necessary services for the server to run smoothly"
+                )
+
+            self.stop_server_btn = ui.button(
+                "Stop Server",
+                on_click=self.stop_server
+            )
+            with self.stop_server_btn:
+                ui.tooltip(
+                    "Stops all services related to the server"
+                )
+
+    def shutdown_application(self) -> None:
+        stop_services(SERVER_SERVICES)
+        stop_services(SCRIPT_SERVICES)
         app.shutdown()
+
+    def start_server(self) -> None:
+        for service_service_card in self.server_service_cards:
+            service_service_card.start_btn.run_method("click")
+
+        self.start_server_btn.disable()
+        self.stop_server_btn.enable()
+
+    def stop_server(self) -> None:
+        for service_service_card in self.server_service_cards:
+            service_service_card.stop_btn.run_method("click")
+
+        self.start_server_btn.disable()
+        self.stop_server_btn.enable()
+
 
 class ServiceCard(ui.card):
     def __init__(self, service: Service) -> None:
@@ -48,9 +92,9 @@ class ServiceCard(ui.card):
 
                 self.stop_btn = ui.button("Stop", on_click=self.stop)
                 self.stop_btn.set_background_color("red")
-        
+
         self.sync_ui()
-    
+
     def sync_ui(self) -> None:
         alive_and_up = self.service.is_running() and self.service.is_ready()
         getting_ready = self.service.is_running() and not self.service.is_ready()
@@ -77,12 +121,13 @@ class ServiceCard(ui.card):
     def stop(self) -> None:
         self.service.stop()
         self.sync_ui()
-    
+
     def check_till_ready(self) -> None:
         if self.service.is_ready():
             self.ready_timer.cancel()
-        
+
         self.sync_ui()
+
 
 class CurrentTime(ui.markdown):
     def __init__(self) -> None:
@@ -92,7 +137,8 @@ class CurrentTime(ui.markdown):
         self.timer = ui.timer(1.0, self.update_time)
 
     def update_time(self) -> None:
-        self.set_content(f"*current time: {datetime.now():%X}*")        
+        self.set_content(f"*current time: {datetime.now():%X}*")
+
 
 def build_ui() -> None:
     ui.markdown("# LOS! Control Panel")
@@ -105,39 +151,43 @@ def build_ui() -> None:
 
     ui.markdown("## Services")
 
+    server_service_cards: list[ServiceCard] = []
+
     with ui.grid(columns=3):
-        for service in SERVICES:
-            ServiceCard(service)
+        for server_service in SERVER_SERVICES:
+            server_service_cards.append(
+                ServiceCard(server_service)
+            )
 
     ui.separator()
 
     ui.markdown("## Scripts")
 
     with ui.grid(columns=3):
-        for script in SCRIPTS:
-            ServiceCard(script)
+        for script_service in SCRIPT_SERVICES:
+            ServiceCard(script_service)
 
     ui.separator()
 
-    with ui.row():
-        with ExitButton():
-            ui.tooltip("Exit the application and stop all running services")
+    FooterButtons(server_service_cards)
+
 
 if __name__ in {
     "__main__",
     "__mp_main__",  # multiprocessing compatibility
 }:
     build_ui()
-    # try:
-    ui.run(
-        title="LOS! Control Panel",
-        dark=True,
-        frameless=True,
-        native=True,
-        reload=False,
-        show=True,
-    )
-    # except Exception as e:
-    #     print(f"An error occurred: {e}")
-    # finally:
-    #     stop_services(SERVICES)
+    try:
+        ui.run(
+            title="LOS! Control Panel",
+            dark=True,
+            frameless=True,
+            native=True,
+            reload=False,
+            show=True,
+        )
+    except Exception as e:
+        print(f"An error occurred: {e}")
+    finally:
+        stop_services(SERVER_SERVICES)
+        stop_services(SCRIPT_SERVICES)
