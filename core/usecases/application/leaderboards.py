@@ -1,14 +1,14 @@
-from core.models.database.beatmaps import Beatmap
+from core.models.adapters.database.beatmaps import Beatmap
 from core.usecases.domain.player import Player
-from core.osu_protocol.osu.types import LeaderboardType
-from core.osu_protocol.osu.leaderboard import Leaderboard, LeaderboardHeader, LeaderboardScore
+from core.adapters.osu_protocol.osu.types import LeaderboardType
+from core.adapters.osu_protocol.osu.leaderboard import Leaderboard, LeaderboardHeader, LeaderboardScore
 import core.usecases.domain.scores as scores_usecases
 import asyncio
 import core.usecases.domain.osu_api as osu_api_usecases
 import core.usecases.application.score_ranking as score_ranking_usecases
 from core.models.domain.gameplay.rank_status import RankStatus
 from core.models.domain.gameplay.mods import Mods
-from core.models.database.scores import Score
+from core.models.adapters.database.scores import Score
 import core.usecases.application.bancho.scores as bancho_scores_usecases
 from core.usecases.application.bancho.scores import BanchoScore
 from core.models.domain.gameplay.scoring import ScoringType

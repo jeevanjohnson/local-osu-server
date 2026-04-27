@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, Path, Query, Response, status, Header
 from typing import Literal
-from core.osu_protocol.osu.leaderboard import NotSubmittedLeaderboard, UpdateBeatmapRequestLeaderboard, GraveyardLeaderboard
+from core.adapters.osu_protocol.osu.leaderboard import NotSubmittedLeaderboard, UpdateBeatmapRequestLeaderboard, GraveyardLeaderboard
 import server.dependencies as dependencies
 from core.usecases.domain.player import Player
 import orjson
@@ -13,14 +13,14 @@ import core.usecases.application.beatmaps as beatmap_usecases
 import core.usecases.domain.beatmap as beatmap_domain
 from core.usecases.application.beatmaps import BeatmapStatus
 import core.usecases.application.leaderboards as leaderboards_usecases
-from core.osu_protocol.osu.types import LeaderboardType
+from core.adapters.osu_protocol.osu.types import LeaderboardType
 from core.usecases.domain.osu_api import InvalidOsuApiCredentialsError
 import time
 from fastapi import Request, Form, File
 from fastapi.responses import RedirectResponse
 import core.usecases.domain.scores as domain_scores_usecases
 import core.usecases.application.scores as scores_usecases
-import core.osu_protocol.osu.score_submission as score_submission_protocol
+import core.adapters.osu_protocol.osu.score_submission as score_submission_protocol
 
 osu = APIRouter(
     prefix="/osu",

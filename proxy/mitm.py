@@ -6,10 +6,10 @@ Purpose/Domain/Concept:
 from mitmproxy import http  # type: ignore
 from mitmproxy.http import Response
 
-import sys
-from pathlib import Path
+import sys  # noqa
+from pathlib import Path  # noqa
 
-sys.path.append(str(Path(__file__).parent.parent))
+sys.path.append(str(Path(__file__).parent.parent))  # noqa
 
 from constants import OsuClient, Ports
 
@@ -20,14 +20,13 @@ from constants import OsuClient, Ports
 # To avoid any DNS issues, we have to direct our proxy server to listen on a URL that the osu! client will request, which is akatsuki.gg.
 # This means that we have to redirect requests from akatsuki.gg to localhost:5001, where our local server will be running.
 
-SUCCESS_MESSAGE_SENT = False
 
 class Proxy:
     # Intercepts all http requests being made on the machine.
     async def request(self, flow: http.HTTPFlow) -> None:
         if flow.request.pretty_host.endswith(OsuClient.REQUEST_URL):
             subdomain = flow.request.pretty_host.split(".")[0]
-            
+
             new_location = flow.request.url.replace(
                 f"https://{subdomain}.{OsuClient.REQUEST_URL}",
                 f"http://localhost:{Ports.SERVER}/{subdomain}",

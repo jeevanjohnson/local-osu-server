@@ -1,8 +1,8 @@
 import core.usecases.domain.authentication as auth_usecases
 from fastapi import Depends, Header, Request
-import core.osu_protocol.cho.server as cho_server
-import core.osu_protocol.cho.client as cho_client
-from core.osu_protocol.cho.client import parse_login_data
+import core.adapters.osu_protocol.cho.server as cho_server
+import core.adapters.osu_protocol.cho.client as cho_client
+from core.adapters.osu_protocol.cho.client import parse_login_data
 import core.services.cho as cho_services
 from typing import Literal
 from core.usecases.domain.player import Player

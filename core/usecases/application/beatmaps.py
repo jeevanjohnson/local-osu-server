@@ -1,4 +1,4 @@
-from core.models.database.beatmaps import Beatmap
+from core.models.adapters.database.beatmaps import Beatmap
 from core.models.domain.gameplay.rank_status import RankStatus
 import core.usecases.domain.beatmap as beatmap_usecases
 import core.usecases.adapters.osufile as osufile_usecases

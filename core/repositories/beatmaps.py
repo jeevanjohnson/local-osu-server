@@ -1,31 +1,26 @@
-from core.models.database.beatmaps import Beatmap
-from jays_tools import JsonCollection
-from core.constants import BEATMAPS
+from core.models.adapters.database.beatmaps import Beatmap
+from core.repositories.database import SQLDatabaseInstance
+from jays_tools.sql_database import EqualTo
 
 
 class BeatmapRepository:
     def __init__(self) -> None:
-        self.collection = JsonCollection(
-            path=BEATMAPS,
-            model=Beatmap
+        self.database = SQLDatabaseInstance()
+
+    async def get(self, md5: str) -> Beatmap | None:
+        beatmaps = await self.database.find(
+            Beatmap, EqualTo("md5", md5)
         )
-
-    def add(self, md5: str, beatmap: Beatmap) -> Beatmap:
-        return self.collection.create(md5, beatmap)
-
-    def get(self, md5: str) -> Beatmap | None:
-        if not self.collection.exists(md5):
+        if not beatmaps:
             return None
 
-        database = self.collection.get(md5)
+        return beatmaps[0]
 
-        return database.get_database()
+    async def insert(self, beatmap: Beatmap) -> Beatmap:
+        return await self.database.insert(beatmap)
 
-    def get_all(self) -> dict[str, Beatmap]:
-        return self.collection.get_all()
+    async def delete(self, beatmap: Beatmap) -> Beatmap:
+        return await self.database.delete(beatmap)
 
-    def delete(self, md5: str) -> None:
-        self.collection.delete(md5)
-
-    def update(self, md5: str, beatmap: Beatmap) -> Beatmap:
-        return self.collection.update(md5, beatmap)
+    async def update(self, beatmap: Beatmap) -> Beatmap:
+        return await self.database.update(beatmap)

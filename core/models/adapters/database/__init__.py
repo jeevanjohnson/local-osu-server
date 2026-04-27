@@ -8,6 +8,8 @@ from .client_state import ClientState
 from .settings import ProfileSettings
 from .performance import Performance
 from .server_settings import ServerSettings
+from .beatmaps import Beatmap
+from .scores import Score
 
 ALL_TABLES: list[Type[MigratableSQLModel]] = [
     SnapShot,
@@ -17,7 +19,9 @@ ALL_TABLES: list[Type[MigratableSQLModel]] = [
     ClientState,
     ProfileSettings,
     Performance,
-    ServerSettings
+    ServerSettings,
+    Beatmap,
+    Score,
 ]
 
 __all__ = ["ALL_TABLES"]

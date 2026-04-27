@@ -7,8 +7,8 @@ from datetime import datetime
 from core.models.domain.normalizers.game_mode import GameMode
 from core.models.domain.normalizers.mods import Mods
 from core.models.domain.normalizers.scoring_type import ScoringType
-from core.osu_protocol.cho.enums import osuAction
-import core.osu_protocol.cho.server as cho_server
+from core.adapters.osu_protocol.cho.enums import osuAction
+import core.adapters.osu_protocol.cho.server as cho_server
 
 
 class Packets(bytearray):

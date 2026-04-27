@@ -3,8 +3,8 @@ Application use cases for calculating score rankings and positions.
 """
 
 import ossapi.models
-from core.models.database.beatmaps import Beatmap
-from core.models.database.scores import Score
+from core.models.adapters.database.beatmaps import Beatmap
+from core.models.adapters.database.scores import Score
 from core.models.domain.gameplay.scoring import ScoringType
 import core.usecases.domain.calculator.position as score_position_calculator_usecases
 import core.usecases.domain.beatmap as domain_beatmap_usecases

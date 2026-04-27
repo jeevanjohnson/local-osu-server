@@ -1,4 +1,4 @@
-from core.osu_protocol.domain.enums import osuCountryCode
+from core.adapters.osu_protocol.domain.enums import osuCountryCode
 from interface.adapters.catbox import CatboxAdapter
 from interface.adapters.image_validation import ImageValidationAdapter
 from jays_tools.architecture import DomainUseCase, Adapters

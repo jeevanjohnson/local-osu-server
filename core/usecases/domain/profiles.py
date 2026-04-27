@@ -1,5 +1,5 @@
 from core.models.adapters.database.profile import Profile
-from core.osu_protocol.domain.enums import osuCountryCode
+from core.adapters.osu_protocol.domain.enums import osuCountryCode
 from core.repositories.profiles import ProfilesRepository
 from jays_tools.architecture import DomainUseCase, Repositories
 

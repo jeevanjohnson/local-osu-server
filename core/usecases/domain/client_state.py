@@ -1,16 +1,21 @@
-from core.repositories.states.client import ClientStateRepository
-from core.models.application.states.client import ClientState
-import core.osu_protocol.cho.server as cho_server
+from core.models.adapters.database.client_state import ClientState
+from core.repositories.client_state import ClientStateRepository
+from jays_tools.architecture import DomainUseCase, Repositories
+import core.adapters.osu_protocol.cho.server as cho_server
 
-def get_client_state() -> ClientState:
-    client_state_repo = ClientStateRepository()
-    return client_state_repo.get_state()
 
-def update_client_state(new_state: ClientState) -> ClientState:
-    client_state_repo = ClientStateRepository()
-    return client_state_repo.update_state(new_state)
+class ClientStateRepositories(Repositories):
+    client_state = ClientStateRepository()
 
-def restart_client() -> ClientState:
-    client_state = get_client_state()
-    client_state.outgoing_packets += cho_server.reset()
-    return update_client_state(client_state)
+
+class ClientStateDomainUseCase(DomainUseCase):
+    def __init__(self) -> None:
+        self.repositories = ClientStateRepositories()
+        self.adapters = None
+        self.services = None
+
+    async def get_client_state(self) -> ClientState:
+        return await self.repositories.client_state.get_client_state()
+
+    async def update_client_state(self, new_state: ClientState) -> ClientState:
+        return await self.repositories.client_state.update_client_state(new_state)

@@ -1,10 +1,10 @@
 
 from core.models.domain.normalizers import Accuracy
-from core.osu_protocol.osu.score_submission import ScoreData
-from core.models.database.beatmaps import Beatmap
-from core.models.database.scores import Score
+from core.adapters.osu_protocol.osu.score_submission import ScoreData
+from core.models.adapters.database.beatmaps import Beatmap
+from core.models.adapters.database.scores import Score
 import core.usecases.domain.scores as scores_usecases
-from core.osu_protocol.domain.enums import osuMods
+from core.adapters.osu_protocol.domain.enums import osuMods
 from core.models.domain.gameplay.mods import Mods
 from core.models.domain.gameplay.game_mode import GameMode
 import core.usecases.domain.calculator.pp as performance_calculator

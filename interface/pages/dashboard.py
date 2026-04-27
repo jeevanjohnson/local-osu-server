@@ -11,7 +11,7 @@ from nicegui.elements.dialog import Dialog
 from nicegui.events import UploadEventArguments
 from nicegui.elements.upload_files import FileUpload
 
-from core.osu_protocol.domain.enums import osuCountryCode
+from core.adapters.osu_protocol.domain.enums import osuCountryCode
 from core.usecases.domain.authentication import AuthenticationDomainUseCase
 import core.usecases.domain.profiles as profiles_usecases
 from interface.components import BaseButton

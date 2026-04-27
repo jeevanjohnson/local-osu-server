@@ -8,13 +8,15 @@ from osu_snapshot.service import OsuSnapShotService
 from proxy.service import ProxyService
 from osu_watcher.service import OsuWatcherService
 from interface.service import InterfaceService
+from server.service import ServerService
 
 # TODO: update management done here
 
 SERVER_SERVICES: list[Service] = [
     ProxyService(),
     OsuWatcherService(),
-    InterfaceService()
+    InterfaceService(),
+    ServerService()
 ]
 
 SCRIPT_SERVICES: list[Service] = [

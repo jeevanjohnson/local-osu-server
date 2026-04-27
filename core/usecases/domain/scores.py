@@ -1,8 +1,8 @@
 from core.models.adapters.database.profile import ProfileSettings
 from core.models.domain.gameplay.scoring import ScoringType
-from core.models.database.beatmaps import Beatmap
+from core.models.adapters.database.beatmaps import Beatmap
 from core.repositories.scores import ScoresRepository, AllMapScoresForProfileResult
-from core.models.database.scores import Score
+from core.models.adapters.database.scores import Score
 from core.models.domain.gameplay.mods import Mods
 from core.models.domain.gameplay.game_mode import GameMode
 import ossapi.models
@@ -10,7 +10,7 @@ import core.usecases.domain.calculator.position as score_position_calculator_use
 import core.usecases.domain.beatmap as domain_beatmap_usecases
 import core.usecases.application.score_ranking as score_ranking_usecases
 import core.usecases.domain.osu_api as osu_api_usecases
-from core.osu_protocol.osu.score_submission import ScoreData
+from core.adapters.osu_protocol.osu.score_submission import ScoreData
 import core.usecases.domain.osu_api as osu_api_usecases
 import ossapi.enums
 import asyncio

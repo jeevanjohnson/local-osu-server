@@ -18,8 +18,8 @@ class InterfaceStateRepository:
             profile_name=profile_name
         ))
 
-    async def update_state(self, state: InterfaceState) -> None:
-        await self.database.update(state)
+    async def update_state(self, state: InterfaceState) -> InterfaceState:
+        return await self.database.update(state)
 
-    async def delete_state(self, state: InterfaceState) -> None:
-        await self.database.delete(state)
+    async def delete_state(self, state: InterfaceState) -> InterfaceState:
+        return await self.database.delete(state)

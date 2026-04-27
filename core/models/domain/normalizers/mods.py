@@ -3,7 +3,7 @@ from typing import Any, Iterable, TypedDict
 
 import ossapi.models
 
-from core.osu_protocol.cho.server import osuMods
+from core.adapters.osu_protocol.cho.server import osuMods
 from core.models.domain.normalizers.game_mode import GameMode
 from jays_tools.architecture import DomainModel
 from core.usecases.adapters.statistics import LinearInterpolation

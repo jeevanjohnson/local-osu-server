@@ -2,7 +2,7 @@
 from enum import IntEnum
 import rosu_pp_py as rosu
 import ossapi.enums
-from core.osu_protocol.domain.enums import osuGameMode
+from core.adapters.osu_protocol.domain.enums import osuGameMode
 from jays_tools.architecture import DomainModel
 
 

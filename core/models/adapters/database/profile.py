@@ -1,7 +1,7 @@
 from jays_tools.sql_database import MigratableSQLModel
 from pydantic import Field
 
-from core.osu_protocol.cho.server import osuCountryCode
+from core.adapters.osu_protocol.cho.server import osuCountryCode
 import random
 
 

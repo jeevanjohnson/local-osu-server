@@ -3,14 +3,14 @@ from typing import Any, Callable, Coroutine, Literal, TypeVar
 
 from fastapi import APIRouter, Depends, Header, Request, Response
 
-from core.osu_protocol.cho.enums import osuAction
-import core.osu_protocol.cho.server as cho_server
-import core.osu_protocol.cho.client as cho_client
+from core.adapters.osu_protocol.cho.enums import osuAction
+import core.adapters.osu_protocol.cho.server as cho_server
+import core.adapters.osu_protocol.cho.client as cho_client
 import server.dependencies as dependencies
 from core.models.domain.gameplay.mods import Mods
 from core.models.domain.gameplay.game_mode import GameMode
 
-from core.osu_protocol.cho.client import (
+from core.adapters.osu_protocol.cho.client import (
     ChangeAction,
     ClientPackets,
     FriendAdd,

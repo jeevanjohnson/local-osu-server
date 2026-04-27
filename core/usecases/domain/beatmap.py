@@ -5,7 +5,7 @@ import functools
 
 from core.repositories.beatmaps import BeatmapRepository
 from core.repositories.osu_file_locations import OsuFileLocationRepository
-from core.models.database.beatmaps import Beatmap
+from core.models.adapters.database.beatmaps import Beatmap
 import core.usecases.domain.osu_api as osu_api_usecases
 from core.models.domain.gameplay.game_mode import GameMode
 from core.models.domain.gameplay.rank_status import RankStatus

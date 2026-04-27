@@ -1,7 +1,7 @@
 from enum import IntEnum
 import ossapi.enums
 
-from core.osu_protocol.osu.types import osuMapStatus
+from core.adapters.osu_protocol.osu.types import osuMapStatus
 
 class RankStatus(IntEnum):
     UNSUBMITTED = 0
