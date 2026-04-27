@@ -1,4 +1,5 @@
 from core.models.adapters.database.profile import Profile
+from core.osu_protocol.domain.enums import osuCountryCode
 from core.repositories.profiles import ProfilesRepository
 from jays_tools.architecture import DomainUseCase, Repositories
 
@@ -10,6 +11,8 @@ class ProfilesRepositories(Repositories):
 class ProfilesDomainUseCase(DomainUseCase):
     def __init__(self) -> None:
         self.repositories = ProfilesRepository()
+        self.adapters = None
+        self.services = None
 
     async def get_all(self) -> list[Profile]:
         """Get all profiles from repository."""
@@ -41,4 +44,28 @@ class ProfilesDomainUseCase(DomainUseCase):
         return await self.repositories.update_profile(profile)
 
     async def update_pfp(self, profile_name: str, pfp_url: str) -> Profile:
-        ...
+        profile = await self.get(profile_name)
+        if profile is None:
+            raise Exception("no profile to update")
+
+        profile.avatar_url = pfp_url
+
+        return await self.update_profile(profile)
+
+    async def update_notes(self, profile_name: str, notes: str) -> Profile:
+        profile = await self.get(profile_name)
+        if profile is None:
+            raise Exception("no profile to update")
+
+        profile.notes = notes
+
+        return await self.update_profile(profile)
+
+    async def update_country(self, profile_name: str, country_code: osuCountryCode) -> Profile:
+        profile = await self.get(profile_name)
+        if profile is None:
+            raise Exception("no profile to update")
+
+        profile.country_code = country_code
+
+        return await self.update_profile(profile)

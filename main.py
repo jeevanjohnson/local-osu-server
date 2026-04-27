@@ -34,7 +34,7 @@ class FooterButtons:
             self.exit_btn.set_background_color("red")
             with self.exit_btn:
                 ui.tooltip(
-                    "Shuts down all running services & closes application"
+                    "Safely shuts down application."
                 )
 
             self.start_server_btn = ui.button(
@@ -56,6 +56,8 @@ class FooterButtons:
                     "Stops all services related to the server"
                 )
 
+            self.stop_server_btn.disable()
+
     def shutdown_application(self) -> None:
         stop_services(SERVER_SERVICES)
         stop_services(SCRIPT_SERVICES)
@@ -72,8 +74,8 @@ class FooterButtons:
         for service_service_card in self.server_service_cards:
             service_service_card.stop_btn.run_method("click")
 
-        self.start_server_btn.disable()
-        self.stop_server_btn.enable()
+        self.start_server_btn.enable()
+        self.stop_server_btn.disable()
 
 
 class ServiceCard(ui.card):

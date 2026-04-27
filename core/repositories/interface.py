@@ -8,7 +8,7 @@ class InterfaceStateRepository:
 
     async def get_state(self) -> InterfaceState | None:
         interface_state = await self.database.find(InterfaceState)
-        if interface_state is None:
+        if not interface_state:
             return None
 
         return interface_state[0]

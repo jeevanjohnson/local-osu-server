@@ -1,3 +1,8 @@
+import sys  # noqa
+from pathlib import Path  # noqa
+
+sys.path.append(str(Path(__file__).parent.parent))  # noqa
+
 from typing import Callable
 
 from nicegui import ui

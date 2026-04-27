@@ -1,235 +1,215 @@
-import os
-import tempfile
+import sys  # noqa
+from pathlib import Path  # noqa
+sys.path.append(str(Path(__file__).parent.parent))  # noqa
+
 from typing import Any, Callable
 
 import requests
+from core.models.adapters.database.profile import Profile
 from nicegui import ui, events
 from nicegui.elements.dialog import Dialog
 from nicegui.events import UploadEventArguments
+from nicegui.elements.upload_files import FileUpload
 
 from core.osu_protocol.domain.enums import osuCountryCode
 from core.usecases.domain.authentication import AuthenticationDomainUseCase
 import core.usecases.domain.profiles as profiles_usecases
 from interface.components import BaseButton
-from interface.usecases.profile import ProfileDomainUseCase
+from interface.usecases.domain.profile import ProfileDomainUseCase
 
 AUTHENTICATION_DOMAIN_USECASE = AuthenticationDomainUseCase()
 PROFILE_DOMAIN_USECASE = ProfileDomainUseCase()
 
-
-class LogoutButton(BaseButton):
-    def __init__(self) -> None:
-        super().__init__("Logout")
-        self.on_click(self.execute)
-
-    async def execute(self) -> None:
-        await AUTHENTICATION_DOMAIN_USECASE.logout()
-        ui.notify("Logged out successfully")
-        ui.navigate.to("/login")
+COUNTRY_FLAG_URL = "https://flagcdn.com/w80/{}.png"
 
 
-class ChangeProfilePictureButton(BaseButton):
-    def __init__(self, profile_name: str, refresh_callback: Callable[[str], Any]) -> None:
-        super().__init__("Change Profile Picture")
-        self.dialog: Dialog | None = None
-        self.profile_name = profile_name
-        self.refresh_callback = refresh_callback
-        self.render_upload_option: Any = None
-        self.on_click(self.execute)
+class ControlPanel:
+    def __init__(self, profile: Profile) -> None:
+        ...
 
-    async def update_pfp_from_path(self, path: UploadEventArguments) -> None:
-        ui.notify("Uploading file, please wait...")
+
+class ProfilePictureSection:
+    def __init__(self, profile: Profile) -> None:
+        self.profile = profile
+        self.cached_input: str | FileUpload | None = None
+
+        with ui.column():
+            self.pfp = ui.interactive_image(profile.avatar_url, size=(128, 128)).style(
+                "width: 128px; height: 128px; object-fit: cover; border-radius: 50%;"
+            )
+            self.change_pfp_btn = ui.button(
+                "Change Profile Picture",
+                on_click=self.execute
+            ).classes(
+                "w-32"
+            )
+
+    async def change_pfp(self) -> None:
+        if self.cached_input is None:
+            ui.notify("No input provided for profile picture update")
+            return
+
         try:
-            PROFILE_PICTURE_DOMAIN_USECASE.update_pfp(path.file)
+            self.profile = await PROFILE_DOMAIN_USECASE.update_profile_picture(
+                self.profile.name, self.cached_input
+            )
         except Exception as e:
-            ui.notify(f"Error uploading file: {e}")
+            ui.notify(f"Error updating profile picture: {e}")
             return
 
-        ui.notify("File uploaded successfully!")
-
-    def is_valid_image_url(self, url: str) -> bool:
-        try:
-            response = requests.head(url, timeout=5, allow_redirects=True)
-            content_type = response.headers.get("content-type", "")
-            return content_type.startswith("image/")
-        except Exception:
-            return False
-
-    def update_pfp_from_url(self, url: str, from_upload: bool = False) -> None:
-        if not from_upload:
-            if not self.is_valid_image_url(url):
-                ui.notify("Please enter a valid image URL")
-                return
-
-        profile = profiles_usecases.get(self.profile_name)
-        if profile is None:
-            ui.notify("Profile not found")
-            return
-
-        profile.avatar_url = url
-        profiles_usecases.update_profile(self.profile_name, profile)
-
-        if self.dialog is not None:
-            self.dialog.close()
-
+        self.pfp.set_source(self.profile.avatar_url)
         ui.notify("Profile picture updated successfully!")
-        self.refresh_callback(self.profile_name)
 
-        if self.render_upload_option is not None:
-            self.render_upload_option.refresh()
-
-    def execute(self) -> None:
-        with ui.dialog() as dialog, ui.card():
-            with ui.column().classes(
-                "flex items-center justify-center w-full"
-            ):
-
-                msg = "### Either enter a direct link to an image, or a local file!"
-                ui.markdown(msg).classes("text-center")
-
-                url_input = ui.input(
-                    label="Image URL", placeholder="https://a.ppy.sh/"
-                )
-
-                ui.button(
-                    "Use URL", on_click=lambda: self.update_pfp_from_url(url_input.value)
-                )
-
-                ui.separator()
-
-                @ui.refreshable
-                def render_upload_option() -> None:
-                    ui.upload(
-                        label="Image Upload",
-                        max_files=1,
-                        auto_upload=True,
-                        on_upload=self.update_pfp_from_path,
-                        max_file_size=20 * 1024 * 1024,
-                    )
-
-                self.render_upload_option = render_upload_option
-                self.render_upload_option()
-                ui.button("Cancel", on_click=dialog.close)
-
-        self.dialog = dialog
-        dialog.open()
-
-
-class ChangeCountryFlag(ui.interactive_image):
-    def __init__(
-        self,
-        profile_name: str,
-        country_code: osuCountryCode,
-        dialog: Dialog,
-        refresh_flag: Callable[[], None]
-    ) -> None:
-        flag_url = f"https://flagcdn.com/w80/{country_code.name.lower()}.png"
-
-        super().__init__(flag_url, on_mouse=self.change_flag)
-        self.profile_name = profile_name
-        self.country_code = country_code
-        self.dialog = dialog
-        self.refresh_flag = refresh_flag
-
-    def change_flag(self) -> None:
-        profile = profiles_usecases.get(self.profile_name)
-        if profile is None:
-            ui.notify("Profile not found")
-            return
-
-        profile.country_code = self.country_code
-        profiles_usecases.update_profile(self.profile_name, profile)
-
-        self.refresh_flag()
         self.dialog.close()
 
-        ui.notify(f"Country changed to {self.country_code.name}")
+    def cache_input(self, value: str | UploadEventArguments) -> None:
+        if isinstance(value, str):
+            self.cached_input = value
+        else:
+            self.cached_input = value.file
+
+    def execute(self) -> None:
+        with ui.dialog() as self.dialog, ui.card():
+            ui.markdown(
+                "Enter a direct link to an image, or upload a local file!"
+            ).classes(
+                "text-center"
+            )
+
+            with ui.column().classes("items-center gap-4"):
+                self.url_input = ui.input(
+                    label="Image URL",
+                    placeholder="https://a.ppy.sh/",
+                    on_change=lambda: self.cache_input(self.url_input.value)
+                )
+
+                self.local_file_input = ui.upload(
+                    label="Image Upload",
+                    max_files=1,
+                    max_file_size=20 * 1024 * 1024,
+                    auto_upload=True,
+                    on_upload=self.cache_input
+                )
+
+                with ui.row():
+                    self.submit_btn = ui.button(
+                        "Submit",
+                        on_click=self.change_pfp
+                    )
+
+                    self.cancel_btn = ui.button(
+                        "Cancel",
+                        on_click=self.dialog.close
+                    )
+
+        self.dialog.open()
 
 
-class CountryFlag(ui.interactive_image):
-    def __init__(self, profile_name: str) -> None:
-        super().__init__(f"https://flagcdn.com/w80/xx.png", on_mouse=self.open_dialog)
-        self.profile_name = profile_name
-        self.dialog: Dialog | None = None
-        self.refresh()
+class ProfileNotesSection:
+    def __init__(self, profile: Profile) -> None:
+        self.profile = profile
+        self.notes_input = ui.textarea(
+            label="Notes",
+            placeholder="Add some notes to your profile...",
+            value=profile.notes,
+            on_change=self.update_notes
+        ).classes("w-96")
 
-    def refresh(self) -> None:
-        profile = profiles_usecases.get(self.profile_name)
-        if profile is None:
-            ui.notify("Profile not found")
+    async def update_notes(self) -> None:
+        new_notes = self.notes_input.value
+        try:
+            self.profile = await PROFILE_DOMAIN_USECASE.update_profile_notes(
+                self.profile.name, new_notes
+            )
+        except Exception as e:
+            ui.notify(f"Error updating profile notes: {e}")
+
+
+class CountryFlagSection:
+    def __init__(self, profile: Profile) -> None:
+        self.profile = profile
+
+        self.current_flag = ui.interactive_image(
+            COUNTRY_FLAG_URL.format(profile.country_code.name.lower()),
+            on_mouse=self.change_country_dialog
+        ).style(
+            "width: 24px; "
+            "height: 16px; "
+            "object-fit: cover; "
+            "border: 1px solid white; "
+            "cursor: pointer; "
+            "margin-top: 12px; "
+        )
+
+    async def change_country(self, country_code: osuCountryCode) -> None:
+        try:
+            self.profile = await PROFILE_DOMAIN_USECASE.update_profile_country(
+                self.profile.name, country_code
+            )
+        except Exception as e:
+            ui.notify(f"Error updating country: {e}")
             return
 
-        country_code = profile.country_code.name.lower()
-        self.set_source(f"https://flagcdn.com/w80/{country_code}.png")
+        self.current_flag.set_source(
+            COUNTRY_FLAG_URL.format(country_code.name.lower())
+        )
+        ui.notify("Country updated successfully!")
 
-    def change_flag(self, country_code: str) -> None:
-        profile = profiles_usecases.get(self.profile_name)
-        if profile is None:
-            ui.notify("Profile not found")
-            return
+        self.dialog.close()
 
-        profile.country_code = osuCountryCode[country_code.upper()]
-        profiles_usecases.update_profile(self.profile_name, profile)
-
-        self.refresh()
-
-    def open_dialog(self, event: events.MouseEventArguments) -> None:
-        with ui.dialog() as dialog, ui.card():
+    def change_country_dialog(self, event: events.MouseEventArguments) -> None:
+        with ui.dialog() as self.dialog, ui.card():
             ui.markdown("### Select your country").classes("text-center")
             with ui.grid(columns=5):
                 for code in osuCountryCode:
                     if code == osuCountryCode.XX:
                         continue
 
-                    ChangeCountryFlag(self.profile_name, code, dialog, self.refresh).style(
+                    ui.interactive_image(
+                        COUNTRY_FLAG_URL.format(code.name.lower()),
+                        on_mouse=(
+                            lambda event, code=code:
+                                self.change_country(code)
+                        )
+                    ).style(
                         "width: 80px; height: 60px; object-fit: cover; border-radius: 8px; cursor: pointer;"
                     )
 
-            ui.button("Cancel", on_click=dialog.close)
+            ui.button("Cancel", on_click=self.dialog.close)
 
-        self.dialog = dialog
-        dialog.open()
+        self.dialog.open()
 
 
-class ProfileNotes(ui.textarea):
-    def __init__(self, profile_name: str) -> None:
-        super().__init__(label="Notes", placeholder="Add some notes to your profile...")
-        self.profile_name = profile_name
-        self.classes("w-96")
-        self.refresh()
+class SideBar:
+    def __init__(self, profile: Profile) -> None:
 
-        self.on_value_change(self.on_change)
+        with ui.row().classes("text-center gap-2"):
+            self.name = ui.markdown(f"Logged in as **{profile.name}**")
+            CountryFlagSection(profile)
 
-    def refresh(self) -> None:
-        profile = profiles_usecases.get(self.profile_name)
-        if profile is None:
-            ui.notify("Profile not found")
-            return
+        ProfilePictureSection(profile)
 
-        self.value = profile.notes
+        self.logout_btn = ui.button(
+            "Logout",
+            on_click=self.logout
+        ).classes(
+            "w-32"
+        )
 
-    def on_change(self) -> None:
-        profile = profiles_usecases.get(self.profile_name)
-        if profile is None:
-            ui.notify("Profile not found")
-            return
+        self.server_settings_btn = ui.button(
+            "Server Settings",
+            on_click=lambda: ui.navigate.to("/server-settings"),
+        ).classes(
+            "w-32"
+        )
 
-        profile.notes = self.value
-        profiles_usecases.update_profile(self.profile_name, profile)
+    async def logout(self) -> None:
+        await AUTHENTICATION_DOMAIN_USECASE.logout()
+        ui.notify("Logged out successfully")
+        ui.navigate.to("/login")
 
 
 def build(template: Callable[[], None]) -> None:
-    @ui.refreshable
-    def render_profile_picture(profile_name: str) -> None:
-        profile = profiles_usecases.get(profile_name)
-        profile_url = (
-            profile.avatar_url
-            if profile is not None
-            else "https://a.ppy.sh/"
-        )
-        ui.interactive_image(profile_url, size=(256, 256)).style(
-            "width: 256px; height: 256px; object-fit: cover; border-radius: 50%;"
-        )
 
     @ui.page("/dashboard")
     async def dashboard() -> None:
@@ -246,27 +226,10 @@ def build(template: Callable[[], None]) -> None:
 
         template()
 
-        with ui.column().classes(
-            "flex items-center justify-center w-full min-h-screen gap-6"
-        ):
-            ui.markdown(f"# Welcome `{profile.name}` !!")
-            render_profile_picture(profile.name)
-            CountryFlag(profile.name)
+        with ui.column():
+            SideBar(profile)
 
-            ui.separator().classes("w-96")
+        ui.separator().props('vertical')
 
-            with ui.row():
-                ChangeProfilePictureButton(
-                    profile.name, render_profile_picture.refresh
-                )
-
-            ProfileNotes(profile.name)
-
-            ui.separator().classes("w-96")
-
-            with ui.row():
-                ui.button(
-                    "Server Settings",
-                    on_click=lambda: ui.navigate.to("/server-settings"),
-                )
-                LogoutButton()
+        with ui.column():
+            ControlPanel(profile)

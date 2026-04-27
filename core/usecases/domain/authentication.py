@@ -7,8 +7,8 @@ from core.models.adapters.database.profile import Profile
 
 
 class AuthenticationRepositories(Repositories):
-    interface_state_repository = InterfaceStateRepository()
-    profiles_repository = ProfilesRepository()
+    interface_state = InterfaceStateRepository()
+    profiles = ProfilesRepository()
 
 
 class AuthenticationDomainUseCase(DomainUseCase):
@@ -18,11 +18,11 @@ class AuthenticationDomainUseCase(DomainUseCase):
         self.services = None
 
     async def logged_in_as(self) -> Profile | None:
-        current_interface_state = await self.repositories.interface_state_repository.get_state()
+        current_interface_state = await self.repositories.interface_state.get_state()
         if current_interface_state is None:
             return None
 
-        current_profile = await self.repositories.profiles_repository.get_profile(
+        current_profile = await self.repositories.profiles.get_profile(
             current_interface_state.profile_name
         )
         if current_profile is None:
@@ -34,12 +34,12 @@ class AuthenticationDomainUseCase(DomainUseCase):
         return await self.logged_in_as() is not None
 
     async def login(self, profile_name: str) -> InterfaceState:
-        return await self.repositories.interface_state_repository.create_state(profile_name)
+        return await self.repositories.interface_state.create_state(profile_name)
 
     async def logout(self) -> None:
-        current_interface_state = await self.repositories.interface_state_repository.get_state()
+        current_interface_state = await self.repositories.interface_state.get_state()
         if current_interface_state is None:
             print("No interface state found")
             return None
 
-        await self.repositories.interface_state_repository.delete_state(current_interface_state)
+        await self.repositories.interface_state.delete_state(current_interface_state)

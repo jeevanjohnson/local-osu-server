@@ -1,41 +1,13 @@
-import subprocess
-import sys
-import time
-import webbrowser
-from pathlib import Path
-from jays_tools.services import Service, ReadinessSignal
-from constants import Ports
+import sys  # noqa
+from pathlib import Path  # noqa
+
+sys.path.append(str(Path(__file__).parent.parent))  # noqa
+
 from nicegui import ui
-from fastapi import FastAPI as BaseFastAPI
-from contextlib import asynccontextmanager
-
-
-class FastAPI(BaseFastAPI):
-    def __init__(self, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
-        self.readiness_signal: ReadinessSignal
-
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    pages = Path(__file__).parent / "pages"
-    for page in pages.glob("*.py"):
-        module_name = page.stem
-        page = __import__(
-            f"interface.pages.{module_name}", fromlist=[module_name])
-        try:
-            page.build(template)
-        except AttributeError:
-            print(
-                f"Page module {module_name} does not have a build function."
-            )
-            sys.exit(1)
-
-    app.readiness_signal.set()
-    webbrowser.open(f"http://localhost:{Ports.INTERFACE}/")
-    yield
-
-app = FastAPI(lifespan=lifespan)
+from constants import Ports
+from jays_tools.services import Service, ReadinessSignal
+import subprocess
+from constants import Paths
 
 
 def template() -> None:
@@ -79,22 +51,67 @@ def template() -> None:
 
     ui.button.default_props('no-caps')
 
+    ui.separator.default_style(
+        "color: white; "
+    )
+
+
+def stop() -> None:
+    if Paths.INTERFACE_PID.exists():
+        pid = int(Paths.INTERFACE_PID.read_text())
+        try:
+            subprocess.run(
+                ["taskkill", "/F", "/PID", str(pid)],
+                check=True,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+        except subprocess.CalledProcessError:
+            print(f"Failed to stop interface service with PID {pid}")
+
+        Paths.INTERFACE_PID.unlink()
+
 
 def start(readiness_signal: ReadinessSignal) -> None:
-    app.readiness_signal = readiness_signal
-    ui.run_with(
-        app,
-        title="LOS Interface",
-        # show=False,
-        # reload=True,
-        dark=True,
-        # port=Ports.INTERFACE,
-    )
+    process = subprocess.Popen([
+        sys.executable, "-m", "interface.service"
+    ])
+    Paths.INTERFACE_PID.write_text(str(process.pid))
+    readiness_signal.set()
 
 
 def InterfaceService() -> Service:
     return Service(
         name="Interface Service",
-        description="The interface for the LOS system",
+        description=f"The interface for the LOS system, you can find here: http://localhost:{Ports.INTERFACE}",
         start_func=start,
+        stop_func=stop,
+    )
+
+
+if __name__ in {
+    "__main__",
+    "__mp_main__"
+}:
+    pages = Path(__file__).parent / "pages"
+    for page in pages.glob("*.py"):
+        module_name = page.stem
+        print("loading", module_name)
+        page = __import__(
+            f"interface.pages.{module_name}", fromlist=[module_name])
+
+        try:
+            page.build(template)
+        except AttributeError:
+            print(
+                f"Page module {module_name} does not have a build function."
+            )
+            sys.exit(1)
+
+    ui.run(
+        title="LOS Interface",
+        show=False,
+        reload=False,
+        dark=True,
+        port=Ports.INTERFACE,
     )
