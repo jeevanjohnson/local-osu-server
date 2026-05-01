@@ -1,83 +1,74 @@
 from fastapi import APIRouter, Depends, Path, Query, Response, status, Header
 from typing import Literal
-from core.adapters.osu_protocol.osu.leaderboard import NotSubmittedLeaderboard, UpdateBeatmapRequestLeaderboard, GraveyardLeaderboard
+from server.adapters.osu_protocol.osu.leaderboard.leaderboard import NotSubmittedLeaderboard, UpdateBeatmapRequestLeaderboard, GraveyardLeaderboard
 import server.dependencies as dependencies
 from core.usecases.domain.player import Player
 import orjson
 from fastapi.responses import RedirectResponse
 import core.usecases.domain.port as port_usecases
 import core.usecases.domain.client_state as client_state_usecases
-from core.models.domain.gameplay.game_mode import GameMode
-from core.models.domain.gameplay.mods import Mods
+from core.models.domain.normalizers.game_mode import GameMode
+from core.models.domain.normalizers.mods import Mods
 import core.usecases.application.beatmaps as beatmap_usecases
 import core.usecases.domain.beatmap as beatmap_domain
 from core.usecases.application.beatmaps import BeatmapStatus
 import core.usecases.application.leaderboards as leaderboards_usecases
-from core.adapters.osu_protocol.osu.types import LeaderboardType
+from server.adapters.osu_protocol.osu.enums import LeaderboardType
 from core.usecases.domain.osu_api import InvalidOsuApiCredentialsError
 import time
 from fastapi import Request, Form, File
 from fastapi.responses import RedirectResponse
 import core.usecases.domain.scores as domain_scores_usecases
 import core.usecases.application.scores as scores_usecases
-import core.adapters.osu_protocol.osu.score_submission as score_submission_protocol
+import server.adapters.osu_protocol.osu.score_submission.score as score_submission_protocol
+from server.usecases.domain.player import PlayerDomainUseCase
+from constants import Ports
+
+PLAYER_DOMAIN_USECASE = PlayerDomainUseCase()
 
 osu = APIRouter(
     prefix="/osu",
 )
 
-@osu.get("/web/osu-getseasonal.php")
-async def get_seasonal_backgrounds(
-    player: Player | None = Depends(dependencies.player)
-):
-    if player is None:
-        return Response(b"[]")
 
-    profile = player.get_profile()
-    
+@osu.get("/web/osu-getseasonal.php")
+async def get_seasonal_backgrounds():
     return Response(
-        orjson.dumps(profile.seasonal_backgrounds)
+        orjson.dumps(
+            await PLAYER_DOMAIN_USECASE.get_seasonal_backgrounds()
+        )
     )
+
 
 @osu.get("/beatmap{full_path:path}")
 async def get_beatmap(
     full_path: str
 ):
     return RedirectResponse(
-        url= f"https://osu.ppy.sh/beatmap{full_path}",
+        url=f"https://osu.ppy.sh/beatmap{full_path}",
         status_code=status.HTTP_301_MOVED_PERMANENTLY
     )
+
 
 @osu.get("/users/{user_id}")
 async def get_user_page(
     user_id: int = Path(...),
 ):
     if user_id != 2:
-        response = f"https://osu.ppy.sh/users/{user_id}"
+        redirect_url = f"https://osu.ppy.sh/users/{user_id}"
     else:
-        interface_port = port_usecases.retrive_port_for("interface")
+        redirect_url = f"http://localhost:{Ports.INTERFACE}/"
 
-        if interface_port is None:
-            response = "https://osu.ppy.sh/users/40241928046012941826421894"
-        else:
-            response = f"http://localhost:{interface_port}/dashboard/"
-    
     return RedirectResponse(
-        url=response,
+        url=redirect_url,
         status_code=status.HTTP_307_TEMPORARY_REDIRECT,
     )
 
+
 @osu.get("/home/account/edit")
 async def get_avatar_page():
-    interface_port = port_usecases.retrive_port_for("interface")
-
-    if interface_port is None:
-        response = "https://osu.ppy.sh/users/40241928046012941826421894"
-    else:
-        response = f"http://localhost:{interface_port}/dashboard/"
-
     return RedirectResponse(
-        url=response,
+        url=f"http://localhost:{Ports.INTERFACE}/",
         status_code=status.HTTP_307_TEMPORARY_REDIRECT,
     )
 
@@ -97,50 +88,12 @@ async def get_leaderboard(
     raw_mods_arg: int = Query(..., alias="mods"),
     map_package_hash: str = Query(..., alias="h"),
     aqn_files_found: bool = Query(..., alias="a"),
-    player: Player | None = Depends(dependencies.player)
 ):
-    if player is None:
-        client_state_usecases.restart_client()
-        return Response(b"error: no")
-
-    client_state = player.get_client_state()
-    
-    client_state.direct_reference.last_query = []
-    client_state.direct_reference.cursor_string = None
-
-    mode_arg = GameMode(raw_mode_arg)
-    mods_arg = Mods.from_stable_int(raw_mods_arg)
-
-    if client_state.game_mode != mode_arg:
-        client_state.game_mode = mode_arg
-    
-    if client_state.mods != mods_arg:
-        client_state.mods = mods_arg
-    
-    player.update_client_state(client_state)
-    client_state = player.update_client_stats()
-
-    profile = player.get_profile()
-
-    if not profile.settings.submission.relax_submission:
-        if "RX" in client_state.mods:
-            player.notify("Due to your settings, scores with the RX mod will not be submitted. Please disable the RX mod to submit scores.")
-    
-    if not profile.settings.submission.auto_pilot_submission:
-        if "AP" in client_state.mods:
-            player.notify("Due to your settings, scores with the AP mod will not be submitted. Please disable the AP mod to submit scores.")
-
-    if not profile.settings.submission.score_v2_submission:
-        if "SV2" in client_state.mods:
-            player.notify("Due to your settings, scores with the SV2 mod will not be submitted. Please disable the SV2 mod to submit scores.")
-    
-    if profile.settings.submission.force_score_v2:
-        if "SV2" not in client_state.mods:
-            player.notify("Due to your settings, only scores with the SV2 mod will be submitted. Please enable the SV2 mod to submit scores.")
-        
-    if profile.settings.submission.force_nf:
-        if "NF" not in client_state.mods:
-            player.notify("Due to your settings, only scores with the NF mod will be submitted. Please enable the NF mod to submit scores.")
+    await PLAYER_DOMAIN_USECASE.clear_direct_reference()
+    await PLAYER_DOMAIN_USECASE.apply_ruleset(
+        GameMode(raw_mode_arg),
+        Mods.from_stable_int(raw_mods_arg)
+    )
 
     t0 = time.time()
     try:
@@ -152,7 +105,8 @@ async def get_leaderboard(
         client_state_usecases.restart_client()
         return Response(b"error: no")
     t1 = time.time()
-    print(f"[TIMING] beatmap lookup for '{map_filename}': {(t1-t0)*1000:.2f}ms")
+    print(
+        f"[TIMING] beatmap lookup for '{map_filename}': {(t1-t0)*1000:.2f}ms")
 
     beatmap = beatmap_result.beatmap
     beatmap_status = beatmap_result.status
@@ -169,14 +123,14 @@ async def get_leaderboard(
             leaderboard = UpdateBeatmapRequestLeaderboard()
         else:
             leaderboard = NotSubmittedLeaderboard()
-        
+
         return Response(
             leaderboard.serialize()
         )
-    
+
     if beatmap is None:
         return Response(b"error: no")
-    
+
     client_state.beatmap.md5 = beatmap.md5
     client_state.beatmap.id = beatmap.osu_id
     client_state.beatmap.set_id = beatmap.osu_set_id
@@ -202,7 +156,7 @@ async def get_leaderboard(
             beatmap=beatmap,
             beatmap_status=beatmap_status,
             player=player,
-            leaderboard_type =leaderboard_type,
+            leaderboard_type=leaderboard_type,
         )
     except InvalidOsuApiCredentialsError:
         client_state_usecases.restart_client()
@@ -211,6 +165,7 @@ async def get_leaderboard(
     return Response(
         leaderboard.serialize()
     )
+
 
 @osu.get("/web/maps/{map_filename}")
 async def get_map_file(
@@ -222,11 +177,12 @@ async def get_map_file(
 
     if beatmap_domain.valid_difficulty_adjusted_filename(map_filename):
         return Response(status_code=status.HTTP_404_NOT_FOUND)
-    
+
     return RedirectResponse(
         url=f"https://osu.ppy.sh{url_path}",
         status_code=status.HTTP_301_MOVED_PERMANENTLY
     )
+
 
 @osu.post("/web/osu-submit-modular-selector.php")
 # log
@@ -264,30 +220,36 @@ async def osuSubmitModularSelector(
     score_mods = Mods.from_stable_int(score_data.mods)
 
     if "RX" in score_mods and not profile.settings.submission.relax_submission:
-        player.notify("Score submission failed: RX mod is not allowed to be submitted based on your settings.")
+        player.notify(
+            "Score submission failed: RX mod is not allowed to be submitted based on your settings.")
         return Response(b"error: no")
 
     if "AP" in score_mods and not profile.settings.submission.auto_pilot_submission:
-        player.notify("Score submission failed: AP mod is not allowed to be submitted based on your settings.")
+        player.notify(
+            "Score submission failed: AP mod is not allowed to be submitted based on your settings.")
         return Response(b"error: no")
 
     if "SV2" in score_mods and not profile.settings.submission.score_v2_submission:
-        player.notify("Score submission failed: SV2 mod is not allowed to be submitted based on your settings.")
+        player.notify(
+            "Score submission failed: SV2 mod is not allowed to be submitted based on your settings.")
         return Response(b"error: no")
-    
+
     if "SV2" not in score_mods and profile.settings.submission.force_score_v2:
-        player.notify("Score submission failed: Score V2 mod is required to be submitted based on your settings.")
+        player.notify(
+            "Score submission failed: Score V2 mod is required to be submitted based on your settings.")
         return Response(b"error: no")
-    
+
     if "NF" not in score_mods and profile.settings.submission.force_nf:
-        player.notify("Score submission failed: NF mod is required to be submitted based on your settings.")
+        player.notify(
+            "Score submission failed: NF mod is required to be submitted based on your settings.")
         return Response(b"error: no")
-    
+
     performance = player.get_performance(client_state.game_mode)
 
     performance.playcount += 1
-    
-    performance = player.update_performance(client_state.game_mode, performance)
+
+    performance = player.update_performance(
+        client_state.game_mode, performance)
 
     if not score_data.passed:
         return Response(b"ok")
@@ -297,7 +259,7 @@ async def osuSubmitModularSelector(
     if beatmap is None:
         player.notify("Score submission failed: beatmap not found.")
         return Response(b"error: no")
-    
+
     if player.name in beatmap.status_override:
         beatmap_status = beatmap.status_override[player.name]
     else:
@@ -307,8 +269,9 @@ async def osuSubmitModularSelector(
         performance.total_score_v2 += score_data.total_score
     else:
         performance.total_score_v1 += score_data.total_score
-    
-    performance = player.update_performance(client_state.game_mode, performance)
+
+    performance = player.update_performance(
+        client_state.game_mode, performance)
 
     if not beatmap_status.has_leaderboards():
         # TODO: properly show score change on client
@@ -328,18 +291,21 @@ async def osuSubmitModularSelector(
         profile_name=player.name,
         profile=player.get_profile(),
     )
-    
+
     print(f"[OSU_SUBMIT] NEW PROFILE RETURNED:")
-    print(f"[OSU_SUBMIT] - PP: {new_profile.performance[client_state.game_mode].performance_points}")
-    print(f"[OSU_SUBMIT] - Rank: #{new_profile.performance[client_state.game_mode].rank}")
-    print(f"[OSU_SUBMIT] - Accuracy: {new_profile.performance[client_state.game_mode].accuracy.to_percentage():.2f}%")
-    
+    print(
+        f"[OSU_SUBMIT] - PP: {new_profile.performance[client_state.game_mode].performance_points}")
+    print(
+        f"[OSU_SUBMIT] - Rank: #{new_profile.performance[client_state.game_mode].rank}")
+    print(
+        f"[OSU_SUBMIT] - Accuracy: {new_profile.performance[client_state.game_mode].accuracy.to_percentage():.2f}%")
+
     # UPDATE PLAYER WITH NEW PROFILE
     print(f"[OSU_SUBMIT] Updating player object with new profile...")
     player.update_profile(new_profile)
 
     player.update_client_stats()
-    
+
     print(f"[OSU_SUBMIT] PLAYER STATS AFTER UPDATE:")
     performance_after = player.get_performance(client_state.game_mode)
     print(f"[OSU_SUBMIT] - Player PP: {performance_after.performance_points}")
@@ -506,7 +472,7 @@ async def osuSubmitModularSelector(
         beatmap_passcount=beatmap.pass_count,
         last_updated=beatmap.last_updated,
         score_id=new_score.id,
-        achievements=score_submission_protocol.Achievements(), # TODO: Achievements?
+        achievements=score_submission_protocol.Achievements(),  # TODO: Achievements?
         beatmap_chart=beatmap_chart,
         overall_ranking_chart=overall_ranking_chart,
     )
@@ -514,4 +480,3 @@ async def osuSubmitModularSelector(
     return Response(
         submission_charts.serialize()
     )
-

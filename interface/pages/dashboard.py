@@ -2,19 +2,15 @@ import sys  # noqa
 from pathlib import Path  # noqa
 sys.path.append(str(Path(__file__).parent.parent))  # noqa
 
-from typing import Any, Callable
+from typing import Callable
 
-import requests
 from core.models.adapters.database.profile import Profile
 from nicegui import ui, events
-from nicegui.elements.dialog import Dialog
 from nicegui.events import UploadEventArguments
 from nicegui.elements.upload_files import FileUpload
 
-from core.adapters.osu_protocol.domain.enums import osuCountryCode
+from core.models.domain.normalizers.country_codes import CountryCode
 from core.usecases.domain.authentication import AuthenticationDomainUseCase
-import core.usecases.domain.profiles as profiles_usecases
-from interface.components import BaseButton
 from interface.usecases.domain.profile import ProfileDomainUseCase
 
 AUTHENTICATION_DOMAIN_USECASE = AuthenticationDomainUseCase()
@@ -141,7 +137,7 @@ class CountryFlagSection:
             "margin-top: 12px; "
         )
 
-    async def change_country(self, country_code: osuCountryCode) -> None:
+    async def change_country(self, country_code: CountryCode) -> None:
         try:
             self.profile = await PROFILE_DOMAIN_USECASE.update_profile_country(
                 self.profile.name, country_code
@@ -161,8 +157,8 @@ class CountryFlagSection:
         with ui.dialog() as self.dialog, ui.card():
             ui.markdown("### Select your country").classes("text-center")
             with ui.grid(columns=5):
-                for code in osuCountryCode:
-                    if code == osuCountryCode.XX:
+                for code in CountryCode:
+                    if code == CountryCode.XX:
                         continue
 
                     ui.interactive_image(

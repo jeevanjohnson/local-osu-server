@@ -8,6 +8,9 @@ from constants import Ports
 from jays_tools.services import Service, ReadinessSignal
 import subprocess
 from constants import Paths
+from interface.repositories.process import ProcessRepository
+
+PROCESS_REPOSITORY = ProcessRepository()
 
 
 def template() -> None:
@@ -57,8 +60,9 @@ def template() -> None:
 
 
 def stop() -> None:
-    if Paths.INTERFACE_PID.exists():
-        pid = int(Paths.INTERFACE_PID.read_text())
+    pid = PROCESS_REPOSITORY.get_process_id()
+
+    if pid is not None:
         try:
             subprocess.run(
                 ["taskkill", "/F", "/PID", str(pid)],
@@ -69,14 +73,14 @@ def stop() -> None:
         except subprocess.CalledProcessError:
             print(f"Failed to stop interface service with PID {pid}")
 
-        Paths.INTERFACE_PID.unlink()
+        PROCESS_REPOSITORY.clear_process_id()
 
 
 def start(readiness_signal: ReadinessSignal) -> None:
     process = subprocess.Popen([
         sys.executable, "-m", "interface.service"
     ])
-    Paths.INTERFACE_PID.write_text(str(process.pid))
+    PROCESS_REPOSITORY.save_process_id(process.pid)
     readiness_signal.set()
 
 

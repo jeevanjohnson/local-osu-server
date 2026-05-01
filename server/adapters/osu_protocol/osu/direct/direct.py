@@ -1,10 +1,7 @@
 from dataclasses import dataclass
 from datetime import datetime
-
-import ossapi.enums
-import ossapi.models
-
-from archieve.models.domain.gameplay import osuGameMode
+from server.adapters.osu_protocol.enums import ClientGameMode
+from server.adapters.osu_protocol.osu.enums import BeatmapSetStatus
 
 DIRECT_DIFF_FORMAT = (
     "[{difficulty:.2f}⭐] {version} {{CS{cs} OD{accuracy} AR{ar} HP{drain}}}@{mode_int}"
@@ -26,7 +23,7 @@ class DirectBeatmap:
     od: float
     ar: float
     hp: float
-    mode: osuGameMode
+    mode: ClientGameMode
 
     def serialize(self) -> str:
         return DIRECT_DIFF_FORMAT.format(
@@ -49,7 +46,7 @@ class DirectBeatmapSet:
     has_video: bool
     has_story: bool
     last_updated: datetime  # utc timestamp
-    status: ossapi.models.RankStatus
+    status: BeatmapSetStatus
     maps: list[DirectBeatmap]
 
     def serialize(self) -> str:
@@ -76,45 +73,30 @@ class DirectSearchResult:
     def serialize(self) -> bytes:
         count = len(self.beatmap_sets)
         header = "101" if count == 50 else str(count)
-        rows = [header] + [bmap_set.serialize() for bmap_set in self.beatmap_sets]
+        rows = [header] + [bmap_set.serialize()
+                           for bmap_set in self.beatmap_sets]
         return "\n".join(rows).encode()
 
 
-class osuRankedStatus:
-    ALL = 4
-    RANKED = 0
-    RANKED_PLAYED = 7
-    LOVED = 8
-    QUALIFIED = 3
-    PENDING = 2
-    GRAVEYARD = 5
+# def osu_direct_ranked_status_to_osu_api_v2(
+#     ranked_status: int,
+# ) -> ossapi.enums.BeatmapsetSearchCategory:
+#     return {
+#         osuRankedStatus.ALL: ossapi.enums.BeatmapsetSearchCategory.ANY,
+#         osuRankedStatus.RANKED: ossapi.enums.BeatmapsetSearchCategory.RANKED,
+#         osuRankedStatus.RANKED_PLAYED: ossapi.enums.BeatmapsetSearchCategory.RANKED,
+#         osuRankedStatus.LOVED: ossapi.enums.BeatmapsetSearchCategory.LOVED,
+#         osuRankedStatus.QUALIFIED: ossapi.enums.BeatmapsetSearchCategory.QUALIFIED,
+#         osuRankedStatus.PENDING: ossapi.enums.BeatmapsetSearchCategory.PENDING,
+#         osuRankedStatus.GRAVEYARD: ossapi.enums.BeatmapsetSearchCategory.GRAVEYARD,
+#     }[ranked_status]
 
 
-def osu_direct_ranked_status_to_osu_api_v2(
-    ranked_status: int,
-) -> ossapi.enums.BeatmapsetSearchCategory:
-    try:
-        return {
-            osuRankedStatus.ALL: ossapi.enums.BeatmapsetSearchCategory.ANY,
-            osuRankedStatus.RANKED: ossapi.enums.BeatmapsetSearchCategory.RANKED,
-            osuRankedStatus.RANKED_PLAYED: ossapi.enums.BeatmapsetSearchCategory.RANKED,
-            osuRankedStatus.LOVED: ossapi.enums.BeatmapsetSearchCategory.LOVED,
-            osuRankedStatus.QUALIFIED: ossapi.enums.BeatmapsetSearchCategory.QUALIFIED,
-            osuRankedStatus.PENDING: ossapi.enums.BeatmapsetSearchCategory.PENDING,
-            osuRankedStatus.GRAVEYARD: ossapi.enums.BeatmapsetSearchCategory.GRAVEYARD,
-        }[ranked_status]
-    except KeyError as e:
-        # # log.error(
-        #     f"Received unknown ranked status {ranked_status} in osu-direct request, defaulting to ranked"
-        # )
-        raise e
-
-
-def osu_direct_mode_to_osu_api_v2(mode: int) -> ossapi.enums.BeatmapsetSearchMode:
-    return {
-        -1: ossapi.enums.BeatmapsetSearchMode.ANY,
-        0: ossapi.enums.BeatmapsetSearchMode.OSU,
-        1: ossapi.enums.BeatmapsetSearchMode.TAIKO,
-        2: ossapi.enums.BeatmapsetSearchMode.CATCH,
-        3: ossapi.enums.BeatmapsetSearchMode.MANIA,
-    }[mode]
+# def osu_direct_mode_to_osu_api_v2(mode: int) -> ossapi.enums.BeatmapsetSearchMode:
+#     return {
+#         -1: ossapi.enums.BeatmapsetSearchMode.ANY,
+#         0: ossapi.enums.BeatmapsetSearchMode.OSU,
+#         1: ossapi.enums.BeatmapsetSearchMode.TAIKO,
+#         2: ossapi.enums.BeatmapsetSearchMode.CATCH,
+#         3: ossapi.enums.BeatmapsetSearchMode.MANIA,
+#     }[mode]

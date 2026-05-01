@@ -1,7 +1,7 @@
 from core.models.adapters.database.beatmaps import Beatmap
 from core.usecases.domain.player import Player
-from core.adapters.osu_protocol.osu.types import LeaderboardType
-from core.adapters.osu_protocol.osu.leaderboard import Leaderboard, LeaderboardHeader, LeaderboardScore
+from server.adapters.osu_protocol.osu.enums import LeaderboardType
+from server.adapters.osu_protocol.osu.leaderboard.leaderboard import Leaderboard, LeaderboardHeader, LeaderboardScore
 import core.usecases.domain.scores as scores_usecases
 import asyncio
 import core.usecases.domain.osu_api as osu_api_usecases

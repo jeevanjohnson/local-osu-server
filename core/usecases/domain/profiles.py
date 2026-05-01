@@ -1,6 +1,6 @@
 from core.models.adapters.database.profile import Profile
-from core.adapters.osu_protocol.domain.enums import osuCountryCode
-from core.repositories.profiles import ProfilesRepository
+from core.models.domain.normalizers.country_codes import CountryCode
+from core.repositories.profiles.profiles import ProfilesRepository
 from jays_tools.architecture import DomainUseCase, Repositories
 
 
@@ -61,7 +61,7 @@ class ProfilesDomainUseCase(DomainUseCase):
 
         return await self.update_profile(profile)
 
-    async def update_country(self, profile_name: str, country_code: osuCountryCode) -> Profile:
+    async def update_country(self, profile_name: str, country_code: CountryCode) -> Profile:
         profile = await self.get(profile_name)
         if profile is None:
             raise Exception("no profile to update")

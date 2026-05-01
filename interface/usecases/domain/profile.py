@@ -1,4 +1,4 @@
-from core.adapters.osu_protocol.domain.enums import osuCountryCode
+from core.models.domain.normalizers.country_codes import CountryCode
 from interface.adapters.catbox import CatboxAdapter
 from interface.adapters.image_validation import ImageValidationAdapter
 from jays_tools.architecture import DomainUseCase, Adapters
@@ -83,5 +83,5 @@ class ProfileDomainUseCase(DomainUseCase):
     async def update_profile_notes(self, profile_name: str, notes: str) -> Profile:
         return await self.core_domain_usecases.profile.update_notes(profile_name, notes)
 
-    async def update_profile_country(self, profile_name: str, country_code: osuCountryCode) -> Profile:
+    async def update_profile_country(self, profile_name: str, country_code: CountryCode) -> Profile:
         return await self.core_domain_usecases.profile.update_country(profile_name, country_code)

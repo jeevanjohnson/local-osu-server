@@ -1,7 +1,7 @@
 from jays_tools.sql_database import MigratableSQLModel
 from pydantic import Field
 
-from core.adapters.osu_protocol.cho.server import osuCountryCode
+from core.models.domain.normalizers.country_codes import CountryCode
 import random
 
 
@@ -11,9 +11,9 @@ def seasonal_backgrounds_factory() -> list[str]:
     ]
 
 
-def random_country_code_factory() -> osuCountryCode:
+def random_country_code_factory() -> CountryCode:
     return random.choice(
-        list(osuCountryCode)
+        list(CountryCode)
     )
 
 
@@ -21,7 +21,7 @@ class ProfileV1(MigratableSQLModel, table=True):
     name: str = Field(default="")
     avatar_url: str = Field(default="https://a.ppy.sh/")
     friend_ids: list[int] = Field(default=[])
-    country_code: osuCountryCode = Field(
+    country_code: CountryCode = Field(
         default_factory=random_country_code_factory
     )
     notes: str = Field(default="")

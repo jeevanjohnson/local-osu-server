@@ -3,7 +3,7 @@ from typing import Any, Iterable, TypedDict
 
 import ossapi.models
 
-from core.adapters.osu_protocol.cho.server import osuMods
+from server.adapters.osu_protocol.enums import ClientMods
 from core.models.domain.normalizers.game_mode import GameMode
 from jays_tools.architecture import DomainModel
 from core.usecases.adapters.statistics import LinearInterpolation
@@ -17,7 +17,7 @@ class AttributeAdjustmentResult(TypedDict):
 
 
 class SplitModsResult(TypedDict):
-    stable_mods: osuMods
+    stable_mods: ClientMods
     lazer_mods: list[str]
 
 
@@ -84,9 +84,9 @@ class Mods(list[str], DomainModel):
         return cls(mods_list)
 
     @classmethod
-    def from_stable_mods(cls, stable_mods: osuMods) -> "Mods":
+    def from_stable_mods(cls, stable_mods: ClientMods) -> "Mods":
         mods_list = []
-        for mod in osuMods:
+        for mod in ClientMods:
             if stable_mods & mod:
                 mods_list.append(
                     cls.normalize_stable_mod(mod)
@@ -135,44 +135,80 @@ class Mods(list[str], DomainModel):
 
     @classmethod
     def from_stable_int(cls, stable_mods_int: int) -> "Mods":
-        stable_mods = osuMods(stable_mods_int)
+        stable_mods = ClientMods(stable_mods_int)
         return cls.from_stable_mods(stable_mods)
 
     @staticmethod
-    def normalize_stable_mod(stable_mod: osuMods) -> str:
+    def normalize_stable_mod(stable_mod: ClientMods) -> str:
         return {
-            osuMods.DOUBLETIME: "DT",
-            osuMods.NIGHTCORE: "NC",
-            osuMods.HARDROCK: "HR",
-            osuMods.HIDDEN: "HD",
-            osuMods.FLASHLIGHT: "FL",
-            osuMods.EASY: "EZ",
-            osuMods.NOFAIL: "NF",
-            osuMods.SUDDENDEATH: "SD",
-            osuMods.TOUCHSCREEN: "TD",
-            osuMods.RELAX: "RX",
-            osuMods.HALFTIME: "HT",
-            osuMods.AUTOPLAY: "AU",
-            osuMods.SPUNOUT: "SO",
-            osuMods.AUTOPILOT: "AP",
-            osuMods.PERFECT: "PF",
-            osuMods.KEY4: "4K",
-            osuMods.KEY5: "5K",
-            osuMods.KEY6: "6K",
-            osuMods.KEY7: "7K",
-            osuMods.KEY8: "8K",
-            osuMods.FADEIN: "FI",
-            osuMods.RANDOM: "RN",
-            osuMods.CINEMA: "CM",
-            osuMods.TARGET: "TP",
-            osuMods.KEY9: "9K",
-            osuMods.KEYCOOP: "COOP",
-            osuMods.KEY1: "1K",
-            osuMods.KEY3: "3K",
-            osuMods.KEY2: "2K",
-            osuMods.SCOREV2: "SV2",
-            osuMods.MIRROR: "MR",
+            ClientMods.DOUBLETIME: "DT",
+            ClientMods.NIGHTCORE: "NC",
+            ClientMods.HARDROCK: "HR",
+            ClientMods.HIDDEN: "HD",
+            ClientMods.FLASHLIGHT: "FL",
+            ClientMods.EASY: "EZ",
+            ClientMods.NOFAIL: "NF",
+            ClientMods.SUDDENDEATH: "SD",
+            ClientMods.TOUCHSCREEN: "TD",
+            ClientMods.RELAX: "RX",
+            ClientMods.HALFTIME: "HT",
+            ClientMods.AUTOPLAY: "AU",
+            ClientMods.SPUNOUT: "SO",
+            ClientMods.AUTOPILOT: "AP",
+            ClientMods.PERFECT: "PF",
+            ClientMods.KEY4: "4K",
+            ClientMods.KEY5: "5K",
+            ClientMods.KEY6: "6K",
+            ClientMods.KEY7: "7K",
+            ClientMods.KEY8: "8K",
+            ClientMods.FADEIN: "FI",
+            ClientMods.RANDOM: "RN",
+            ClientMods.CINEMA: "CM",
+            ClientMods.TARGET: "TP",
+            ClientMods.KEY9: "9K",
+            ClientMods.KEYCOOP: "COOP",
+            ClientMods.KEY1: "1K",
+            ClientMods.KEY3: "3K",
+            ClientMods.KEY2: "2K",
+            ClientMods.SCOREV2: "SV2",
+            ClientMods.MIRROR: "MR",
         }[stable_mod]
+
+    @staticmethod
+    def stable_mod_from_acronym(acronym: str) -> ClientMods:
+        return {
+            "DT": ClientMods.DOUBLETIME,
+            "NC": ClientMods.NIGHTCORE,
+            "HR": ClientMods.HARDROCK,
+            "HD": ClientMods.HIDDEN,
+            "FL": ClientMods.FLASHLIGHT,
+            "EZ": ClientMods.EASY,
+            "NF": ClientMods.NOFAIL,
+            "SD": ClientMods.SUDDENDEATH,
+            "TD": ClientMods.TOUCHSCREEN,
+            "RX": ClientMods.RELAX,
+            "HT": ClientMods.HALFTIME,
+            "AU": ClientMods.AUTOPLAY,
+            "SO": ClientMods.SPUNOUT,
+            "AP": ClientMods.AUTOPILOT,
+            "PF": ClientMods.PERFECT,
+            "4K": ClientMods.KEY4,
+            "5K": ClientMods.KEY5,
+            "6K": ClientMods.KEY6,
+            "7K": ClientMods.KEY7,
+            "8K": ClientMods.KEY8,
+            "FI": ClientMods.FADEIN,
+            "RN": ClientMods.RANDOM,
+            "CM": ClientMods.CINEMA,
+            "TP": ClientMods.TARGET,
+            "9K": ClientMods.KEY9,
+            "COOP": ClientMods.KEYCOOP,
+            "1K": ClientMods.KEY1,
+            "3K": ClientMods.KEY3,
+            "2K": ClientMods.KEY2,
+            "SV2": ClientMods.SCOREV2,
+            "MR": ClientMods.MIRROR,
+        }[acronym]
 
     def rate(self) -> RateResult:
         rate = None
@@ -270,20 +306,20 @@ class Mods(list[str], DomainModel):
         )
 
     def split_mods(self) -> SplitModsResult:
-        stable_mods = osuMods.NOMOD
+        stable_mods = ClientMods.NOMOD
         lazer_mods = []
 
         for mod in self:
             try:
-                stable_mods |= osuMods.from_acronym(mod)
+                stable_mods |= self.stable_mod_from_acronym(mod)
             except ValueError:
                 lazer_mods.append(mod)
 
-        if stable_mods & osuMods.NIGHTCORE:
-            stable_mods |= osuMods.DOUBLETIME
+        if stable_mods & ClientMods.NIGHTCORE:
+            stable_mods |= ClientMods.DOUBLETIME
 
-        if stable_mods & osuMods.PERFECT:
-            stable_mods |= osuMods.SUDDENDEATH
+        if stable_mods & ClientMods.PERFECT:
+            stable_mods |= ClientMods.SUDDENDEATH
 
         return SplitModsResult(
             stable_mods=stable_mods,
@@ -340,20 +376,20 @@ class Mods(list[str], DomainModel):
     def to_osu_api_v2(self) -> int:
         stable_mods = self.to_stable_mods()
 
-        stable_mods &= ~osuMods.SCOREV2
-        stable_mods &= ~osuMods.RELAX
-        stable_mods &= ~osuMods.AUTOPILOT
+        stable_mods &= ~ClientMods.SCOREV2
+        stable_mods &= ~ClientMods.RELAX
+        stable_mods &= ~ClientMods.AUTOPILOT
 
         return int(stable_mods)
 
-    def to_stable_mods(self, remove_rate_mods: bool = False) -> osuMods:
+    def to_stable_mods(self, remove_rate_mods: bool = False) -> ClientMods:
         result = self.split_mods()
         stable_mods = result["stable_mods"]
 
         if remove_rate_mods:
-            stable_mods &= ~osuMods.DOUBLETIME
-            stable_mods &= ~osuMods.NIGHTCORE
-            stable_mods &= ~osuMods.HALFTIME
+            stable_mods &= ~ClientMods.DOUBLETIME
+            stable_mods &= ~ClientMods.NIGHTCORE
+            stable_mods &= ~ClientMods.HALFTIME
 
         return stable_mods
 

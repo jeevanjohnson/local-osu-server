@@ -1,196 +1,122 @@
-from datetime import datetime
-from typing import Any, Callable, Coroutine, Literal, TypeVar
+from typing import get_type_hints
+from typing import Callable, Coroutine, Any
+from typing import Any, Callable, Coroutine, Literal
 
-from fastapi import APIRouter, Depends, Header, Request, Response
+from fastapi import APIRouter, Header, Request, Response
 
-from core.adapters.osu_protocol.cho.enums import osuAction
-import core.adapters.osu_protocol.cho.server as cho_server
-import core.adapters.osu_protocol.cho.client as cho_client
-import server.dependencies as dependencies
-from core.models.domain.gameplay.mods import Mods
-from core.models.domain.gameplay.game_mode import GameMode
-
-from core.adapters.osu_protocol.cho.client import (
-    ChangeAction,
-    ClientPackets,
-    FriendAdd,
-    FriendRemove,
+from server.adapters.osu_protocol.cho.packets.packets import (
+    ClientPacketStream,
+    ClientPacketBase,
     LogOut,
-    Packet,
-    Packets,
-    Ping,
-    SendPrivateMessage,
-    SendPublicMessage,
     UserStatsRequest,
+    FriendRemove,
+    FriendAdd,
+    SendMessage,
+    StatusChanged
 )
-from core.usecases.domain.player import Player
+from server.usecases.domain.player import PlayerDomainUseCase
+
 
 bancho = APIRouter()
 
+PLAYER_DOMAIN_USECASE = PlayerDomainUseCase()
+
+
 @bancho.post("/")
 async def client_request_handler(
+    request: Request,
+    osu_token: str | None = Header(None),
     user_agent: Literal["osu!"] = Header(...),
-    player: Player | None = Depends(dependencies.player),
-    login_response: cho_server.Packets | None = Depends(dependencies.login_response),
-    incoming_packets: cho_client.Packets = Depends(dependencies.incoming_packets),
 ):
-    if login_response is not None:
-        return Response(
-            content=login_response.build(), 
-            headers={"cho-token": "welcome-to-los-2026"}
-        )
-    
-    if player is None:
-        return Response(
-            content = cho_server.reset().build(),
-        )
+    if osu_token is None:
+        # TODO: login response
+        return
 
-    for packet in incoming_packets:
-        if packet.id not in PACKET_HANDLERS:
-            continue
-
-        await PACKET_HANDLERS[ClientPackets(packet.id)](packet, player)
-
-    return Response(
-        content=player.extract_outgoing_packets()
+    packet_stream = ClientPacketStream.from_osu_client(
+        await request.body()
     )
 
-PacketType = TypeVar("PacketType", bound=Packet)
-PACKET_HANDLER = Callable[[PacketType, Player], Coroutine[Any, Any, None]]
+    for packet in packet_stream:
+        packet_type = type(packet)
+
+        if packet_type not in PACKET_HANDLERS:
+            continue
+
+        await PACKET_HANDLERS[packet_type](packet)
+
+    outgoing_packets = await PLAYER_DOMAIN_USECASE.clear_outgoing_packets()
+    return Response(outgoing_packets)
+
+
+type PACKET_HANDLER = Callable[..., Coroutine[Any, Any, None]]
+
 PACKET_HANDLERS: dict[
-    ClientPackets,
-    PACKET_HANDLER,
+    type[ClientPacketBase], PACKET_HANDLER
 ] = {}
 
 
-def register_packet_handler(packet_id: ClientPackets, packet_type: type[PacketType]):
-    def inner(func: PACKET_HANDLER) -> PACKET_HANDLER:
-        async def wrapper(
-            packet: Packet, player: Player
-        ) -> None:
-            if not isinstance(packet, packet_type):
-                return None
-
-            return await func(packet, player)
-
-        PACKET_HANDLERS[packet_id] = wrapper
-        return func
-
-    return inner
+def register_packet_handler(func: PACKET_HANDLER) -> PACKET_HANDLER:
+    packet_type = get_type_hints(func)["packet"]
+    PACKET_HANDLERS[packet_type] = func
+    return func
 
 
-@register_packet_handler(ClientPackets.PING, packet_type=Ping)
-async def handle_ping(
-    packet: Ping, player: Player
+@register_packet_handler
+async def on_status_changed(
+    packet: StatusChanged
 ) -> None:
-    return
+    await PLAYER_DOMAIN_USECASE.update_status(
+        packet.status,
+        packet.status_message
+    )
 
-@register_packet_handler(ClientPackets.CHANGE_ACTION, packet_type=ChangeAction)
-async def on_action_change(
-    packet: ChangeAction, player: Player
-) -> None:
-    client_state = player.get_client_state()
-    
-    client_state.status = osuAction(packet.action.value)
-    if client_state.status != osuAction.OsuDirect:
-        client_state.direct_reference.cursor_string = None
-    
-    client_state.status_message = packet.info_text.value
-    client_state.mods = Mods.from_stable_int(packet.current_mods.value)
-    client_state.game_mode = GameMode(packet.current_game_mode.value)
 
-    client_state.beatmap.md5 = packet.beatmap_md5.value
-    client_state.beatmap.id = packet.beatmap_id.value
-
-    player.update_client_state(client_state)
-    player.update_client_stats()
-
-    return
-
-@register_packet_handler(ClientPackets.LOGOUT, packet_type=LogOut)
+@register_packet_handler
 async def on_logout(
-    packet: LogOut, player: Player
+    packet: LogOut
 ) -> None:
-    client_state = player.get_client_state()
-
-    if datetime.now().timestamp() - client_state.in_game_at.timestamp() < 1:
+    if not await PLAYER_DOMAIN_USECASE.valid_logout():
         return
 
-    client_state.in_game = False
-    client_state.status = osuAction.Idle
-    client_state.status_message = ""
-    client_state.beatmap.md5 = ""
-    client_state.beatmap.id = 0
-    client_state.game_mode = GameMode.STANDARD
-    client_state.mods = Mods()
-    client_state.direct_reference.cursor_string = None
+    await PLAYER_DOMAIN_USECASE.logout()
 
-    player.update_client_state(client_state)
 
-    return
-
-@register_packet_handler(ClientPackets.USER_STATS_REQUEST, packet_type=UserStatsRequest)
-async def on_user_stats_request(
-    packet: UserStatsRequest, player: Player
+@register_packet_handler
+async def user_stats_request(
+    packet: UserStatsRequest
 ) -> None:
-    
-    user_ids = packet.user_ids.value
+
+    user_ids = packet.user_ids
 
     if 3 in user_ids:
         user_ids.remove(3)
-    
+
     if 2 not in user_ids:
         user_ids.append(2)
-    
+
     # TODO: implement stats for other users (friends)
 
-@register_packet_handler(ClientPackets.FRIEND_REMOVE, packet_type=FriendRemove)
-async def on_friend_remove(
-    packet: FriendRemove, player: Player
+
+@register_packet_handler
+async def friend_remove(
+    packet: FriendRemove
 ) -> None:
-    friend_id = packet.friend_user_id.value
-
-    profile = player.get_profile()
-    if friend_id in profile.friend_ids:
-        profile.friend_ids.remove(friend_id)
-        player.update_profile(profile)
-
-    client_state = player.get_client_state()
-    client_state.outgoing_packets += cho_server.UserFriendList(profile.friend_ids)
-    player.update_client_state(client_state) # TODO: logout packet?
-
-    return
+    await PLAYER_DOMAIN_USECASE.remove_friend(packet.id)
 
 
-@register_packet_handler(ClientPackets.FRIEND_ADD, packet_type=FriendAdd)
+@register_packet_handler
 async def on_friend_add(
-    packet: FriendAdd, player: Player
+    packet: FriendAdd
 ) -> None:
-    client_state = player.get_client_state()
-
-    client_state.outgoing_packets += cho_server.Notification(
+    await PLAYER_DOMAIN_USECASE.notify(
         "Adding friends this way is not supported in LOS! ʕ•̫͡•ʔ\n"
         "Please refer to the interface for adding friends."
     )
 
-    player.update_client_state(client_state)
 
-
-@register_packet_handler(
-    ClientPackets.SEND_PUBLIC_MESSAGE, packet_type=SendPublicMessage
-)
+@register_packet_handler
 async def on_send_public_message(
-    packet: SendPublicMessage, player: Player
-) -> None:
-    # TODO: messages
-    return
-
-
-@register_packet_handler(
-    ClientPackets.SEND_PRIVATE_MESSAGE, packet_type=SendPrivateMessage
-)
-async def on_send_private_message(
-    packet: SendPrivateMessage, player: Player
+    packet: SendMessage
 ) -> None:
     # TODO: messages
     return

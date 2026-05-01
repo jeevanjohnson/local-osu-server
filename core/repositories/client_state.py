@@ -10,10 +10,10 @@ class ClientStateRepository(Repository):
     async def create_client_state(self) -> ClientState:
         return await self.database.insert(ClientState())
 
-    async def get_client_state(self) -> ClientState:
+    async def get_client_state(self) -> ClientState | None:
         client_state = await self.database.find(ClientState)
         if client_state is None:
-            return await self.create_client_state()
+            return None
 
         return client_state[0]
 
@@ -22,5 +22,8 @@ class ClientStateRepository(Repository):
 
     async def delete_client_state(self) -> ClientState:
         client_state = await self.get_client_state()
+        if client_state is None:
+            raise ValueError("No client state to delete")
+
         await self.database.delete(client_state)
         return client_state

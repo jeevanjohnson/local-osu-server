@@ -5,7 +5,7 @@ from .osu_file_locations import OsuFileLocations
 from .interface import InterfaceState
 from .profile import Profile
 from .client_state import ClientState
-from .settings import ProfileSettings
+from .profile_settings import ProfileSettings
 from .performance import Performance
 from .server_settings import ServerSettings
 from .beatmaps import Beatmap

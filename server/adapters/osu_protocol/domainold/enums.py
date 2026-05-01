@@ -2,6 +2,7 @@ import ossapi
 
 from enum import unique, IntEnum, IntFlag
 
+
 @unique
 class osuGameMode(IntEnum):
     STANDARD = 0
@@ -165,6 +166,7 @@ class osuMods(IntFlag):
             }[acronym.strip().upper()]
         except KeyError:
             raise ValueError(f"Invalid mod acronym: {acronym}")
+
 
 @unique
 class osuCountryCode(IntEnum):

@@ -14,3 +14,10 @@ class Paths:
     DATA = Path("./.data")
     DATABASE = DATA / "database.db"
     INTERFACE_PID = DATA / "interface.pid"
+
+
+__all__ = [
+    "Ports",
+    "OsuClient",
+    "Paths"
+]

@@ -2,7 +2,7 @@
 from enum import IntEnum
 import rosu_pp_py as rosu
 import ossapi.enums
-from core.adapters.osu_protocol.domain.enums import osuGameMode
+from server.adapters.osu_protocol.enums import ClientGameMode
 from jays_tools.architecture import DomainModel
 
 
@@ -49,10 +49,10 @@ class GameMode(DomainModel, IntEnum):
         }[self]
 
     @classmethod
-    def from_client(cls, client_value: osuGameMode) -> "GameMode":
+    def from_client(cls, client_value: ClientGameMode) -> "GameMode":
         return {
-            osuGameMode.STANDARD: cls.STANDARD,
-            osuGameMode.TAIKO: cls.TAIKO,
-            osuGameMode.CATCH_THE_BEAT: cls.CATCH,
-            osuGameMode.MANIA: cls.MANIA,
+            ClientGameMode.STANDARD: cls.STANDARD,
+            ClientGameMode.TAIKO: cls.TAIKO,
+            ClientGameMode.CATCH: cls.CATCH,
+            ClientGameMode.MANIA: cls.MANIA,
         }[client_value]

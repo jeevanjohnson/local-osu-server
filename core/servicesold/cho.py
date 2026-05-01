@@ -1,7 +1,7 @@
-import core.adapters.osu_protocol.cho.client as cho_client
+import server.adapters.osu_protocol.cho.client as cho_client
 from core.usecases.domain.player import Player
-import core.adapters.osu_protocol.cho.server as cho_server
-import core.adapters.osu_protocol.cho.enums as cho_enums
+import server.adapters.osu_protocol.cho.server as cho_server
+import server.osu_protocol.cho.enums as cho_enums
 from datetime import datetime
 
 async def login(

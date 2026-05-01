@@ -7,19 +7,22 @@ from datetime import datetime
 from core.models.domain.normalizers.game_mode import GameMode
 from core.models.domain.normalizers.mods import Mods
 from core.models.domain.normalizers.scoring_type import ScoringType
-from core.adapters.osu_protocol.cho.enums import osuAction
-import core.adapters.osu_protocol.cho.server as cho_server
+from core.models.domain.normalizers.client_status import ClientStatus
+from server.adapters.osu_protocol.cho.packets.packets import ServerPacket, ServerPacketStream
 
 
 class Packets(bytearray):
 
-    def __iadd__(self, other: bytes | cho_server.Packet | cho_server.Packets) -> "Packets":
-        if isinstance(other, (cho_server.Packet, cho_server.Packets)):
-            self += other.build()
+    def __iadd__(self, other: bytes | ServerPacket | ServerPacketStream) -> "Packets":
+        if isinstance(other, (ServerPacket, ServerPacketStream)):
+            self += other.serialize()
+            return self
         elif isinstance(other, bytes):
-            super().__iadd__(other)
-
-        return self
+            return super().__iadd__(other)
+        else:
+            raise TypeError(
+                f"Unsupported type for Packets addition: {type(other)}"
+            )
 
 
 class ClientStateV1(MigratableSQLModel, table=True):
@@ -35,7 +38,7 @@ class ClientStateV1(MigratableSQLModel, table=True):
     beatmap_is_difficulty_adjusted: bool = Field(default=False)
     loaded_score_id: int = Field(default=0)
 
-    status: osuAction = Field(default=osuAction.Idle)
+    status: ClientStatus = Field(default=ClientStatus.IDLE)
     status_message: str = Field(default="")
 
     direct_cursor_string: str | None = Field(default=None)

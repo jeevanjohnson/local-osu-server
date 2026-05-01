@@ -1,7 +1,6 @@
 from core.models.adapters.database.client_state import ClientState
 from core.repositories.client_state import ClientStateRepository
 from jays_tools.architecture import DomainUseCase, Repositories
-import core.adapters.osu_protocol.cho.server as cho_server
 
 
 class ClientStateRepositories(Repositories):
@@ -14,8 +13,11 @@ class ClientStateDomainUseCase(DomainUseCase):
         self.adapters = None
         self.services = None
 
-    async def get_client_state(self) -> ClientState:
+    async def get_client_state(self) -> ClientState | None:
         return await self.repositories.client_state.get_client_state()
 
     async def update_client_state(self, new_state: ClientState) -> ClientState:
         return await self.repositories.client_state.update_client_state(new_state)
+
+    async def delete_client_state(self) -> ClientState:
+        return await self.repositories.client_state.delete_client_state()
