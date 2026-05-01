@@ -32,7 +32,7 @@ class GameMode(DomainModel, IntEnum):
         }[self]
 
     @classmethod
-    def from_api_v2(cls, api_value: ossapi.enums.GameMode) -> "GameMode":
+    def from_api(cls, api_value: ossapi.enums.GameMode) -> "GameMode":
         return {
             ossapi.enums.GameMode.OSU: cls.STANDARD,
             ossapi.enums.GameMode.TAIKO: cls.TAIKO,
@@ -40,7 +40,7 @@ class GameMode(DomainModel, IntEnum):
             ossapi.enums.GameMode.MANIA: cls.MANIA,
         }[api_value]
 
-    def to_api_v2(self) -> ossapi.enums.GameMode:
+    def to_api(self) -> ossapi.enums.GameMode:
         return {
             self.STANDARD: ossapi.enums.GameMode.OSU,
             self.TAIKO: ossapi.enums.GameMode.TAIKO,

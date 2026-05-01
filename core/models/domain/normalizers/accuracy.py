@@ -12,5 +12,5 @@ class Accuracy(float, DomainModel):
         return self * 100
 
     @classmethod
-    def from_percetage(cls, value: float) -> float:
+    def from_percentage(cls, value: float) -> "Accuracy":
         return cls(value / 100)

@@ -1,6 +1,6 @@
 from core.models.adapters.database.profile import Profile
 from core.models.domain.normalizers.country_codes import CountryCode
-from core.repositories.profiles.profiles import ProfilesRepository
+from core.repositories.profiles import ProfilesRepository
 from jays_tools.architecture import DomainUseCase, Repositories
 
 

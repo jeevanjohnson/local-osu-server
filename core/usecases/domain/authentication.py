@@ -1,7 +1,7 @@
 from jays_tools.architecture import DomainUseCase, Repositories
 
 from core.repositories.interface import InterfaceStateRepository
-from core.repositories.profiles.profiles import ProfilesRepository
+from core.repositories.profiles import ProfilesRepository
 from core.models.adapters.database.interface import InterfaceState
 from core.models.adapters.database.profile import Profile
 

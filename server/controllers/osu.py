@@ -14,7 +14,7 @@ import core.usecases.domain.beatmap as beatmap_domain
 from core.usecases.application.beatmaps import BeatmapStatus
 import core.usecases.application.leaderboards as leaderboards_usecases
 from server.adapters.osu_protocol.osu.enums import LeaderboardType
-from core.usecases.domain.osu_api import InvalidOsuApiCredentialsError
+from core.usecases.osu_api import InvalidOsuApiCredentialsError
 import time
 from fastapi import Request, Form, File
 from fastapi.responses import RedirectResponse

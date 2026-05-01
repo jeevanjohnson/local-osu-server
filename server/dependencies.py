@@ -6,7 +6,7 @@ from server.adapters.osu_protocol.cho.client import parse_login_data
 import core.services.cho as cho_services
 from typing import Literal
 from core.usecases.domain.player import Player
-import core.usecases.domain.osu_api as osu_api_usecases
+import core.usecases.osu_api as osu_api_usecases
 
 
 async def player() -> Player | None:

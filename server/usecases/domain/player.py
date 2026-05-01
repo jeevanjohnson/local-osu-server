@@ -149,10 +149,10 @@ class PlayerDomainUseCase(DomainUseCase):
         client_state.game_mode = mode
         client_state.mods = mods
 
-        if profile_settings.allow_score_v2_submission and "SV2" in mods:
-            client_state.current_scoring_mode = ScoringType.SCOREV2
-        elif profile_settings.pp_leaderboards:
+        if profile_settings.pp_leaderboards:
             client_state.current_scoring_mode = ScoringType.PP
+        elif profile_settings.allow_score_v2_submission and "SV2" in mods:
+            client_state.current_scoring_mode = ScoringType.SCOREV2
         else:
             client_state.current_scoring_mode = ScoringType.SCOREV1
 

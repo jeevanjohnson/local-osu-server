@@ -1,5 +1,6 @@
 from enum import IntEnum
 import ossapi.enums
+import
 
 
 class RankStatus(IntEnum):
@@ -17,7 +18,7 @@ class RankStatus(IntEnum):
         return self in {RankStatus.RANKED, RankStatus.APPROVED, RankStatus.QUALIFIED, RankStatus.LOVED}
 
     @classmethod
-    def from_api_v2(cls, ranked_status: ossapi.enums.RankStatus) -> "RankStatus":
+    def from_api(cls, ranked_status: ossapi.enums.RankStatus) -> "RankStatus":
         return {
             ossapi.enums.RankStatus.GRAVEYARD: cls.PENDING,
             ossapi.enums.RankStatus.WIP: cls.PENDING,

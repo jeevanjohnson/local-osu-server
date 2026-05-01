@@ -1,4 +1,5 @@
 
+from ossapi.models import Mod
 from typing import Any, Iterable, TypedDict
 
 import ossapi.models
@@ -95,7 +96,7 @@ class Mods(list[str], DomainModel):
         return cls.from_list(mods_list)
 
     @classmethod
-    def from_api_v2(cls, mods: list[ossapi.models.NonLegacyMod]) -> "Mods":
+    def from_api(cls, mods: list[ossapi.models.NonLegacyMod]) -> "Mods":
         final_mods = []
 
         for mod in mods:
@@ -359,28 +360,14 @@ class Mods(list[str], DomainModel):
 
         return ",".join(copy)
 
-    def _to_osu_api_v2(self) -> list[str]:
-        result = []
-
-        for mod in self:
-            if mod.endswith("X"):
-                continue
-
-            if mod.startswith(("AR", "OD", "HP", "CS")):
-                continue
-
-            result.append(f"mods[]={mod}")
-
-        return result
-
-    def to_osu_api_v2(self) -> int:
+    def to_api(self) -> Mod:
         stable_mods = self.to_stable_mods()
 
         stable_mods &= ~ClientMods.SCOREV2
         stable_mods &= ~ClientMods.RELAX
         stable_mods &= ~ClientMods.AUTOPILOT
 
-        return int(stable_mods)
+        return Mod(stable_mods)
 
     def to_stable_mods(self, remove_rate_mods: bool = False) -> ClientMods:
         result = self.split_mods()
