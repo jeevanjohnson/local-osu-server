@@ -1,146 +1,63 @@
 from pathlib import Path
-
+from typing import Coroutine
+from asyncio import Task
+import asyncio
 from hachiko.hachiko import AIOEventHandler
+from osu_watcher.usecases import OsuDomainUsecases
 
-from core.repositories.osu_file_locations import OsuFileLocationsRepository
-from osu_watcher.services import OsuFileLocationService, OsuFileService
 
 class SongFolderHandler(AIOEventHandler):
     def __init__(self) -> None:
         super().__init__()
-        self.osu_file_location_repo = OsuFileLocationsRepository()
-        self.osu_file_location_service = OsuFileLocationService()
-        self.osu_file_service = OsuFileService()
+
+        self.osu_domain_usecases = OsuDomainUsecases()
+        self.pending_refresh_task: Task | None = None
 
     def get_songs_folder(self, osu_file: Path) -> Path:
         return osu_file.parent.parent
 
-    async def delete_from_path(self, path: Path) -> None:
-        songs_folder = self.get_songs_folder(path)
+    def osu_event(self, event, event_path_str: str) -> Path | None:
+        if event.is_directory:
+            return None
 
-        osu_file_locations = await self.osu_file_location_repo.get(songs_folder)
+        if not event_path_str.endswith(".osu"):
+            return None
 
-        if osu_file_locations is None:
+        event_src_path = Path(event_path_str)
+
+        if not event_src_path.is_file():
+            return None
+
+        if not event_src_path.suffix == ".osu":
+            return None
+
+        return event_src_path
+
+    async def on_osu_event(self, event, event_path_str: str) -> None:
+        event_src_path = self.osu_event(event, event_path_str)
+        if event_src_path is None:
             return
 
-        if path not in osu_file_locations.path_to_filename:
-            return
-        
-        osu_file_locations = self.osu_file_location_service.remove(
-            path, osu_file_locations
+        songs_folder = self.get_songs_folder(event_src_path)
+
+        if self.pending_refresh_task:
+            self.pending_refresh_task.cancel()
+            self.pending_refresh_task = None
+
+        self.pending_refresh_task = asyncio.create_task(
+            self.osu_domain_usecases.refresh_osu_file_locations_in_database(
+                songs_folder
+            )
         )
-
-        await self.osu_file_location_repo.update(osu_file_locations)
-
-    async def add_from_path(self, path: Path) -> None:
-        songs_folder = self.get_songs_folder(path)
-
-        osu_file_locations = await self.osu_file_location_repo.get(songs_folder)
-
-        if osu_file_locations is None:
-            return
-
-        if path in osu_file_locations.path_to_filename:
-            return
-    
-        parsed_osu_file = self.osu_file_service.parse_watcher_data(path)
-
-        osu_file_locations = self.osu_file_location_service.add(
-            parsed_osu_file, osu_file_locations
-        )
-        
-        await self.osu_file_location_repo.update(osu_file_locations)
 
     async def on_created(self, event) -> None:
-        if event.is_directory:
-            return
-
-        if not event.src_path.endswith(".osu"):  # type: ignore
-            return
-
-        event_src_path = Path(event.src_path)  # type: ignore
-
-        if not event_src_path.is_file():
-            return
-
-        if not event_src_path.suffix == ".osu":
-            return
-
-        print(f"File created: {event_src_path}")
-
-        await self.add_from_path(event_src_path)
+        await self.on_osu_event(event, event.src_path)
 
     async def on_modified(self, event) -> None:
-        if event.is_directory:
-            return
-
-        if not event.src_path.endswith(".osu"):  # type: ignore
-            return
-
-        event_src_path = Path(event.src_path)  # type: ignore
-
-        if not event_src_path.is_file():
-            return
-
-        if not event_src_path.suffix == ".osu":
-            return
-
-        print(f"File modified: {event_src_path}")
-
-        # delete old data and add new data
-        await self.delete_from_path(event_src_path)
-        await self.add_from_path(event_src_path)
+        await self.on_osu_event(event, event.src_path)
 
     async def on_deleted(self, event) -> None:
-        if event.is_directory:
-            return
+        await self.on_osu_event(event, event.src_path)
 
-        if not event.src_path.endswith(".osu"):  # type: ignore
-            return
-
-        event_src_path = Path(event.src_path)  # type: ignore
-
-        if not event_src_path.is_file():
-            return
-
-        if not event_src_path.suffix == ".osu":
-            return
-        
-        print(f"File deleted: {event_src_path}")
-
-        await self.delete_from_path(event_src_path)
-    
     async def on_moved(self, event) -> None:
-        if event.is_directory:
-            return
-
-        if not event.src_path.endswith(".osu"):  # type: ignore
-            return
-
-
-        if not event.dest_path.endswith(".osu"):  # type: ignore
-            return
-
-        # remove old cache
-        old_path = Path(event.src_path)  # type: ignore
-
-        if not old_path.is_file():
-            return
-
-        if not old_path.suffix == ".osu":
-            return
-
-        await self.delete_from_path(old_path)
-
-        # add new cache
-        new_path = Path(event.dest_path)  # type: ignore
-
-        if not new_path.is_file():
-            return
-
-        if not new_path.suffix == ".osu":
-            return
-
-        await self.add_from_path(new_path)
-
-        print(f"File moved: {old_path} -> {new_path}")
+        await self.on_osu_event(event, event.dest_path)

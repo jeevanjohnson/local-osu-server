@@ -7,17 +7,19 @@ from core.usecases.domain.profiles import ProfilesDomainUseCase
 from core.usecases.domain.client_state import ClientStateDomainUseCase
 from datetime import datetime
 from server.adapters.osu_protocol.cho.packets.packets import ServerPacket, ServerPacketStream
-from server.adapters.osu_protocol.cho.packets.packets import friend_list, notify
+from server.adapters.osu_protocol.cho.packets.packets import friend_list, notify, force_relog
 from server.adapters.osu_protocol.cho.packets.enums import ClientStatus
 from core.models.domain.normalizers.client_status import ClientStatus as DomainClientStatus
 from core.models.domain.normalizers.scoring_type import ScoringType
 from core.usecases.domain.profile_settings import ProfileSettingsDomainUseCase
+from core.usecases.domain.performance import PerformanceDomainUseCase
 
 
 class PlayerCoreDomainUsecases:
     profile = ProfilesDomainUseCase()
     client_state = ClientStateDomainUseCase()
     profile_settings = ProfileSettingsDomainUseCase()
+    performance = PerformanceDomainUseCase()
 
 
 class PlayerDomainUseCase(DomainUseCase):
@@ -113,6 +115,17 @@ class PlayerDomainUseCase(DomainUseCase):
 
         return profile.seasonal_backgrounds
 
+    async def clear_beatmap_reference(self) -> None:
+        client_state = await self.core_domain_usecases.client_state.get_client_state()
+        if client_state is None:
+            return
+
+        client_state.beatmap_id = 0
+        client_state.beatmap_md5 = ""
+        client_state.beatmap_set_id = 0
+        client_state.beatmap_is_difficulty_adjusted = False
+        await self.core_domain_usecases.client_state.update_client_state(client_state)
+
     async def clear_direct_reference(self) -> None:
         client_state = await self.core_domain_usecases.client_state.get_client_state()
         if client_state is None:
@@ -182,3 +195,15 @@ class PlayerDomainUseCase(DomainUseCase):
             )
 
         await self.core_domain_usecases.client_state.update_client_state(client_state)
+
+    async def relog(self) -> None:
+        await self.append_outgoing_packet(
+            force_relog()
+        )
+
+    async def get_current_rule_set(self) -> ScoringType:
+        client_state = await self.core_domain_usecases.client_state.get_client_state()
+        if client_state is None:
+            return ScoringType.SCOREV1
+
+        return client_state.current_scoring_mode

@@ -38,7 +38,8 @@ class OsuDomainUsecases(DomainUseCase):
         osu_file_locations: OsuFileLocations,
         osu_files: Iterable[Path]
     ) -> OsuFileLocations:
-        with ThreadPoolExecutor(max_workers=8) as executor:
+        # max_workers=8
+        with ThreadPoolExecutor() as executor:
             futures = {
                 executor.submit(self.services.osu_file_service.parse_watcher_data, file): file
                 for file in osu_files
@@ -74,13 +75,15 @@ class OsuDomainUsecases(DomainUseCase):
         delete_osu_files: Iterable[Path] | None,
     ) -> OsuFileLocations:
 
-        if add_osu_files is not None:
-            osu_file_locations = self.add_osu_files(
-                osu_file_locations, add_osu_files)
-
         if delete_osu_files is not None:
             osu_file_locations = self.delete_osu_files(
-                osu_file_locations, delete_osu_files)
+                osu_file_locations, delete_osu_files
+            )
+
+        if add_osu_files is not None:
+            osu_file_locations = self.add_osu_files(
+                osu_file_locations, add_osu_files
+            )
 
         return osu_file_locations
 
@@ -95,7 +98,7 @@ class OsuDomainUsecases(DomainUseCase):
 
         osu_file_locations = self.sync(
             osu_file_locations,
-            add_osu_files=(file for file in songs_folder.glob("**/*.osu")),
+            add_osu_files=songs_folder.glob("**/*.osu"),
             delete_osu_files=None
         )
 
@@ -106,10 +109,8 @@ class OsuDomainUsecases(DomainUseCase):
         if osu_file_locations is None:
             raise Exception("Songs folder not initialized in database")
 
-        current_songs_folder = set(
-            file for file in songs_folder.glob("**/*.osu"))
-        all_currently_stored_paths = set(
-            osu_file_locations.path_to_filename.keys())
+        current_songs_folder = set(songs_folder.glob("**/*.osu"))
+        all_currently_stored_paths = osu_file_locations.path_to_filename.keys()
 
         # In DB but not in folder
         files_needing_to_be_deleted = all_currently_stored_paths - current_songs_folder

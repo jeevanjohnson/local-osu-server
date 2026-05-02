@@ -1,4 +1,4 @@
-from core.models.adapters.database.profile_settings import ProfileSettings
+from core.models.adapters.database.settings import ProfileSettings
 from core.repositories.profile_settings import ProfileSettingsRepository
 from jays_tools.architecture import DomainUseCase, Repositories
 

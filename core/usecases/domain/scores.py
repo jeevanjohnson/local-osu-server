@@ -9,9 +9,9 @@ import ossapi.models
 import core.usecases.domain.calculator.position as score_position_calculator_usecases
 import core.usecases.domain.beatmap as domain_beatmap_usecases
 import core.usecases.application.score_ranking as score_ranking_usecases
-import core.usecases.osu_api as osu_api_usecases
+import core.usecases.domain.osu_api as osu_api_usecases
 from server.adapters.osu_protocol.osu.score_submission.score import ScoreData
-import core.usecases.osu_api as osu_api_usecases
+import core.usecases.domain.osu_api as osu_api_usecases
 import ossapi.enums
 import asyncio
 import numpy as np

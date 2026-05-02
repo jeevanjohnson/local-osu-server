@@ -1,6 +1,5 @@
 from enum import IntEnum
 import ossapi.enums
-import
 
 
 class RankStatus(IntEnum):

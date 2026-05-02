@@ -3,6 +3,7 @@ from jays_tools.sql_database import MigratableSQLModel
 from pydantic import Field
 from pathlib import Path
 
+
 class OsuFileLocationsV1(MigratableSQLModel, AdapterModel, table=True):
     songs_folder_directory: Path = Field(default_factory=Path)
 
@@ -15,5 +16,6 @@ class OsuFileLocationsV1(MigratableSQLModel, AdapterModel, table=True):
     path_to_id: dict[Path, int] = Field(default_factory=dict)
     path_to_set_id: dict[Path, int] = Field(default_factory=dict)
     path_to_filename: dict[Path, str] = Field(default_factory=dict)
+
 
 OsuFileLocations = OsuFileLocationsV1

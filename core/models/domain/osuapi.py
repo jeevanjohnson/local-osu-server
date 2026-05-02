@@ -94,7 +94,7 @@ class OsuApiScore:
         score_id = (
             score.legacy_score_id or
             score.id or
-            0
+            None
         )
 
         valid_replay_avaliable = (

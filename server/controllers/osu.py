@@ -14,7 +14,7 @@ import core.usecases.domain.beatmap as beatmap_domain
 from core.usecases.application.beatmaps import BeatmapStatus
 import core.usecases.application.leaderboards as leaderboards_usecases
 from server.adapters.osu_protocol.osu.enums import LeaderboardType
-from core.usecases.osu_api import InvalidOsuApiCredentialsError
+from core.usecases.domain.osu_api import InvalidOsuApiCredentialsError
 import time
 from fastapi import Request, Form, File
 from fastapi.responses import RedirectResponse
@@ -94,77 +94,102 @@ async def get_leaderboard(
         GameMode(raw_mode_arg),
         Mods.from_stable_int(raw_mods_arg)
     )
-
-    t0 = time.time()
     try:
-        beatmap_result = await beatmap_usecases.from_leaderboard_request(
-            filename=map_filename,
-            md5=map_md5,
-        )
-    except InvalidOsuApiCredentialsError:
-        client_state_usecases.restart_client()
-        return Response(b"error: no")
-    t1 = time.time()
-    print(
-        f"[TIMING] beatmap lookup for '{map_filename}': {(t1-t0)*1000:.2f}ms")
-
-    beatmap = beatmap_result.beatmap
-    beatmap_status = beatmap_result.status
-
-    if beatmap_status in (BeatmapStatus.UNSUBMITTED, BeatmapStatus.NEEDS_UPDATE):
-        client_state.beatmap.md5 = ""
-        client_state.beatmap.id = 0
-        client_state.beatmap.set_id = 0
-        client_state.beatmap.is_difficulty_adjusted = False
-
-        client_state = player.update_client_state(client_state)
-
-        if beatmap_status == BeatmapStatus.NEEDS_UPDATE:
-            leaderboard = UpdateBeatmapRequestLeaderboard()
+        if await BEATMAP_DOMAIN_USECASE.is_difficulty_adjusted(map_filename):
+            beatmap = await BEATMAP_DOMAIN_USECASE.get_difficulty_adjusted_beatmap(map_filename, map_md5)
         else:
-            leaderboard = NotSubmittedLeaderboard()
-
-        return Response(
-            leaderboard.serialize()
-        )
+            beatmap = await BEATMAP_DOMAIN_USECASE.get_by_md5(map_md5)
+    except Exception:  # TODO: api credential error
+        await PLAYER_DOMAIN_USECASE.relog()
+        return Response(b"error: no")
 
     if beatmap is None:
-        return Response(b"error: no")
+        if BEATMAP_DOMAIN_USECASE.is_unsubmitted(map_md5):
+            leaderboard = NotSubmittedLeaderboard()
+        else:
+            leaderboard = UpdateBeatmapRequestLeaderboard()
 
-    client_state.beatmap.md5 = beatmap.md5
-    client_state.beatmap.id = beatmap.osu_id
-    client_state.beatmap.set_id = beatmap.osu_set_id
-    client_state.beatmap.is_difficulty_adjusted = beatmap.difficulty_adjusted
-
-    client_state = player.update_client_state(client_state)
-
-    if player.name in beatmap.status_override:
-        beatmap_status = beatmap.status_override[player.name]
-    else:
-        beatmap_status = beatmap.status
-
-    if not beatmap_status.has_leaderboards():
-        leaderboard = GraveyardLeaderboard()
+        await PLAYER_DOMAIN_USECASE.clear_beatmap_reference()
         return Response(
             leaderboard.serialize()
         )
 
-    leaderboard_type = LeaderboardType(raw_leaderboard_type)
-
-    try:
-        leaderboard = await leaderboards_usecases.from_client_request(
-            beatmap=beatmap,
-            beatmap_status=beatmap_status,
-            player=player,
-            leaderboard_type=leaderboard_type,
-        )
-    except InvalidOsuApiCredentialsError:
-        client_state_usecases.restart_client()
-        return Response(b"error: no")
+    leaderboard = LEADERBOARD_USECASE.get_for_beatmap(beatmap)
 
     return Response(
         leaderboard.serialize()
     )
+
+    # t0 = time.time()
+    # try:
+    #     beatmap_result = await beatmap_usecases.from_leaderboard_request(
+    #         filename=map_filename,
+    #         md5=map_md5,
+    #     )
+    # except InvalidOsuApiCredentialsError:
+    #     client_state_usecases.restart_client()
+    #     return Response(b"error: no")
+    # t1 = time.time()
+    # print(
+    #     f"[TIMING] beatmap lookup for '{map_filename}': {(t1-t0)*1000:.2f}ms")
+
+    # beatmap = beatmap_result.beatmap
+    # beatmap_status = beatmap_result.status
+
+    # if beatmap_status in (BeatmapStatus.UNSUBMITTED, BeatmapStatus.NEEDS_UPDATE):
+    #     client_state.beatmap.md5 = ""
+    #     client_state.beatmap.id = 0
+    #     client_state.beatmap.set_id = 0
+    #     client_state.beatmap.is_difficulty_adjusted = False
+
+    #     client_state = player.update_client_state(client_state)
+
+    #     if beatmap_status == BeatmapStatus.NEEDS_UPDATE:
+    #         leaderboard = UpdateBeatmapRequestLeaderboard()
+    #     else:
+    #         leaderboard = NotSubmittedLeaderboard()
+
+    #     return Response(
+    #         leaderboard.serialize()
+    #     )
+
+    # if beatmap is None:
+    #     return Response(b"error: no")
+
+    # client_state.beatmap.md5 = beatmap.md5
+    # client_state.beatmap.id = beatmap.osu_id
+    # client_state.beatmap.set_id = beatmap.osu_set_id
+    # client_state.beatmap.is_difficulty_adjusted = beatmap.difficulty_adjusted
+
+    # client_state = player.update_client_state(client_state)
+
+    # if player.name in beatmap.status_override:
+    #     beatmap_status = beatmap.status_override[player.name]
+    # else:
+    #     beatmap_status = beatmap.status
+
+    # if not beatmap_status.has_leaderboards():
+    #     leaderboard = GraveyardLeaderboard()
+    #     return Response(
+    #         leaderboard.serialize()
+    #     )
+
+    # leaderboard_type = LeaderboardType(raw_leaderboard_type)
+
+    # try:
+    #     leaderboard = await leaderboards_usecases.from_client_request(
+    #         beatmap=beatmap,
+    #         beatmap_status=beatmap_status,
+    #         player=player,
+    #         leaderboard_type=leaderboard_type,
+    #     )
+    # except InvalidOsuApiCredentialsError:
+    #     client_state_usecases.restart_client()
+    #     return Response(b"error: no")
+
+    # return Response(
+    #     leaderboard.serialize()
+    # )
 
 
 @osu.get("/web/maps/{map_filename}")
@@ -201,7 +226,6 @@ async def osuSubmitModularSelector(
     osu_version: str = Form(..., alias="osuver"),
     client_hash_b64: bytes = Form(..., alias="s"),
     fl_cheat_screenshot: bytes | None = File(None, alias="i"),
-    player: Player | None = Depends(dependencies.player)
 ):
     if player is None:
         client_state_usecases.restart_client()

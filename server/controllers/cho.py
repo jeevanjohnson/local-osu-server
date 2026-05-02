@@ -115,7 +115,7 @@ async def on_friend_add(
 
 
 @register_packet_handler
-async def on_send_public_message(
+async def on_message(
     packet: SendMessage
 ) -> None:
     # TODO: messages

@@ -6,18 +6,7 @@ from server.adapters.osu_protocol.cho.client import parse_login_data
 import core.services.cho as cho_services
 from typing import Literal
 from core.usecases.domain.player import Player
-import core.usecases.osu_api as osu_api_usecases
-
-
-async def player() -> Player | None:
-    result = auth_usecases.current_logged_in_profile()
-
-    if result is None:
-        return None
-
-    profile_name, profile = result
-
-    return Player(profile_name)
+import core.usecases.domain.osu_api as osu_api_usecases
 
 
 async def login_response(

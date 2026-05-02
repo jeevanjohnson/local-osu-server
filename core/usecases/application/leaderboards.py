@@ -4,7 +4,7 @@ from server.adapters.osu_protocol.osu.enums import LeaderboardType
 from server.adapters.osu_protocol.osu.leaderboard.leaderboard import Leaderboard, LeaderboardHeader, LeaderboardScore
 import core.usecases.domain.scores as scores_usecases
 import asyncio
-import core.usecases.osu_api as osu_api_usecases
+import core.usecases.domain.osu_api as osu_api_usecases
 import core.usecases.application.score_ranking as score_ranking_usecases
 from core.models.domain.gameplay.rank_status import RankStatus
 from core.models.domain.gameplay.mods import Mods

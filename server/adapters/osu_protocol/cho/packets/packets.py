@@ -67,15 +67,14 @@ class ClientPacketReader:
 
 
 class ClientPacketBase:
-    def __init_subclass__(cls, *packet_id: ClientToServer, **kwargs):
-        super().__init_subclass__(**kwargs)
+    def __init_subclass__(cls, packet_id: ClientToServer | tuple[ClientToServer, ...], *args, **kwargs):
+        super().__init_subclass__(*args, **kwargs)
 
-        if not packet_id:
-            raise ValueError(
-                "ClientPacketBase subclasses must have an 'id' argument")
-
-        for id in packet_id:
-            READABLE_PACKETS[id] = cls
+        if isinstance(packet_id, tuple):
+            for id in packet_id:
+                READABLE_PACKETS[id] = cls
+        else:
+            READABLE_PACKETS[packet_id] = cls
 
     @classmethod
     def deserialize(cls, packet_body: ClientPacketReader) -> "Self":
@@ -418,9 +417,9 @@ def player_snapshot(
     )
 
 
-def force_relog(
+def relog(
+    timeout: int,
     notification: str | None = None,
-    timeout: int = 0
 ) -> ServerPacket | ServerPacketStream:
     packet = ServerPacket(
         id=ServerToClient.RESTART,
@@ -433,6 +432,10 @@ def force_relog(
         packet += notify(notification)
 
     return packet
+
+
+def force_relog() -> ServerPacket | ServerPacketStream:
+    return relog(timeout=0)
 
 
 def player_logged_out(user_id: int) -> ServerPacket:

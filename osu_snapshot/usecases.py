@@ -43,7 +43,8 @@ class OsuSnapShotDomainUseCase(DomainUseCase):
             pp_and_ranks.extend(
                 self.services.scraper.extract_pp_and_ranks(ranking_page_html))
             print(
-                f"Scraped {len(pp_and_ranks)} pp and rank pairs from page {page}/200 of {mode} mode.")
+                f"Scraped {len(pp_and_ranks)} pp and rank pairs from page {page}/200 of {mode} mode."
+            )
             # be nice to the server and avoid rate limits
             await asyncio.sleep(2)
 
