@@ -196,6 +196,13 @@ class PlayerDomainUseCase(DomainUseCase):
 
         await self.core_domain_usecases.client_state.update_client_state(client_state)
 
+    async def get_scoring_type(self) -> ScoringType:
+        client_state = await self.core_domain_usecases.client_state.get_client_state()
+        if client_state is None:
+            return ScoringType.SCOREV1
+
+        return client_state.current_scoring_mode
+
     async def relog(self) -> None:
         await self.append_outgoing_packet(
             force_relog()

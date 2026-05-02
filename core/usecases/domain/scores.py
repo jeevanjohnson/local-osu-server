@@ -17,6 +17,7 @@ import asyncio
 import numpy as np
 from scipy.interpolate import RBFInterpolator
 
+
 async def calculate_total_score_v1(
     beatmap: Beatmap,
     count300: int,
@@ -28,7 +29,7 @@ async def calculate_total_score_v1(
     game_mode: GameMode
 ) -> int:
     api_client = osu_api_usecases.get_api_client()
-    
+
     try:
         tasks = [
             api_client.beatmap_scores(
@@ -50,12 +51,12 @@ async def calculate_total_score_v1(
     except ValueError:
         # if the beatmap doesn't exist on the API, we can't calculate a scorev1 value
         return 0
-    
+
     if not first_scores.scores and not second_scores.scores:
         return 0
 
     scores_dict = {
-        (s.user_id, s.ended_at.timestamp()): s 
+        (s.user_id, s.ended_at.timestamp()): s
         for s in first_scores.scores + second_scores.scores
     }
     scores = list(scores_dict.values())
@@ -64,21 +65,23 @@ async def calculate_total_score_v1(
     if len(scores) < 4:
         avg_score = np.mean([s.total_score for s in scores])
         return max(1, int(avg_score * 0.95))  # Conservative estimate
-    
+
     # Strategy 2: Medium scores - use closest match
     if len(scores) < 7:
-        query_accuracy = (count300 + count100/3 + count50/5) / (count300 + count100 + count50 + count_miss) if (count300 + count100 + count50 + count_miss) > 0 else 0
-        
+        query_accuracy = (count300 + count100/3 + count50/5) / (count300 + count100 +
+                                                                count50 + count_miss) if (count300 + count100 + count50 + count_miss) > 0 else 0
+
         closest_score = min(
             scores,
             key=lambda s: abs(
-                ((s.statistics.great or 0) + (s.statistics.ok or 0)/3 + (s.statistics.meh or 0)/5) 
+                ((s.statistics.great or 0) + (s.statistics.ok or 0) /
+                 3 + (s.statistics.meh or 0)/5)
                 / max(1, (s.statistics.great or 0) + (s.statistics.ok or 0) + (s.statistics.meh or 0) + (s.statistics.miss or 0))
                 - query_accuracy
             )
         )
         return max(1, int(closest_score.total_score * 0.98))
-    
+
     # Strategy 3: Enough scores - use RBF interpolation
     input_parameters = np.array([
         [
@@ -100,7 +103,7 @@ async def calculate_total_score_v1(
 
     try:
         rbf_interpolator = RBFInterpolator(
-            input_parameters, 
+            input_parameters,
             log_output_scores,
             kernel="multiquadric",
             epsilon=1.0,
@@ -108,11 +111,11 @@ async def calculate_total_score_v1(
         )
 
         query = np.array([
-            float(count300), 
-            float(count100), 
-            float(count50), 
-            float(count_miss), 
-            float(combo), 
+            float(count300),
+            float(count100),
+            float(count50),
+            float(count_miss),
+            float(combo),
             mods.multiplier(game_mode)
         ])
 
@@ -124,6 +127,7 @@ async def calculate_total_score_v1(
         print(f"RBF interpolation failed: {e}")
         return 0
 
+
 def calculate_total_score_v2(
     count300: int,
     count100: int,
@@ -134,42 +138,44 @@ def calculate_total_score_v2(
     mods: Mods,
     game_mode: GameMode
 ) -> int:
-        total_hits = count300 + count100 + count50 + count_miss
+    total_hits = count300 + count100 + count50 + count_miss
 
-        if total_hits == 0:
-            return 0
+    if total_hits == 0:
+        return 0
 
-        # Accuracy calculation (standard osu! weighting)
-        accuracy = (count300 + count100 / 3 + count50 / 5) / total_hits
+    # Accuracy calculation (standard osu! weighting)
+    accuracy = (count300 + count100 / 3 + count50 / 5) / total_hits
 
-        # Combo progress: achieved combo / max possible combo
-        combo_progress = combo / beamtap_max_combo if beamtap_max_combo > 0 else 0
+    # Combo progress: achieved combo / max possible combo
+    combo_progress = combo / beamtap_max_combo if beamtap_max_combo > 0 else 0
 
-        # Accuracy progress: in osu!standard this is always 1.0
-        accuracy_progress = 1.0
+    # Accuracy progress: in osu!standard this is always 1.0
+    accuracy_progress = 1.0
 
-        # Correct lazer scoring formula (two 500k terms)
-        hit_score = (
-            500_000 * accuracy * combo_progress
-            + 500_000 * (accuracy**5) * accuracy_progress
-        )
+    # Correct lazer scoring formula (two 500k terms)
+    hit_score = (
+        500_000 * accuracy * combo_progress
+        + 500_000 * (accuracy**5) * accuracy_progress
+    )
 
-        # Apply the 0.96× "Classic" multiplier (always present for imported scores)
-        # Then apply any mod multiplier from the original play (DT, HT, etc.)
-        return round(
-            hit_score * 0.96 * mods.multiplier(game_mode)
-        )
+    # Apply the 0.96× "Classic" multiplier (always present for imported scores)
+    # Then apply any mod multiplier from the original play (DT, HT, etc.)
+    return round(
+        hit_score * 0.96 * mods.multiplier(game_mode)
+    )
+
 
 def generate_unique_score_id() -> int:
     score_repo = ScoresRepository()
     return score_repo.generate_new_score_id()
 
+
 def build_from_score_data(
-    score_id: int,    
-    score_data: ScoreData, 
+    score_id: int,
+    score_data: ScoreData,
     total_score_v1: int,
     total_score_v2: int,
-    difficulty_adjusted_map_score: bool, 
+    difficulty_adjusted_map_score: bool,
     original_md5: str,
     pp: int
 ) -> Score:
@@ -177,7 +183,8 @@ def build_from_score_data(
 
     score.id = score_id
     score.profile_name = score_data.username
-    print(f"[BUILD_SCORE] Profile name set to: '{score.profile_name}' (from score_data.username)")
+    print(
+        f"[BUILD_SCORE] Profile name set to: '{score.profile_name}' (from score_data.username)")
     score.beatmap.md5 = score_data.beatmap_md5
     score.beatmap.difficulty_adjusted = difficulty_adjusted_map_score
     score.beatmap.original_md5 = original_md5
@@ -201,10 +208,12 @@ def build_from_score_data(
     score.epoch_time_set_at = int(score_data.play_time.timestamp())
     return score
 
+
 def add(score: Score):
     scores_repo = ScoresRepository()
     submitted_score = scores_repo.add_score(score.beatmap.md5, score)
     return submitted_score
+
 
 def get_map_scores_for(profile_name: str, beatmap_md5: str) -> list[Score]:
     scores_repo = ScoresRepository()
@@ -212,13 +221,16 @@ def get_map_scores_for(profile_name: str, beatmap_md5: str) -> list[Score]:
 
     return map_scores
 
+
 def get_all_map_scores_for_profile(profile_name: str, game_mode: GameMode) -> list[AllMapScoresForProfileResult]:
-    print(f"[GET_ALL_SCORES] Retrieving scores for profile: '{profile_name}' in {game_mode}")
+    print(
+        f"[GET_ALL_SCORES] Retrieving scores for profile: '{profile_name}' in {game_mode}")
     scores_repo = ScoresRepository()
     return scores_repo.get_all_map_scores_for_profile(profile_name, game_mode)
 
+
 def get_personal_best_for(
-    profile_name: str, 
+    profile_name: str,
     beatmap_md5: str,
     scoring_type: ScoringType,
     game_mode: GameMode,
@@ -227,7 +239,8 @@ def get_personal_best_for(
     scores_repo = ScoresRepository()
     map_scores = scores_repo.get_scores_for(profile_name, beatmap_md5)
 
-    map_scores = [score for score in map_scores if score.game_mode == game_mode]
+    map_scores = [
+        score for score in map_scores if score.game_mode == game_mode]
 
     if with_mods is not None:
         map_scores = [score for score in map_scores if score.mods == with_mods]
@@ -244,11 +257,12 @@ def get_personal_best_for(
             return score.statistics.pp
 
     personal_best = max(map_scores, key=score_sort_key)
-    
+
     return personal_best
 
+
 async def _get_position_for(
-    score: Score, 
+    score: Score,
     beatmap: Beatmap,
     bancho_scores: list[ossapi.models.Score],
     scoring_type: ScoringType
@@ -261,9 +275,10 @@ async def _get_position_for(
         scoring_type=scoring_type,
     )
 
+
 async def get_position_for(
-    score: Score, 
-    beatmap: Beatmap, 
+    score: Score,
+    beatmap: Beatmap,
     settings: ProfileSettings,
     game_mode: GameMode
 ) -> int:

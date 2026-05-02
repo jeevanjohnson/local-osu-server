@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from datetime import datetime
 from core.models.domain.normalizers.mods import Mods
 from core.models.domain.normalizers.rank_status import RankStatus
 from ossapi import Beatmap, Beatmapset, Score, UserCompact
@@ -18,8 +19,13 @@ class OsuApiBeatmap:
     mode: GameMode
     play_count: int
     pass_count: int
-    last_updated: int
+    last_updated: datetime
     average_rating: float
+    cs: float
+    ar: float
+    hp: float
+    od: float
+    star_rating: float
 
     @classmethod
     def from_api(cls, beatmap: Beatmap, beatmap_set: Beatmapset) -> "OsuApiBeatmap":
@@ -37,8 +43,44 @@ class OsuApiBeatmap:
             mode=GameMode.from_api(beatmap.mode),
             play_count=beatmap.playcount,
             pass_count=beatmap.passcount,
-            last_updated=int(beatmap.last_updated.timestamp()),
+            last_updated=beatmap.last_updated,
             average_rating=beatmap.rating,
+            star_rating=beatmap.difficulty_rating,
+            cs=beatmap.cs,
+            ar=beatmap.ar,
+            hp=beatmap.drain,
+            od=beatmap.accuracy,
+        )
+
+
+@dataclass
+class OsuApiBeatmapSet:
+    id: int
+    artist: str
+    title: str
+    creator: str
+    has_video: bool
+    has_storyboard: bool
+    last_updated: datetime
+    status: RankStatus
+    beatmaps: list[OsuApiBeatmap]
+
+    @classmethod
+    def from_api(cls, beatmap_set: Beatmapset) -> "OsuApiBeatmapSet":
+        assert beatmap_set.beatmaps, "Beatmapset's beatmaps are required to create OsuApiBeatmapSet"
+        return cls(
+            id=beatmap_set.id,
+            artist=beatmap_set.artist,
+            title=beatmap_set.title,
+            creator=beatmap_set.creator,
+            has_video=beatmap_set.video,
+            has_storyboard=beatmap_set.storyboard,
+            last_updated=beatmap_set.last_updated,
+            status=RankStatus.from_api(beatmap_set.status),
+            beatmaps=[
+                OsuApiBeatmap.from_api(beatmap, beatmap_set)
+                for beatmap in beatmap_set.beatmaps
+            ]
         )
 
 

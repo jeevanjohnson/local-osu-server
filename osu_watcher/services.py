@@ -3,7 +3,7 @@ from pathlib import Path
 import os
 from core.models.adapters.database.osu_file_locations import OsuFileLocations
 from osu_watcher.models.domain import ParsedOsuFile
-from core.services.osufile import OsuFileService as BaseOsuFileService
+from core.services.osu_file import OsuFileService as BaseOsuFileService
 
 
 class OsuFileLocationService(Service):

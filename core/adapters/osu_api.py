@@ -1,4 +1,6 @@
 
+from enum import IntEnum, unique
+
 from jays_tools.architecture import Adapter
 from datetime import datetime, timedelta
 from typing import Any
@@ -6,15 +8,37 @@ import asyncio
 
 from ossapi import OssapiAsync as BaseOssapiAsync, ScoreType
 from ossapi import Cursor as BaseCursor
+import ossapi
+import ossapi.enums
 
 from core.models.domain.normalizers.mods import Mods
-from core.models.domain.osuapi import OsuApiBeatmap, OsuApiScore
+from core.models.domain.normalizers.rank_status import RankStatus
+from core.models.domain.osuapi import OsuApiBeatmap, OsuApiBeatmapSet, OsuApiScore
 from core.models.domain.normalizers.game_mode import GameMode
 
 ONE_MINUTE = timedelta(minutes=1)
 
 
+@unique
+class osuDirectCategory(IntEnum):
+    RANKED = 0
+    PENDING = 2
+    QUALIFIED = 3
+    ALL = 4
+    GRAVEYARD = 5
+    RANKED_PLAYED = 7
+    LOVED = 8
+
+
 class CursorString(str, BaseCursor):
+    pass
+
+
+class InvalidApiCredentialsError(Exception):
+    pass
+
+
+class APIRateLimitExceededError(Exception):
     pass
 
 
@@ -33,7 +57,7 @@ class OssapiAsync(BaseOssapiAsync):
             self.last_call_time = datetime.now()
 
         if self.api_calls >= 60:
-            raise SystemExit(
+            raise APIRateLimitExceededError(
                 "More than 60 API calls in the last minute! Please contact a developer ASAP!!"
             )
 
@@ -64,10 +88,35 @@ class OssapiAsync(BaseOssapiAsync):
 
 class OsuApiV2Adapter(Adapter):
     def get_client(self, client_id: int, client_secret: str) -> OssapiAsync:
-        return OssapiAsync(
-            client_id=client_id,
-            client_secret=client_secret
-        )
+        try:
+            return OssapiAsync(
+                client_id=client_id,
+                client_secret=client_secret
+            )
+        except ValueError:
+            raise InvalidApiCredentialsError(
+                "Invalid osu! API v2 client ID or secret"
+            )
+
+    def osu_direct_to_api_category(self, category: int) -> ossapi.enums.BeatmapsetSearchCategory:
+        return {
+            osuDirectCategory.ALL: ossapi.enums.BeatmapsetSearchCategory.ANY,
+            osuDirectCategory.RANKED: ossapi.enums.BeatmapsetSearchCategory.RANKED,
+            osuDirectCategory.RANKED_PLAYED: ossapi.enums.BeatmapsetSearchCategory.RANKED,
+            osuDirectCategory.LOVED: ossapi.enums.BeatmapsetSearchCategory.LOVED,
+            osuDirectCategory.QUALIFIED: ossapi.enums.BeatmapsetSearchCategory.QUALIFIED,
+            osuDirectCategory.PENDING: ossapi.enums.BeatmapsetSearchCategory.PENDING,
+            osuDirectCategory.GRAVEYARD: ossapi.enums.BeatmapsetSearchCategory.GRAVEYARD,
+        }[osuDirectCategory(category)]
+
+    def osu_direct_to_api_game_mode(self, mode: int) -> ossapi.enums.BeatmapsetSearchMode:
+        return {
+            -1: ossapi.enums.BeatmapsetSearchMode.ANY,
+            0: ossapi.enums.BeatmapsetSearchMode.OSU,
+            1: ossapi.enums.BeatmapsetSearchMode.TAIKO,
+            2: ossapi.enums.BeatmapsetSearchMode.CATCH,
+            3: ossapi.enums.BeatmapsetSearchMode.MANIA,
+        }[mode]
 
     async def get_beatmap(
         self,
@@ -248,3 +297,26 @@ class OsuApiV2Adapter(Adapter):
             return None
 
         return score
+
+    async def search_beatmaps(
+        self,
+        client: OssapiAsync,
+        query: str,
+        category: ossapi.enums.BeatmapsetSearchCategory,
+        mode: ossapi.enums.BeatmapsetSearchMode,
+        cursor: CursorString | None = None,
+    ) -> list[OsuApiBeatmapSet]:
+        try:
+            beatmap_sets = await client.search_beatmapsets(
+                query=query,
+                category=category,
+                mode=mode,
+                cursor=cursor
+            )
+        except ValueError:
+            return []
+
+        return [
+            OsuApiBeatmapSet.from_api(beatmap_set)
+            for beatmap_set in beatmap_sets.beatmapsets
+        ]

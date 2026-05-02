@@ -1,9 +1,12 @@
-from core.adapters.osuapi import OsuApiV2Adapter, OssapiAsync
+import ossapi.enums
+
+from core.adapters.osu_api import CursorString, OsuApiV2Adapter, OssapiAsync
 from core.models.domain.normalizers.mods import Mods
-from core.models.domain.osuapi import OsuApiBeatmap, OsuApiScore
+from core.models.domain.osuapi import OsuApiBeatmap, OsuApiBeatmapSet, OsuApiScore
 from core.usecases.domain.server_settings import ServerSettingsDomainUseCase
 from jays_tools.architecture import DomainUseCase, Adapters, DomainUseCases
 from core.models.domain.normalizers.game_mode import GameMode
+from core.adapters.osu_api import InvalidApiCredentialsError
 
 
 class OsuApiV2Adapters(Adapters):
@@ -26,7 +29,7 @@ class OsuApiV2DomainUseCase(DomainUseCase):
         client_secret = await self.lower_level_use_cases.server_settings.get_osu_api_v2_client_secret()
 
         if client_id is None or client_secret is None:
-            raise ValueError(
+            raise InvalidApiCredentialsError(
                 "osu! API v2 client ID and secret must be set in server settings"
             )
 
@@ -132,3 +135,31 @@ class OsuApiV2DomainUseCase(DomainUseCase):
             lazer_only,
             stable_only
         )
+
+    async def search_beatmaps(
+        self,
+        query: str,
+        category: ossapi.enums.BeatmapsetSearchCategory,
+        mode: ossapi.enums.BeatmapsetSearchMode,
+        cursor: CursorString | None = None
+    ) -> list[OsuApiBeatmapSet]:
+        client = await self.get_api_client()
+        return await self.adapters.osu_api_v2.search_beatmaps(
+            client,
+            query,
+            category,
+            mode,
+            cursor
+        )
+
+    def osu_direct_to_api_category(
+        self,
+        direct_category: int
+    ) -> ossapi.enums.BeatmapsetSearchCategory:
+        return self.adapters.osu_api_v2.osu_direct_to_api_category(direct_category)
+
+    def osu_direct_to_api_game_mode(
+        self,
+        direct_mode: int
+    ) -> ossapi.enums.BeatmapsetSearchMode:
+        return self.adapters.osu_api_v2.osu_direct_to_api_game_mode(direct_mode)

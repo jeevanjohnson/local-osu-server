@@ -87,14 +87,14 @@ class OsuDomainUsecases(DomainUseCase):
 
         return osu_file_locations
 
-    async def is_songs_folder_initilized_in_database(self, songs_folder: Path) -> bool:
-        if await self.repositories.osu_file_locations.get(songs_folder) is None:
+    async def is_songs_folder_initilized_in_database(self) -> bool:
+        if await self.repositories.osu_file_locations.get() is None:
             return False
 
         return True
 
     async def init_songs_folder_in_database(self, songs_folder: Path) -> None:
-        osu_file_locations = await self.repositories.osu_file_locations.create(songs_folder)
+        osu_file_locations = await self.repositories.osu_file_locations.create()
 
         osu_file_locations = self.sync(
             osu_file_locations,
@@ -105,7 +105,7 @@ class OsuDomainUsecases(DomainUseCase):
         await self.repositories.osu_file_locations.update(osu_file_locations)
 
     async def refresh_osu_file_locations_in_database(self, songs_folder: Path) -> None:
-        osu_file_locations = await self.repositories.osu_file_locations.get(songs_folder)
+        osu_file_locations = await self.repositories.osu_file_locations.get()
         if osu_file_locations is None:
             raise Exception("Songs folder not initialized in database")
 

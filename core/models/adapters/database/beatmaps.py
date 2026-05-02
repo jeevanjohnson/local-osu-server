@@ -27,8 +27,8 @@ class BeatmapV1(MigratableSQLModel, table=True):
     ar: float = Field(default=0.0)
     hp: float = Field(default=0.0)
     od: float = Field(default=0.0)
-    object_count: int = Field(default=0)
-    drain_time_seconds: int = Field(default=0)
+    # object_count: int = Field(default=0)
+    # drain_time_seconds: int = Field(default=0)
 
     play_count: int = Field(default=0)
     play_count_timestamp: datetime = Field(default_factory=datetime.now)

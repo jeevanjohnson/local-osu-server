@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
 
+from core.models.adapters.database.beatmaps import Beatmap
 from server.adapters.osu_protocol.osu.enums import BeatmapSetStatus
 from server.adapters.osu_protocol.enums import ClientMods
 

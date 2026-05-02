@@ -5,8 +5,6 @@ from pathlib import Path
 
 
 class OsuFileLocationsV1(MigratableSQLModel, AdapterModel, table=True):
-    songs_folder_directory: Path = Field(default_factory=Path)
-
     md5_to_path: dict[str, Path] = Field(default_factory=dict)
     id_to_paths: dict[int, list[Path]] = Field(default_factory=dict)
     set_id_to_paths: dict[int, list[Path]] = Field(default_factory=dict)

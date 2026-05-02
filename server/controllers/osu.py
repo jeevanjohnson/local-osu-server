@@ -1,11 +1,10 @@
 from fastapi import APIRouter, Depends, Path, Query, Response, status, Header
 from typing import Literal
-from server.adapters.osu_protocol.osu.leaderboard.leaderboard import NotSubmittedLeaderboard, UpdateBeatmapRequestLeaderboard, GraveyardLeaderboard
+from core.adapters.osu_api import InvalidApiCredentialsError
 import server.dependencies as dependencies
 from core.usecases.domain.player import Player
 import orjson
 from fastapi.responses import RedirectResponse
-import core.usecases.domain.port as port_usecases
 import core.usecases.domain.client_state as client_state_usecases
 from core.models.domain.normalizers.game_mode import GameMode
 from core.models.domain.normalizers.mods import Mods
@@ -13,7 +12,7 @@ import core.usecases.application.beatmaps as beatmap_usecases
 import core.usecases.domain.beatmap as beatmap_domain
 from core.usecases.application.beatmaps import BeatmapStatus
 import core.usecases.application.leaderboards as leaderboards_usecases
-from server.adapters.osu_protocol.osu.enums import LeaderboardType
+from server.adapters.osu_protocol.osu.leaderboard.enums import LeaderboardType
 from core.usecases.domain.osu_api import InvalidOsuApiCredentialsError
 import time
 from fastapi import Request, Form, File
@@ -22,9 +21,14 @@ import core.usecases.domain.scores as domain_scores_usecases
 import core.usecases.application.scores as scores_usecases
 import server.adapters.osu_protocol.osu.score_submission.score as score_submission_protocol
 from server.usecases.domain.player import PlayerDomainUseCase
+from core.usecases.domain.beatmap import BeatmapDomainUseCase
 from constants import Ports
+from server.adapters.osu_protocol.osu.leaderboard.leaderboard import update_available_leaderboard, not_submitted_leaderboard
+from server.usecases.domain.leaderboard import LeaderboardDomainUseCase
 
 PLAYER_DOMAIN_USECASE = PlayerDomainUseCase()
+BEATMAP_DOMAIN_USECASE = BeatmapDomainUseCase()
+LEADERBOARD_USECASE = LeaderboardDomainUseCase()
 
 osu = APIRouter(
     prefix="/osu",
@@ -95,26 +99,29 @@ async def get_leaderboard(
         Mods.from_stable_int(raw_mods_arg)
     )
     try:
-        if await BEATMAP_DOMAIN_USECASE.is_difficulty_adjusted(map_filename):
-            beatmap = await BEATMAP_DOMAIN_USECASE.get_difficulty_adjusted_beatmap(map_filename, map_md5)
+        if BEATMAP_DOMAIN_USECASE.is_difficulty_adjusted(map_filename):
+            beatmap = await BEATMAP_DOMAIN_USECASE.get_difficulty_adjusted_beatmap(map_md5, map_filename)
         else:
-            beatmap = await BEATMAP_DOMAIN_USECASE.get_by_md5(map_md5)
-    except Exception:  # TODO: api credential error
+            beatmap = await BEATMAP_DOMAIN_USECASE.get_beatmap(map_md5)
+    except InvalidApiCredentialsError:
         await PLAYER_DOMAIN_USECASE.relog()
         return Response(b"error: no")
 
     if beatmap is None:
         if BEATMAP_DOMAIN_USECASE.is_unsubmitted(map_md5):
-            leaderboard = NotSubmittedLeaderboard()
+            leaderboard = not_submitted_leaderboard()
         else:
-            leaderboard = UpdateBeatmapRequestLeaderboard()
+            leaderboard = update_available_leaderboard()
 
         await PLAYER_DOMAIN_USECASE.clear_beatmap_reference()
         return Response(
             leaderboard.serialize()
         )
 
-    leaderboard = LEADERBOARD_USECASE.get_for_beatmap(beatmap)
+    leaderboard = await LEADERBOARD_USECASE.get_leaderboard(
+        beatmap,
+        LeaderboardType(raw_leaderboard_type),
+    )
 
     return Response(
         leaderboard.serialize()
